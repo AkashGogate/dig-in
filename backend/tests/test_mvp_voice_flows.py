@@ -1,5 +1,7 @@
 """Voice flow checks: natural kitchen phrasing and the kitchen-voice role gate."""
 
+from pathlib import Path
+
 import test_mvp_core as core
 
 from app.mvp.menu import load_menu
@@ -37,3 +39,18 @@ def test_server_session_cannot_use_kitchen_voice(demo):
         source="voice",
     )
     assert response.status_code == 409
+
+
+def test_live_homophones_only_count_in_the_table_slot():
+    """Regressions from the first live DIG IN eval run (nova-3 transcripts)."""
+    from app.mvp.menu import load_menu as _load
+    from app.mvp.voice import parse_kitchen as _kitchen
+    from app.mvp.voice import parse_order as _order
+
+    menu = _load(Path(__file__).resolve().parents[1] / "fixtures/menus/dig-in.json")
+    started = _kitchen(menu, "Start table for bulldozer")
+    assert started["action"] == "start_dish" and started["table_id"] == "4"
+    assert _order(menu, "Table to, one tots", "2")["table_id"] == "2"
+    # smart_format used to merge "three, one backhoe" into "31": must block, never accept.
+    merged = _order(menu, "Table 31 backhoe without slaw", "3")
+    assert {f["code"] for f in merged["flags"]} >= {"table_mismatch"}

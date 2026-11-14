@@ -8,7 +8,7 @@ review candidates for Server orders; action/table/dish for Kitchen callouts.
   --mode mock      feeds the ground-truth transcript text (no audio, free).
                    Proves parser + scoring plumbing; NOT speech accuracy.
   --mode deepgram  transcribes each WAV with Deepgram prerecorded using the
-                   same params as the live adapter (nova-3, en, smart_format,
+                   same params as the live adapter (nova-3, en, punctuate, smart_format off,
                    mip_opt_out, menu keyterms). BILLABLE: refuses unless
                    --confirm-billable is passed, and prints the audio seconds
                    and estimated cost first. Run only with explicit approval.
@@ -42,7 +42,11 @@ def prerecorded_url(menu) -> str:
     params = [
         ("model", "nova-3"),
         ("language", "en"),
-        ("smart_format", "true"),
+        (
+            "smart_format",
+            "false",
+        ),  # live eval: smart_format merged "three, one backhoe" into "31"
+        ("punctuate", "true"),
         ("mip_opt_out", "true"),
         *(("keyterm", term) for term in keyterms(menu)),
     ]
@@ -91,6 +95,15 @@ def matches(expected: dict, actual: dict) -> bool:
     return True
 
 
+def outcome(flow: str, actual: dict, passed: bool) -> str:
+    """exact | flagged (blocked or no action: a human must step in) | wrong (accepted silently)."""
+    if passed:
+        return "exact"
+    if flow == "kitchen":
+        return "flagged" if actual["action"] is None else "wrong"
+    return "flagged" if actual["flag_codes"] else "wrong"
+
+
 def evaluate(mode: str, manifest_path: Path = MANIFEST_PATH) -> list[dict]:
     menu = load_menu(MENU_PATH)
     results = []
@@ -100,6 +113,7 @@ def evaluate(mode: str, manifest_path: Path = MANIFEST_PATH) -> list[dict]:
         else:
             text = transcribe(manifest_path.parent / clip["file"], menu)
         actual = observe(clip, text, menu)
+        passed = any(matches(e, actual) for e in clip["expected_any"])
         results.append(
             {
                 "name": clip["name"],
@@ -107,7 +121,8 @@ def evaluate(mode: str, manifest_path: Path = MANIFEST_PATH) -> list[dict]:
                 "condition": clip["condition"],
                 "heard": text,
                 "actual": actual,
-                "passed": any(matches(e, actual) for e in clip["expected_any"]),
+                "passed": passed,
+                "outcome": outcome(clip["flow"], actual, passed),
             }
         )
     return results
@@ -119,17 +134,30 @@ def scorecard(mode: str, results: list[dict]) -> str:
     else:
         banner = "DEEPGRAM: real nova-3 transcription of synthetic say clips (not a real kitchen)."
     rows = ["# DIG IN voice eval scorecard (" + mode + ")", "", banner, ""]
-    rows += ["| Flow | Condition | Passed |", "| --- | --- | --- |"]
+    rows += [
+        "Outcomes: **exact** = parsed as intended; **flagged** = blocked or no action, a human",
+        "must review (safe); **wrong** = accepted silently with the wrong content (unsafe).",
+        "",
+        "| Flow | Condition | Exact | Flagged | Wrong |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    count = lambda group, kind: sum(r["outcome"] == kind for r in group)  # noqa: E731
     for flow, condition in sorted({(r["flow"], r["condition"]) for r in results}):
         group = [r for r in results if (r["flow"], r["condition"]) == (flow, condition)]
-        passed = sum(r["passed"] for r in group)
-        rows.append(f"| {flow} | {condition} | {passed}/{len(group)} |")
-    total = sum(r["passed"] for r in results)
-    rows += ["", f"**Total: {total}/{len(results)}**", ""]
-    rows += ["| Clip | Pass | Heard |", "| --- | --- | --- |"]
+        rows.append(
+            f"| {flow} | {condition} | {count(group, 'exact')}/{len(group)} "
+            f"| {count(group, 'flagged')} | {count(group, 'wrong')} |"
+        )
+    rows += [
+        "",
+        f"**Total: {count(results, 'exact')}/{len(results)} exact, "
+        f"{count(results, 'flagged')} flagged, {count(results, 'wrong')} wrong**",
+        "",
+        "| Clip | Outcome | Heard |",
+        "| --- | --- | --- |",
+    ]
     for r in results:
-        verdict = "PASS" if r["passed"] else "FAIL"
-        rows.append("| " + r["name"] + " | " + verdict + " | " + r["heard"] + " |")
+        rows.append("| " + r["name"] + " | " + r["outcome"] + " | " + r["heard"] + " |")
     return NEWLINE.join(rows) + NEWLINE
 
 
@@ -157,8 +185,14 @@ def main(argv: list[str] | None = None) -> int:
             return 2
     results = evaluate(args.mode)
     SCORECARD_PATH.write_text(scorecard(args.mode, results))
-    passed = sum(r["passed"] for r in results)
-    print(f"{passed}/{len(results)} passed ({args.mode}); wrote {SCORECARD_PATH}")
+    kinds = {
+        k: sum(r["outcome"] == k for r in results)
+        for k in ("exact", "flagged", "wrong")
+    }
+    print(
+        f"{kinds['exact']}/{len(results)} exact, {kinds['flagged']} flagged, "
+        f"{kinds['wrong']} wrong ({args.mode}); wrote {SCORECARD_PATH}"
+    )
     return 0
 
 

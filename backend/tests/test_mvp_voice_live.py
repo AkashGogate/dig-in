@@ -111,6 +111,7 @@ def test_keyterms_come_from_menu_and_url_opts_out_of_retention_without_diarizati
     assert len(terms) == len(set(terms)) <= voice_live.MAX_KEYTERMS
     query = parse_qs(urlsplit(voice_live.listen_url(menu)).query)
     assert query["model"] == ["nova-3"] and query["mip_opt_out"] == ["true"]
+    assert query["smart_format"] == ["false"]  # keeps "three, one" from becoming "31"
     assert "diarize" not in query and "The Bulldozer" in query["keyterm"]
 
 

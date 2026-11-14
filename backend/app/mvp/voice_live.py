@@ -66,7 +66,11 @@ def listen_url(menu: MenuDocument) -> str:
     params = [
         ("model", "nova-3"),
         ("language", "en"),
-        ("smart_format", "true"),
+        (
+            "smart_format",
+            "false",
+        ),  # live eval: smart_format merged "three, one backhoe" into "31"
+        ("punctuate", "true"),
         ("interim_results", "true"),
         ("mip_opt_out", "true"),  # opt out of Deepgram's model-improvement retention
         *(("keyterm", term) for term in keyterms(menu)),

@@ -43,3 +43,13 @@ def test_deepgram_params_match_live_adapter():
     url = dig_in.prerecorded_url(dig_in.load_menu(dig_in.MENU_PATH))
     assert "model=nova-3" in url and "mip_opt_out=true" in url
     assert "keyterm=The+Bulldozer" in url and "diarize" not in url
+
+
+def test_outcome_separates_flagged_from_silently_wrong():
+    assert (
+        dig_in.outcome("server", {"flag_codes": ["table_mismatch"]}, False) == "flagged"
+    )
+    assert dig_in.outcome("server", {"flag_codes": []}, False) == "wrong"
+    assert dig_in.outcome("kitchen", {"action": None}, False) == "flagged"
+    assert dig_in.outcome("kitchen", {"action": "start_dish"}, False) == "wrong"
+    assert dig_in.outcome("server", {"flag_codes": []}, True) == "exact"
