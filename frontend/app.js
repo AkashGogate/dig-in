@@ -162,7 +162,7 @@ function flagMarkup(flag) {
   const mismatch = flag.code === "table_mismatch";
   const tableRequired = flag.code === "table_required";
   const candidates = flag.candidates?.map(id => menuItem(id)?.name || (typeof id === "string" ? id : JSON.stringify(id))) || [];
-  return `<article class="review-flag"><strong>${mismatch ? "Resolve the table mismatch" : tableRequired ? "Confirm the selected table" : "Review an uncertain draft"}</strong><p>${esc(flag.message || human(flag.code))}</p>${candidates.length ? `<p>Candidates: ${esc(candidates.join(", "))}</p>` : ""}<div class="actions">${mismatch || tableRequired ? `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="keep_selected_table" data-command>Keep selected table</button>${mismatch ? `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="use_spoken_table" data-command>Use spoken table</button>` : ""}` : `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="reviewed_remove_unknown" data-command>Reviewed — omit uncertain words</button>`}</div><p class="note">Use manual entries below for the intended item. No candidate is chosen automatically.</p></article>`;
+  return `<article class="review-flag"><strong>${mismatch ? "Resolve the table mismatch" : tableRequired ? "Confirm the selected table" : "Review an uncertain draft"}</strong><p>${esc(flag.message || human(flag.code))}</p>${candidates.length ? `<p>Candidates: ${esc(candidates.join(", "))}</p>` : ""}${["unknown_item", "ambiguous_item"].includes(flag.code) ? (flag.candidates || []).filter(id => menuItem(id)).map(id => `<button type="button" data-action="use-candidate" data-menu="${esc(id)}" data-command>Use ${esc(menuItem(id).name)}</button>`).join("") : ""}<div class="actions">${mismatch || tableRequired ? `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="keep_selected_table" data-command>Keep selected table</button>${mismatch ? `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="use_spoken_table" data-command>Use spoken table</button>` : ""}` : `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="reviewed_remove_unknown" data-command>Reviewed — omit uncertain words</button>`}</div><p class="note">Use manual entries below for the intended item. No candidate is chosen automatically.</p></article>`;
 }
 function refreshModifiers() {
   const modifiers = menuItem($("menu").value)?.modifiers || [];
@@ -422,6 +422,15 @@ document.addEventListener("click", event => {
   const button = event.target.closest("[data-action]");
   if (!button || button.disabled || busy) return;
   const {action, id} = button.dataset;
+  if (action === "use-candidate") {
+    $("manual-editor").open = true;
+    $("edit-line").value = "";
+    $("menu").value = button.dataset.menu;
+    refreshModifiers();
+    $("quantity").value = 1;
+    $("quantity").focus();
+    feedback(`Filled in ${menuItem(button.dataset.menu)?.name}. Check the quantity and modifiers, save the line, then dismiss the uncertain words.`);
+  }
   if (action === "resolve-flag") { const order = state.orders[draftId]; dispatch({action: "resolve_flag", order_id: order.id, revision: order.revision, flag_id: id, resolution: button.dataset.resolution}); }
   if (action === "acknowledge") dispatch({action: "acknowledge", order_id: id});
   if (action === "retry-zones") dispatch({action: "retry_zones", order_id: id});
