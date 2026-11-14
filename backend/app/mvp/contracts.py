@@ -77,6 +77,9 @@ class Order(Model):
     flags: list[DraftFlag] = Field(default_factory=list)
     voice_baseline: list[Line] | None = None
     capture_mode: Literal["manual", "mock_voice", "live_voice"] = "manual"
+    dietary_check: Literal["not_asked", "none_reported", "requests_recorded"] = (
+        "not_asked"
+    )
     corrected_draft_lines: int = 0
     initial_voice_draft_line_count: int = 0
     zone_status: Literal["unassigned", "waiting", "assigned", "released"] = "unassigned"
@@ -199,7 +202,11 @@ class ResolveFlag(Model):
     revision: int
     flag_id: str
     resolution: Literal[
-        "keep_selected_table", "use_spoken_table", "reviewed_remove_unknown"
+        "keep_selected_table",
+        "use_spoken_table",
+        "reviewed_remove_unknown",
+        "asked_none_reported",
+        "reviewed_keep_note",
     ]
 
 

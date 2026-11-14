@@ -11,7 +11,7 @@ import re
 from collections import Counter
 from typing import Protocol
 
-from app.mvp.menu import MenuDocument, match_menu, names, normalize
+from app.mvp.menu import MenuDocument, _occurrences, match_menu, names, normalize
 
 NUMBER_WORDS = {
     word: n
@@ -119,6 +119,53 @@ def _clauses(menu: MenuDocument, text: str) -> list[str]:
     ]
 
 
+NO_DIETARY = re.compile(
+    r"\bno (?:known )?(?:allerg(?:y|ies)|dietary (?:needs|restrictions|requirements))\b"
+)
+DIETARY_TRIGGER = re.compile(
+    r"\b(?:allerg(?:y|ic|ies)|gluten free|dairy free|nut free|vegan|vegetarian"
+    r"|celiac|coeliac|kosher|halal|note|request)\b"
+)
+SEAT = re.compile(r"\bseat (" + NUMBER + r")\b")
+
+
+def _extract_extras(menu: MenuDocument, phrase: str) -> tuple[str, dict]:
+    """Pull seat / dietary words out of one normalized clause before menu matching.
+
+    Configured aliases win: a trigger inside a menu or modifier name stays part
+    of the dish phrase. Dietary text runs from the trigger to the clause end.
+    """
+    extras: dict = {}
+    if NO_DIETARY.search(phrase):
+        extras["none_reported"] = True
+        phrase = NO_DIETARY.sub(" ", phrase)
+    seat = SEAT.search(phrase)
+    if seat:
+        extras["seat"] = int(_number(seat[1]))
+        phrase = phrase[: seat.start()] + " " + phrase[seat.end() :]
+    protected = _occurrences(
+        phrase,
+        {
+            alias
+            for item in menu.items
+            for entity in [item, *item.modifiers]
+            for alias in names(entity)
+        },
+    )
+    trigger = next(
+        (
+            m
+            for m in DIETARY_TRIGGER.finditer(phrase)
+            if not any(a <= m.start() < b for a, b in protected)
+        ),
+        None,
+    )
+    if trigger:
+        extras["requests"] = " ".join(phrase[trigger.start() :].split())[:500]
+        phrase = phrase[: trigger.start()]
+    return " ".join(phrase.split()), extras
+
+
 def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
     table = re.match(r"^\s*table\s+(" + NUMBER + r")\b[\s:,.]*", text, re.IGNORECASE)
     spoken_table = _number(table[1]) if table else None
@@ -142,7 +189,14 @@ def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
             }
         )
     lines = []
-    for index, clause in enumerate(_clauses(menu, remainder)):
+    none_reported = False
+    for index, raw_clause in enumerate(_clauses(menu, remainder)):
+        clause, extras = _extract_extras(menu, raw_clause)
+        none_reported = none_reported or extras.get("none_reported", False)
+        if not clause:
+            if extras.get("requests"):
+                flags.append(_unattached(extras["requests"], index))
+            continue
         number = re.match(r"^(" + NUMBER + r")\b\s*", clause)
         quantity = (
             NUMBER_WORDS.get(
@@ -177,13 +231,26 @@ def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
             for flag in _with_suggestions(menu, phrase, matched["flags"])
         )
         if matched["menu_id"]:
-            lines.append(
-                {
-                    "menu_id": matched["menu_id"],
-                    "quantity": quantity,
-                    "modifiers": matched["modifiers"],
-                }
-            )
+            line = {
+                "menu_id": matched["menu_id"],
+                "quantity": quantity,
+                "modifiers": matched["modifiers"],
+            }
+            if "seat" in extras:
+                line["seat"] = extras["seat"]
+            if extras.get("requests"):
+                line["requests"] = extras["requests"]
+                flags.append(
+                    {
+                        "code": "dietary_review",
+                        "message": f'Check the recorded dietary note before sending: "{extras["requests"]}"',
+                        "candidates": [],
+                        "line_index": index,
+                    }
+                )
+            lines.append(line)
+        elif extras.get("requests"):
+            flags.append(_unattached(extras["requests"], index))
     if not lines:
         flags.append(
             {
@@ -192,11 +259,29 @@ def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
                 "candidates": [],
             }
         )
+    dietary = (
+        "requests_recorded"
+        if any(line.get("requests") for line in lines)
+        else "none_reported"
+        if none_reported
+        else None
+    )
     return {
         "table_id": spoken_table,
         "lines": lines,
         "flags": flags,
         "table_mismatch": mismatch,
+        **({"dietary_check": dietary} if dietary else {}),
+    }
+
+
+def _unattached(requests: str, index: int) -> dict:
+    """Dietary words with no confirmed dish must not vanish; a human attaches them."""
+    return {
+        "code": "dietary_unattached",
+        "message": f'Dietary note not attached to a dish: "{requests}". Add it to the right dish manually.',
+        "candidates": [],
+        "line_index": index,
     }
 
 
