@@ -28,6 +28,7 @@ class Settings(BaseModel):
     db_path: str = "data/kitchen.db"
     schema_path: str = "../schema/events.schema.json"
     zone_count_tolerance: int = 0
+    default_trip_qty: int = 1  # INGREDIENT_TRIP with no recipe line for the zone
     zones: dict[str, ZoneSeed] = Field(default_factory=dict)
     recipes: dict[str, list[RecipeLine]] = Field(default_factory=dict)
     push_context: bool = True  # tests turn this off

@@ -1,11 +1,14 @@
 # dig-in CV service config. Polygons are placeholders until you run the
 # calibrator (python -m cvsvc.calibrate --camera <id>), which rewrites them.
 cameras:
-  ingredient_cam: {source: 0, fps_target: 15, resolution: [1280, 720]}
-  plating_cam:    {source: 1, fps_target: 15, resolution: [1280, 720]}
+  ingredient_cam: {source: 1, fps_target: 15, resolution: [1280, 720]}   # MacBook camera, straight on at the ingredients
+  plating_cam:    {source: 0, fps_target: 15, resolution: [1280, 720]}   # Brio 105, bird's-eye over the bays
 
 ingredient:
   camera: ingredient_cam
+  mode: trips                # trips: report reaches into a zone, backend owns counts | slots: count portions
+  min_trip_s: 0.25
+  trip_settle_s: 0.6
   settle_s: 1.0
   occlusion_timeout_s: 6.0
   snapshot_interval_s: 10

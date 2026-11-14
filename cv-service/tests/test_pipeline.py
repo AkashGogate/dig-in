@@ -42,7 +42,7 @@ def scene(tokens=(), plates=(), hand=None, img=None):
 def setup(tmp_path):
     cfg = CVConfig(
         cameras={"cam": CameraConfig(source=0, fps_target=FPS)},
-        ingredient=IngredientConfig(camera="cam", settle_s=0.5, zones=[
+        ingredient=IngredientConfig(camera="cam", mode="slots", settle_s=0.5, zones=[
             ZoneConfig(id="Z1", ingredient="token", polygon=ZONE_POLY, slots=SlotGrid(rows=2, cols=4))]),
         plating=PlatingConfig(camera="cam", debounce_s=0.5, bays=[
             BayConfig(id="A", polygon=BAY_POLY, min_plate_area_px=4000, max_plate_area_px=20000)]),
@@ -164,3 +164,86 @@ def test_worker_thread_on_video_file(setup, tmp_path):
     assert of(events, "PLATE_ARRIVED"), [e["type"] for e in events]
     assert of(events, "CAMERA_STATUS")
     assert w.overlay_seq > 0
+
+
+# ---- trip mode (default): CV detects reaches, backend owns counts ----
+
+@pytest.fixture
+def trip_setup(tmp_path):
+    cfg = CVConfig(
+        cameras={"cam": CameraConfig(source=0, fps_target=FPS)},
+        ingredient=IngredientConfig(camera="cam", zones=[
+            ZoneConfig(id="Z1", ingredient="lettuce", polygon=[(40, 60), (200, 60), (200, 220), (40, 220)]),
+            ZoneConfig(id="Z2", ingredient="tomato", polygon=[(260, 60), (420, 60), (420, 220), (260, 220)])]),
+        plating=PlatingConfig(camera="other"),
+        calibration_dir=str(tmp_path),
+    )
+    cfg.cameras["other"] = CameraConfig(source=1)
+    ctx = ContextStore()
+    bus = EventBus(EventIds("t"))
+    pipes = CameraPipelines(cfg, bus, ctx, Emitter(bus.ids, ctx, "cam", "other"))
+    w = pipes.workers["cam"]
+    events = []
+    w.emit = lambda ev: events.append(ev.model_dump(mode="json"))
+    w._build(base())
+    clock = {"t": 1000.0}
+
+    def feed(frames, seconds=None):
+        frames = frames if isinstance(frames, list) else [frames] * int(seconds * FPS)
+        for img in frames:
+            clock["t"] += 1 / FPS
+            w.process(clock["t"], img)
+
+    return w, ctx, events, feed
+
+
+def hand_frames(x, y, seconds, w=60, h=140):
+    """A moving hand (it jitters, so frame differencing sees motion every frame)."""
+    out = []
+    for i in range(int(seconds * FPS)):
+        img = base()
+        dx = (i % 4) * 6
+        cv2.rectangle(img, (x + dx, y), (x + dx + w, y + h), (120, 160, 220), -1)
+        out.append(img)
+    return out
+
+
+def test_one_reach_is_one_trip_with_attribution(trip_setup):
+    w, ctx, events, feed = trip_setup
+    feed(base(), 1.0)
+    ctx.set_active_ticket(ActiveTicket(ticket_id="T-9", set_at=utcnow_iso()))
+    feed(hand_frames(90, 80, 1.0))     # reach into Z1
+    feed(base(), 2.0)
+    trips = of(events, "INGREDIENT_TRIP")
+    assert len(trips) == 1
+    t = trips[0]
+    assert t["zone_id"] == "Z1" and t["status"] == "observed" and t["payload"]["reason"] is None
+    assert t["attribution"]["ticket_id"] == "T-9" and t["payload"]["ingredient"] == "lettuce"
+    assert 0.5 < t["payload"]["duration_s"] < 1.5
+
+
+def test_brief_flicker_is_not_a_trip(trip_setup):
+    w, ctx, events, feed = trip_setup
+    feed(base(), 1.0)
+    feed(hand_frames(90, 80, 0.13))
+    feed(base(), 2.0)
+    assert of(events, "INGREDIENT_TRIP") == []
+
+
+def test_person_passing_both_zones_is_pending(trip_setup):
+    w, ctx, events, feed = trip_setup
+    feed(base(), 1.0)
+    feed(hand_frames(60, 40, 1.0, w=330, h=200))   # big blob over Z1 and Z2
+    feed(base(), 2.0)
+    trips = of(events, "INGREDIENT_TRIP")
+    assert len(trips) == 2
+    assert all(t["status"] == "pending_review" and t["payload"]["reason"] == "multi_zone" for t in trips)
+
+
+def test_long_occlusion_pending_once(trip_setup):
+    w, ctx, events, feed = trip_setup
+    feed(base(), 1.0)
+    feed(hand_frames(90, 80, 8.0))
+    feed(base(), 2.0)
+    trips = of(events, "INGREDIENT_TRIP")
+    assert len(trips) == 1 and trips[0]["payload"]["reason"] == "long_occlusion"

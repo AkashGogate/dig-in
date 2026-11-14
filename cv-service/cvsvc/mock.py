@@ -126,8 +126,9 @@ class MockKitchen:
     # ---- loop ----
     async def run(self) -> None:
         log.info("mock kitchen running: bays=%s zones=%s", list(self.bays), list(self.zones))
-        for zid, z in self.zones.items():
-            await self._pub(self.emitter.zone_snapshot(zid, z.ingredient, z.count))
+        if self.cfg.ingredient.mode == "slots":
+            for zid, z in self.zones.items():
+                await self._pub(self.emitter.zone_snapshot(zid, z.ingredient, z.count))
         for bay_id, b in self.bays.items():
             await self._pub(self.emitter.bay_state(bay_id, b.count))
         last_hb = last_snap = last_pick = time.time()
@@ -145,7 +146,7 @@ class MockKitchen:
                     await self._random_pick(now)
             if now - last_snap >= min(self.cfg.ingredient.snapshot_interval_s, self.cfg.plating.snapshot_interval_s):
                 last_snap = now
-                if self._cam_ok(self.emitter.ingredient_camera):
+                if self._cam_ok(self.emitter.ingredient_camera) and self.cfg.ingredient.mode == "slots":
                     for zid, z in self.zones.items():
                         await self._pub(self.emitter.zone_snapshot(zid, z.ingredient, z.count))
                 if self._cam_ok(self.emitter.plating_camera):
@@ -180,6 +181,14 @@ class MockKitchen:
                             await self._change_bay(bay_id, 0)
 
     async def _random_pick(self, now: float) -> None:
+        if self.cfg.ingredient.mode == "trips":
+            zid = self.rng.choice(list(self.zones))
+            z = self.zones[zid]
+            attr = self.context.attribution()
+            reason = "multi_zone" if self.rng.random() < self.pending_probability else None
+            await self._pub(self.emitter.trip(zid, z.ingredient, self.rng.uniform(0.6, 2.0),
+                                              0.4 if reason else self.rng.uniform(0.8, 0.98), attr, reason))
+            return
         candidates = [zid for zid, z in self.zones.items() if z.count > 0]
         if not candidates:
             return

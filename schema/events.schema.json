@@ -730,6 +730,135 @@
       "title": "IngredientReturnedPayload",
       "type": "object"
     },
+    "IngredientTrip": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "INGREDIENT_TRIP",
+          "default": "INGREDIENT_TRIP",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/IngredientTripPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "IngredientTrip",
+      "type": "object"
+    },
+    "IngredientTripPayload": {
+      "additionalProperties": false,
+      "description": "A hand reached into the zone and left (trip mode). CV does not count portions;\nthe backend subtracts the recipe quantity per trip.",
+      "properties": {
+        "ingredient": {
+          "title": "Ingredient",
+          "type": "string"
+        },
+        "duration_s": {
+          "title": "Duration S",
+          "type": "number"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "multi_zone",
+                "long_occlusion"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "ingredient",
+        "duration_s",
+        "reason"
+      ],
+      "title": "IngredientTripPayload",
+      "type": "object"
+    },
     "PlateArrived": {
       "additionalProperties": false,
       "properties": {
@@ -1141,6 +1270,7 @@
       "INGREDIENT_CHANGE_PENDING": "#/$defs/IngredientChangePending",
       "INGREDIENT_PICKED": "#/$defs/IngredientPicked",
       "INGREDIENT_RETURNED": "#/$defs/IngredientReturned",
+      "INGREDIENT_TRIP": "#/$defs/IngredientTrip",
       "PLATE_ARRIVED": "#/$defs/PlateArrived",
       "PLATE_REMOVED": "#/$defs/PlateRemoved",
       "ZONE_SNAPSHOT": "#/$defs/ZoneSnapshot"
@@ -1156,6 +1286,9 @@
     },
     {
       "$ref": "#/$defs/IngredientChangePending"
+    },
+    {
+      "$ref": "#/$defs/IngredientTrip"
     },
     {
       "$ref": "#/$defs/ZoneSnapshot"

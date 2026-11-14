@@ -117,3 +117,10 @@ class CV:
 @pytest.fixture
 def cv(clock):
     return CV(clock)
+
+
+def trip(cv, zone, ticket=None, reason=None, ingredient="tomato", ambiguous=False):
+    return cv._base("INGREDIENT_TRIP", "cv.ingredient", "ingredient_cam",
+                    {"ingredient": ingredient, "duration_s": 0.8, "reason": reason}, zone=zone, ticket=ticket,
+                    method="active_ticket_context" if ticket else "none", ambiguous=ambiguous,
+                    status="pending_review" if reason else "observed")

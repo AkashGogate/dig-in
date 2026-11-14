@@ -4,6 +4,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 Point = tuple[int, int]
@@ -37,6 +39,11 @@ class ZoneConfig(BaseModel):
 
 class IngredientConfig(BaseModel):
     camera: str = "ingredient_cam"
+    # trips: detect a hand reaching into a zone; the backend owns counts (default)
+    # slots: count portions with the slot grid (CV_SPEC 6.2)
+    mode: Literal["trips", "slots"] = "trips"
+    min_trip_s: float = 0.25        # shorter motion bursts are noise
+    trip_settle_s: float = 0.6      # no motion this long ends a trip
     settle_s: float = 1.0
     occlusion_timeout_s: float = 6.0
     snapshot_interval_s: float = 10

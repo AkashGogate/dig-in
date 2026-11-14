@@ -36,6 +36,12 @@ class StateView:
             elif t == "INGREDIENT_CHANGE_PENDING":
                 z = self.zones.setdefault(ev["zone_id"], {"ingredient": p["ingredient"], "count": p["count_before"]})
                 z["pending"] = {"reason": p["reason"], "estimate": p["count_after_estimate"], "at": ev["observed_at"]}
+            elif t == "INGREDIENT_TRIP":
+                z = self.zones.setdefault(ev["zone_id"], {"ingredient": p["ingredient"], "trips": 0})
+                z["trips"] = z.get("trips", 0) + 1
+                z["last_trip_at"] = ev["observed_at"]
+                if ev["status"] == "pending_review":
+                    z["pending"] = {"reason": p["reason"], "at": ev["observed_at"]}
             elif t == "BAY_STATE":
                 self.bays[ev["bay_id"]] = {**p, "at": ev["observed_at"]}
             elif t in ("PLATE_ARRIVED", "PLATE_REMOVED"):

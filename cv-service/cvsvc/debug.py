@@ -27,6 +27,18 @@ def draw_zone(img, polygon, state: str, zone_id: str, ingredient: str, count: in
     _label(img, f"{zone_id} {ingredient}: {count}  [{state}]", (x, max(18, y - 8)), color)
 
 
+def draw_trip_zone(img, polygon, state: str, zone_id: str, ingredient: str, trips: int) -> None:
+    color = STATE_COLOR.get(state, GREY)
+    pts = np.array(polygon, np.int32)
+    if state == "active":
+        overlay = img.copy()
+        cv2.fillPoly(overlay, [pts], color)
+        cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
+    cv2.polylines(img, [pts], True, color, 2)
+    x, y = polygon[0]
+    _label(img, f"{zone_id} {ingredient}  trips: {trips}  [{state}]", (x, max(18, y - 8)), color)
+
+
 def draw_bay(img, polygon, state: str, bay_id: str, count: int, assignment, contours) -> None:
     color = STATE_COLOR.get(state, GREY)
     cv2.polylines(img, [np.array(polygon, np.int32)], True, color, 2)

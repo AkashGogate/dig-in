@@ -19,6 +19,7 @@ from cvsvc.emitter import Emitter
 from cvsvc.events import EventBus
 from cvsvc.health import HealthMonitor
 from cvsvc.ingredient.tracker import ZoneTracker
+from cvsvc.ingredient.trips import TripTracker
 from cvsvc.ingredient.zones import ZoneCounter
 from cvsvc.plating.bays import BayCounter
 from cvsvc.plating.tracker import BayTracker
@@ -35,8 +36,11 @@ def reference_path(cfg: CVConfig, camera_id: str) -> Path:
 class _Zone:
     def __init__(self, zcfg, reference, icfg, gray_shape) -> None:
         self.cfg = zcfg
+        self.trips_mode = icfg.mode == "trips"
         self.counter = ZoneCounter(zcfg, reference)
         self.motion = MotionDetector(self.counter.mask, icfg.motion_min_area_px)
+        self.trip = TripTracker(min_trip_s=icfg.min_trip_s, settle_s=icfg.trip_settle_s,
+                                max_trip_s=icfg.occlusion_timeout_s)
         # baseline is taken from the first live frame (see CameraWorker._process_zone)
         self.initialized = False
         self.tracker = ZoneTracker(baseline=0, settle_s=icfg.settle_s,
@@ -44,6 +48,10 @@ class _Zone:
                                    large_delta_limit=icfg.large_delta_limit)
         self.last = None
         self.frozen_baseline: int | None = None
+
+    @property
+    def state(self) -> str:
+        return self.trip.state if self.trips_mode else self.tracker.state
 
 
 class _Bay:
@@ -183,7 +191,7 @@ class CameraWorker:
 
     def snapshots(self, ts: float) -> None:
         for zid, z in self.zones.items():
-            if z.tracker.state == "stable":
+            if not z.trips_mode and z.tracker.state == "stable":
                 self.emit(self.o.emitter.zone_snapshot(zid, z.cfg.ingredient, z.tracker.baseline, ts=ts))
         for bid, b in self.bays.items():
             self.emit(self.o.emitter.bay_state(bid, b.tracker.stable_count, ts=ts))
@@ -200,7 +208,7 @@ class CameraWorker:
 
     def process(self, ts: float, frame: np.ndarray) -> None:
         with self.lock:
-            any_active = any(z.tracker.state in ("active", "settling") for z in self.zones.values()) or \
+            any_active = any(z.state in ("active", "settling") for z in self.zones.values()) or \
                 any(b.tracker.state != "stable" for b in self.bays.values())
             was_frozen = self.health.frozen and self.reference is not None
             tr = self.health.update(ts, frame, any_zone_active=any_active)
@@ -219,8 +227,11 @@ class CameraWorker:
                 self._reconcile(ts, frame)
                 self.recovering_since = None
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            for zid, z in self.zones.items():
-                self._process_zone(ts, frame, gray, zid, z)
+            if self.cfg.ingredient.mode == "trips":
+                self._process_trips(ts, gray)
+            else:
+                for zid, z in self.zones.items():
+                    self._process_zone(ts, frame, gray, zid, z)
             for bid, b in self.bays.items():
                 self._process_bay(ts, frame, gray, bid, b)
             self._render(frame)
@@ -247,6 +258,18 @@ class CameraWorker:
         else:
             self.emit(em.pending(zid, z.cfg.ingredient, res.reason or "unstable_count", res.before, res.after,
                                  res.confidence, attr, ts))
+
+    def _process_trips(self, ts, gray) -> None:
+        motions = {zid: z.motion.update(gray) for zid, z in self.zones.items()}
+        version = self.o.context.active_version()
+        for zid, z in self.zones.items():
+            other = any(m for k, m in motions.items() if k != zid)
+            res = z.trip.update(ts, motions[zid], other, version)
+            if res is None:
+                continue
+            attr = self.o.context.attribution(res.version_at_start)
+            self.emit(self.o.emitter.trip(zid, z.cfg.ingredient, res.duration_s, res.confidence, attr,
+                                          res.reason, ts))
 
     def _process_bay(self, ts, frame, gray, bid, b: _Bay) -> None:
         motion = b.motion.update(gray)
@@ -275,6 +298,8 @@ class CameraWorker:
     def _reconcile(self, ts: float, frame: np.ndarray) -> None:
         em = self.o.emitter
         for zid, z in self.zones.items():
+            if z.trips_mode:
+                continue  # trips carry no counts; nothing to reconcile
             now_count = z.counter.count(frame).count
             before = z.frozen_baseline if z.frozen_baseline is not None else z.tracker.baseline
             z.frozen_baseline = None
@@ -294,7 +319,9 @@ class CameraWorker:
     def _render(self, frame: np.ndarray) -> None:
         img = frame.copy()
         for zid, z in self.zones.items():
-            if z.last is not None:
+            if z.trips_mode:
+                debug.draw_trip_zone(img, z.cfg.polygon, z.trip.state, zid, z.cfg.ingredient, z.trip.trips)
+            elif z.last is not None:
                 debug.draw_zone(img, z.cfg.polygon, z.tracker.state, zid, z.cfg.ingredient, z.tracker.baseline,
                                 z.counter.slot_polygons(), z.last.occupied)
         for bid, b in self.bays.items():

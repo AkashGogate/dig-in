@@ -67,6 +67,14 @@ class IngredientChangePendingPayload(_Payload):
     count_after_estimate: int | None
 
 
+class IngredientTripPayload(_Payload):
+    """A hand reached into the zone and left (trip mode). CV does not count portions;
+    the backend subtracts the recipe quantity per trip."""
+    ingredient: str
+    duration_s: float
+    reason: Literal["multi_zone", "long_occlusion"] | None = None  # set when status is pending_review
+
+
 class ZoneSnapshotPayload(_Payload):
     ingredient: str
     count: int
@@ -140,6 +148,11 @@ class IngredientChangePending(_EventBase):
     payload: IngredientChangePendingPayload
 
 
+class IngredientTrip(_EventBase):
+    type: Literal["INGREDIENT_TRIP"] = "INGREDIENT_TRIP"
+    payload: IngredientTripPayload
+
+
 class ZoneSnapshot(_EventBase):
     type: Literal["ZONE_SNAPSHOT"] = "ZONE_SNAPSHOT"
     payload: ZoneSnapshotPayload
@@ -170,6 +183,7 @@ Event = Annotated[
         IngredientPicked,
         IngredientReturned,
         IngredientChangePending,
+        IngredientTrip,
         ZoneSnapshot,
         PlateArrived,
         PlateRemoved,
@@ -181,7 +195,8 @@ Event = Annotated[
 EventAdapter: TypeAdapter[Event] = TypeAdapter(Event)
 
 PLATE_TYPES = {"PLATE_ARRIVED", "PLATE_REMOVED", "BAY_STATE"}
-INGREDIENT_TYPES = {"INGREDIENT_PICKED", "INGREDIENT_RETURNED", "INGREDIENT_CHANGE_PENDING", "ZONE_SNAPSHOT"}
+INGREDIENT_TYPES = {"INGREDIENT_PICKED", "INGREDIENT_RETURNED", "INGREDIENT_CHANGE_PENDING", "INGREDIENT_TRIP",
+                    "ZONE_SNAPSHOT"}
 
 
 # ---- deterministic ids ----------------------------------------------------

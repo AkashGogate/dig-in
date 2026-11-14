@@ -354,6 +354,7 @@ class Kitchen:
             "INGREDIENT_PICKED": self._on_ingredient_picked,
             "INGREDIENT_RETURNED": self._on_ingredient_returned,
             "INGREDIENT_CHANGE_PENDING": self._on_ingredient_pending,
+            "INGREDIENT_TRIP": self._on_ingredient_trip,
             "ZONE_SNAPSHOT": self._on_zone_snapshot,
         }[t]
         handler(ev)
@@ -730,6 +731,52 @@ class Kitchen:
                       "count_before": p["count_before"], "count_after_estimate": p["count_after_estimate"],
                       "ticket_id": self._attributed_ticket(ev)})
 
+    def trip_qty(self, ticket_id: str | None, zone_id: str) -> int:
+        """Quantity one trip takes from a zone: the recipe line for that zone in the
+        attributed ticket's dishes, else default_trip_qty."""
+        if ticket_id:
+            t = self.ticket(ticket_id)
+            for dish in (t["dishes"] if t else []):
+                for line in self.s.recipes.get(dish, []):
+                    if line.zone == zone_id:
+                        return line.qty
+        return self.s.default_trip_qty
+
+    def _apply_trip(self, zone_id: str, ticket_id: str | None, source: str, obs: str | None) -> int:
+        qty = self.trip_qty(ticket_id, zone_id)
+        self._apply_movement(zone_id, -qty, "pick", source, ticket_id, obs)
+        if ticket_id:
+            self._consume_reservation(ticket_id, zone_id, qty)
+        z = self._zone_view(zone_id)
+        if z is not None and z["on_hand"] <= 0:
+            self._review("zone_empty", zone_id, f"zone {zone_id} ({z['ingredient']}) is out per records "
+                         f"(on hand {z['on_hand']}); restock or correct", {"zone_id": zone_id}, dedupe=True)
+        return qty
+
+    def _on_ingredient_trip(self, ev: dict[str, Any]) -> None:
+        """Trip mode: CV saw a reach into the zone; we subtract the recipe quantity.
+        A pending trip (multi-zone motion, long occlusion) changes nothing until staff resolve it."""
+        zid = ev["zone_id"]
+        if self._zone_view(zid) is None:
+            self.db.execute("UPDATE observations SET acted=0, note='unknown zone' WHERE event_id=?",
+                            (ev["event_id"],))
+            return
+        ticket_id = self._attributed_ticket(ev)
+        p = ev["payload"]
+        if ev["status"] == "pending_review":
+            why = {"multi_zone": "motion in several zones at once", "long_occlusion": "zone blocked for a long time"}
+            self._review("ingredient_trip_pending", ev["event_id"],
+                         f"{zid} ({p['ingredient']}): possible pick, {why.get(p['reason'], p['reason'])}; confirm?",
+                         {"zone_id": zid, "ingredient": p["ingredient"], "reason": p["reason"],
+                          "ticket_id": ticket_id, "qty": self.trip_qty(ticket_id, zid)})
+            return
+        qty = self._apply_trip(zid, ticket_id, "cv", ev["event_id"])
+        if not ticket_id:
+            self._review("unassigned_movement", ev["event_id"],
+                         f"{qty} x {p['ingredient']} taken from {zid} with no active ticket"
+                         + (" (ambiguous)" if ev["attribution"]["ambiguous"] else ""),
+                         {"zone_id": zid, "qty": qty, "optional": True})
+
     def _observe_count(self, zone_id: str, count: int, at: str) -> None:
         self.db.execute("UPDATE zones SET last_observed_count=?, last_observed_at=? WHERE id=? AND "
                         "(last_observed_at IS NULL OR last_observed_at <= ?)", (count, at, zone_id, at))
@@ -1062,6 +1109,17 @@ class Kitchen:
                     self._queue_cv_resolve(zid, count)
                 else:  # reject: nothing physically changed; reset CV to its pre-change baseline
                     self._queue_cv_resolve(zid, d["count_before"])
+            elif kind == "ingredient_trip_pending":
+                if resolution == "accept":
+                    self._apply_trip(d["zone_id"], ticket_id or d.get("ticket_id"), "staff", None)
+                elif resolution == "correct":
+                    if count is None:
+                        raise Invalid("correct needs count (the quantity actually taken)")
+                    if count > 0:
+                        tid = ticket_id or d.get("ticket_id")
+                        self._apply_movement(d["zone_id"], -count, "pick", "staff", tid, None)
+                        if tid:
+                            self._consume_reservation(tid, d["zone_id"], count)
             elif kind == "zone_mismatch":
                 zid = d["zone_id"]
                 if resolution == "accept":  # trust the camera

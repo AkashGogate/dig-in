@@ -20,6 +20,8 @@ from cvsvc.events import (
     IngredientPickedPayload,
     IngredientReturned,
     IngredientReturnedPayload,
+    IngredientTrip,
+    IngredientTripPayload,
     PlateArrived,
     PlateArrivedPayload,
     PlateRemoved,
@@ -71,6 +73,17 @@ class Emitter:
             zone_id=zone_id, confidence=round(confidence, 3), attribution=attribution,
             payload=IngredientChangePendingPayload(ingredient=ingredient, reason=reason,  # type: ignore[arg-type]
                                                    count_before=before, count_after_estimate=estimate),
+        )
+
+    def trip(self, zone_id: str, ingredient: str, duration_s: float, confidence: float,
+             attribution: Attribution, reason: str | None = None, ts: float | None = None) -> IngredientTrip:
+        return IngredientTrip(
+            event_id=self.ids.next(self.ingredient_camera, zone_id, "trip"),
+            source="cv.ingredient", camera_id=self.ingredient_camera, observed_at=self._ts(ts),
+            zone_id=zone_id, confidence=round(confidence, 3), attribution=attribution,
+            status="pending_review" if reason else "observed",
+            payload=IngredientTripPayload(ingredient=ingredient, duration_s=round(duration_s, 2),
+                                          reason=reason),  # type: ignore[arg-type]
         )
 
     def zone_snapshot(self, zone_id: str, ingredient: str, count: int, confidence: float = 1.0,

@@ -10,11 +10,16 @@ db_path: data/kitchen.db
 schema_path: ../schema/events.schema.json
 zone_count_tolerance: 0
 
-zones:
-  Z1: {ingredient: tomato_slice, on_hand: 8}
-  Z2: {ingredient: cheese_slice, on_hand: 6}
+default_trip_qty: 1           # INGREDIENT_TRIP: qty when the recipe has no line for the zone
 
-recipes:
-  burger: [{zone: Z1, qty: 2}, {zone: Z2, qty: 1}]
-  salad: [{zone: Z1, qty: 2}]
-  grilled_cheese: [{zone: Z2, qty: 2}]
+# Stock is owned here (dummy values for now). In trip mode the camera only reports
+# "a hand reached into zone X"; each trip subtracts the recipe qty for that zone.
+zones:
+  Z1: {ingredient: lettuce, on_hand: 20}
+  Z2: {ingredient: tomato, on_hand: 20}
+  Z3: {ingredient: cheese, on_hand: 20}
+
+recipes:                      # qty per trip; 1 for everything for now
+  burger: [{zone: Z1, qty: 1}, {zone: Z2, qty: 1}, {zone: Z3, qty: 1}]
+  salad: [{zone: Z1, qty: 1}, {zone: Z2, qty: 1}]
+  grilled_cheese: [{zone: Z3, qty: 1}]
