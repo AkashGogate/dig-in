@@ -59,3 +59,12 @@
 ## Session 2026-11-13 11:39pm CST
 - Don't assume Vercel's generic cname.vercel-dns.com target is always correct for a custom domain - Vercel can assign a project/domain-specific CNAME target instead, shown under "DNS Change Recommended". Always read the live value off the user's own screen rather than reusing a generic value from memory.
 - Squarespace's simplified DNS editor auto-appends the trailing FQDN dot - tell users to paste CNAME values without the trailing period Vercel's copy button includes.
+
+## Session: repo migration to dig-in
+- User wants repo migrated to github.com/AkashGogate/dig-in - confirmed via explicit choice: swap remote only, preserve full git history, NOT a fresh git init (destructive wipe was explicitly declined).
+- Lesson: `git push` over https can hang silently with no output when it hits an interactive credential prompt and no TTY is available in this tool environment - don't wait indefinitely, kill it after a short timeout and hand the push back to the user to run from their own terminal, same pattern as the earlier blocked-push precedent this session (classifier blocked it there; here it just hangs on auth instead).
+
+## Session: rebase-across-unrelated-histories recovery
+- Lesson (hard-won, this session): when a `git remote set-url` points origin at a DIFFERENT pre-existing repo (not empty/fresh), never run `git pull --rebase` or `git rebase` against it without first checking `git merge-base <old> <new>`. If there's no common ancestor, rebase will either refuse or (worse) silently leave the branch pointer on the wrong commit and wipe the working tree down to just the other repo's files - looks like catastrophic data loss but commits usually survive via reflog/stash refs. Correct tool for combining two unrelated repos' histories is `git merge --allow-unrelated-histories`, not rebase.
+- Preference confirmed: when something looks like a destructive git accident, diagnose fully (check reflog, stash, dangling commits, merge-base) and report exact recoverability BEFORE touching anything further - the dispatched fork agent did this correctly (did not blindly "fix" the wiped tree) and that was the right call; main thread then did the actual recovery with full context.
+- Recurring environment issue, reconfirmed: `git push` to a remote repo hangs (not blocked by classifier this time, just hangs, likely waiting on a credential prompt with no TTY) when run via this tool - always hand pushes back to the user to run from their own terminal rather than waiting indefinitely.
