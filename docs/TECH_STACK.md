@@ -1,28 +1,17 @@
-# TECH_STACK.md
+# Stack and integration status
 
-## Backend / agent runtime
-- Python 3.11+
-- Pipecat — audio pipeline orchestration (transport → VAD/turn-detection → STT → processing → TTS).
-- Daily transport (WebRTC) via Pipecat's native integration.
-- Deepgram STT (Nova-3 or Flux) with `diarize=true` for per-speaker-turn labels.
-- Turn-taking: Pipecat's Silero VAD + Deepgram's end-of-utterance signal.
-- Call-parsing layer: keyword/rule-based first pass (menu item names, quantities, station keywords) with a small LLM fallback for ambiguous phrasing.
-- Ticket/order queue: mocked — a seeded SQLite table standing in for a real POS feed.
-- Structured log store: SQLite via SQLAlchemy (async).
-- API/WebSocket layer: FastAPI + WebSocket.
-- TTS (mismatch alerts): Deepgram TTS (Aura).
+FastAPI/Python 3.11+, Pydantic, uv lock, pytest/Ruff and buildless static HTML/CSS/JS are retained. SQLite/SQLAlchemy supports the old call-log experiment; **MVP v2 state/outbox is in memory**, not that SQLite database. No frontend framework, new platform install or paid dependency is required.
 
-## Frontend / demo surface
-- Next.js/React. Minimal by design.
+| Component | Current seam / limit |
+| --- | --- |
+| Menu | Canonical Pydantic/JSON schema, deterministic alias/modifier matcher; importer protocol/status only |
+| Voice | Constrained ephemeral text parsing and visible hold/release transcript simulator; no live capture/STT/noisy-hall claim |
+| CV | Stable-duration/no-hand/status/versioned occupancy command seam and mock controls; no pixel detector or verified UNO Q ingestion |
+| Core | One-process locked v2 state, revisions, all-K zone allocation, timestamps/notifications and canonical events |
+| Analytics | Background fake/JSONL export, retry outbox, local analyzer, ten-order fixture and Databricks SQL templates; live warehouse/dashboard adapter unimplemented |
+| Screens | Server/Kitchen static web app, API polling, explicit manual fallback; not a native app/offline transaction system |
+| Legacy | Frozen broad v1 coordination/tasks, original parser/WebSocket/audio/eval; isolated state and older semantics |
 
-## Eval/testing
-- Coval, via Pipecat's documented Coval integration.
+`uv sync --locked --python 3.11` installs the normal baseline. Heavy Pipecat/Daily/Silero pipeline remains optional via `--extra live-pipeline`; retained direct Deepgram legacy paths require a provider key only when actually used. Live adapters must verify current official APIs/capabilities before integration; previous names or a supplied brief do not establish working connections.
 
-## Hosting
-- Backend: a persistent-connection host — Fly.io (default) or Render/AWS Fargate/EC2. Not Vercel for the agent runtime.
-- Frontend: Vercel.
-
-## Explicitly not used
-- Vercel for the agent runtime.
-- Any voice-stress/emotion/deception inference.
-- Real POS/kitchen-display integration (mocked instead, stated honestly).
+Current configuration is in [.env.example](../.env.example) and `frontend/config.js`. Databricks Free Edition/warehouse limits/Zerobus availability, actual CV throughput/two feeds, live speech privacy/latency and deployment remain unverified. POS/payments/spoken responses/positioning are deferred. Target Qualcomm relevance comes from the user’s plan, not verified prize rules.

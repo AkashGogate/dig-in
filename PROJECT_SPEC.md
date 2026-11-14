@@ -1,42 +1,47 @@
-# Project Spec — Voice-Native Kitchen Operations Agent
+# Dig In — current MVP specification
 
-Working name: kitchen-copilot (placeholder)
-Author: Akash
+Decision date: 2026-11-14. This is the current agreed scope, normalized from the [supplied team brief](docs/MVP_TEAM_BRIEF.md) and later user decisions. [STATUS](docs/STATUS.md) describes actual capability. The earlier expansive scaffold is preserved as [v1 context](docs/archive/2026-11-14-v1-scaffold.md), not the default product.
 
-## 1. The problem, precisely
-Professional kitchens run on an existing verbal protocol — "calling the pass," "86 the salmon," "fire table 12" — because hands are full and the floor is too loud/fast to type or tap a screen. This project digitizes a behavior that already exists; it doesn't invent a new one.
+## Product and responsibility
 
-What's missing today: verbal fire calls aren't captured anywhere. A mismatch between what was called and what the ticket says isn't caught until the wrong plate is already out. There's no timestamped record of calls, and no safety net for a misheard count beyond another human's attention — the one resource a loud kitchen doesn't have spare.
+The MVP has **two primary screens: Server and Kitchen**, using one authoritative shared backend. Four workstreams are Voice, Computer vision, **Menu/Core**, and Databricks. The user confirmed that the **Menu workstream owner also owns Core/backend and integration**; no individual names have been supplied. Proposed UI split: Voice develops the Server screen; CV develops the Kitchen zone panel; Menu/Core coordinates shared shell, kitchen queue and contract integration. That screen split is a proposal, not assigned people. See [WORKSTREAMS](docs/WORKSTREAMS.md).
 
-The governing test for every feature: remove the microphone — does the task still work, just worse (typing, tapping, writing)? If yes, cut it.
+## Reviewed orders and voice
 
-## 2. Why this, personally
-Frustration with how easy it's become to do the bare minimum in food service, and real respect for kitchens that still put in the work. The throughline is cost, not front-of-house romance — lower error rates and less labor friction in the back of house is what lets a kitchen that cares charge less and still do it right. Scoped to the kitchen specifically — does not extend to customer-facing ordering.
+A server selects a configured table and either enters menu items manually or deliberately holds/releases capture and reads back the order. A menu-constrained parser produces an editable draft using configured item/modifier IDs, quantities and optional seat/dietary requests. Unknown terms/ambiguous matches return flags and candidates, never invented items. The server says the table first; a spoken/selected table mismatch **blocks submission** until an explicit choice. Manual edits do not silently clear unresolved flags. Voice alone cannot submit: a human **Confirm and send** tap must approve the current revision. Sending never authorizes payment.
 
-## 3. Non-goals
-- Front-of-house / table-side / customer ordering — already built and crowded (Tablevoice, PopID's Genius Handheld, SoundHound for Restaurants, ConverseNow, VoicePlug, Checkmate).
-- Drive-thru / QSR ordering — Deepgram's own OfOne acquisition's lane.
-- Any feature with a trivial non-voice substitute.
-- Voice-stress/emotion-based inference of anything — not scientifically defensible, not in this project at any scope.
+The menu owns item names, aliases, modifiers and optional kitchen fields. Orders snapshot item ID/name, station, typical time and recipe where known, so later menu edits cannot rename an open ticket. Missing imported kitchen details remain unknown/null. The MVP ships reviewed JSON and a deterministic matcher; an arbitrary PDF/photo/model importer is an interface requiring later human review. Loading a second menu must require no parser/domain code change.
 
-## 4. Core functionality (v1 scope)
-1. Live fire-call capture — transcribe and structure spoken calls into order-line objects.
-2. Mismatch detection — cross-reference spoken calls against the active ticket queue, flag discrepancies before the plate goes out.
-3. Timestamped structured log — every call logged with speaker-turn attribution and timestamp, matched or not.
-4. Noise-robust turn handling — tolerate overlapping/simultaneous calls plus ambient kitchen noise without breaking. This is the real technical difficulty of the project.
+Demo sessions honestly simulate staff/device identity. Diarization/speaker labels are not authentication. Capture is deliberate; audio is discarded after transcription. V2 retains structured draft facts/counts rather than raw transcripts/audio, and exports no raw capture content. The old voice lab is isolated and retains its historical logging behavior; do not route MVP capture through it.
 
-## 5. Success criteria
-- Working pipeline: live or pre-recorded kitchen audio in → structured, timestamped, mismatch-flagged log out.
-- Coval-based synthetic test suite with pass/fail scorecard and a documented failure-found-and-fixed story.
-- A public, demoable surface with a safe fallback.
-- An honest account of what breaks under hard conditions and what was done about it.
+Correction count is reproducible: compare the most recent voice draft baseline against the confirmed final lines by stable line ID and menu ID/quantity/modifiers/seat/requests. Count distinct changed, added or removed line IDs once; repeated edits to one ID count once and a full revert counts zero. Export `corrected_draft_lines`, `initial_voice_draft_line_count`, `final_line_count` and `capture_mode`. A count including additions may exceed the baseline line count; it is not a speech-accuracy percentage. Pure manual drafts have no voice baseline.
 
-## 6. Target users / advertisable reach
-Small/independent restaurant kitchens, reached through Akash's existing network — not an invented user base.
+## Kitchen and physical plating zones
 
-## 7. Alignment notes (Deepgram JD, for reference)
-- Scoped project, shipped end-to-end — resist scope creep.
-- Contribute to production Deepgram codebase — build on Pipecat, scope a real example/PR.
-- Agentic tooling as default — use Claude Code throughout, keep notes on specific instances.
-- Improve a workflow with AI tools — the Coval eval loop is this bullet.
-- First-principles reasoning — design decisions defensible on their own terms, not copied from a competitor.
+The kernel is **submitted → kitchen acknowledged → per-dish started → ready → picked up → optional delivered**. Acknowledgment does not start cooking. Elapsed timers use actual start timestamps with menu typical minutes when known; missing starts/typical times remain unknown, never percent cooked. Voice or tap may acknowledge/start; ambiguous kitchen phrases must ask for a specific order/dish, especially repeated dishes or multiple orders for one table.
+
+On acknowledgment reserve **K free physical zones atomically for K dish units**. Quantity two requires two distinct dish IDs/zones, not one zone per menu line. If capacity is insufficient, record `zones.waiting` with no partial allocation/overbooking. Retry FIFO as zones free and expose a manual retry path. Order/dish IDs identify the work; table number is display context. Each assignment has a version, rejecting stale camera events. The starter fixture has six zones A–F and a maximum six-unit order; larger requests need explicit splitting.
+
+The default MVP uses the explicit convention **only finished plates enter assigned ready-only zones**. Stable occupancy for 1–2 seconds with no hand (configured demo default 1500ms) marks that physical dish ready. Stable removal after occupancy marks it picked up and frees its zone. This is occupancy detection plus an operating convention, not food identity, modifier or doneness recognition. Producer-reported stable evidence in the mock does not establish real CV accuracy.
+
+Partial progress shows ready units out of total. Emit one `order.ready` notification when every required dish has reached ready; do not notify the whole order on its first plate. Pickup and optional delivered are separate. A plate picked up before the last dish is ready retains its ready milestone.
+
+Unassigned occupancy produces `zone.unexpected` and a review prompt. Returned plates, unknown/blocked/offline feeds, hands, unstable samples, stale versions or empty-before-ready events must not silently free/reassign food. An unavailable feed is **unknown, not empty**. Staff have explicit tap Ready/Pickup and reconciliation controls, including blocked-camera fallback. Tap-ready may occur without a known start time; analytics keeps that duration missing. No extra staff-ready confirmation is required after valid default camera evidence.
+
+There are exactly two conceptual kitchen camera views: plating zones first, fixed countable ingredient zones second. No dining-room video, faces/guest tracking or raw video retention. Board/camera processing and two-feed performance on Qualcomm UNO Q remain unverified.
+
+## Ingredients and analytics
+
+Ingredient detection is second priority: scaffold countable samples, uncertainty/review and accepted movements. A hand alone is not stock change/progress. Recipe expectation, raw observation and accepted movement/balance remain distinct; never deduct both recipe and observed consumption. Returns/restock/waste/corrections preserve provenance and reason. Unclear quantity/attribution stays unresolved.
+
+Core emits canonical versioned events with stable `event_id`, order/dish targets, type, tap/voice/camera/system source, actor, source time and payload. [CanonicalEvent](backend/app/analytics/events.py) is the only new event contract, enriched with receipt time, run/simulation label and accepted-versus-observed outcome. Rejected/stale evidence is not an accepted milestone. Duplicate IDs must not repeat operational effects or export rows. Validated state and local outbox enqueue share the core transaction; adapters never mutate state directly.
+
+Databricks analyzes **where service loses time and where voice/camera fail**. Backend export runs outside requests, batches events and preserves pending failures/retries/health. It must never make a live order wait for cloud analytics. Fake/JSONL modes and ten labeled simulated orders unblock development without cloud credentials; SQL warehouse ingestion is an adapter interface and SQL/dashboard templates remain untested in a real workspace.
+
+Metrics use source timestamps for stage durations, per-dish ready-to-pickup, corrected draft lines, eligible manual fallback actions, zone waiting, camera blocked/offline and unexpected zones. Mandatory Confirm/optional Delivered taps do not count as automation fallback. Missing stages have null/censored counts, not fabricated zeros. Inventory-versus-recipe analysis is conditional on implemented ingredient evidence. Every simulated tile/result must say SIMULATED and include counts. See [analytics definitions](analytics/README.md).
+
+## Deferred and provisional
+
+Deferred from default MVP: positioning, shared task/priority queue, helpers, priority scoring, courses, POS/Square/payment and spoken responses. Existing v1 code remains isolated to preserve previous work. Production auth/durability, live speech/CV/hardware and cloud deployment are not implied by the scaffold.
+
+The supplied brief proposed kitchen push-to-talk, all-ready notify, 60-second escalation and Free Edition. Current task explicitly adopts one all-ready notification and elapsed/typical timers. Kitchen microphone behavior and 60-second escalation remain provisional; escalation is not required/implemented. Free Edition/SQL warehouse/quotas/Zerobus availability require workspace verification, not assumption. The team still needs individual names for the four role owners and confirmation of the proposed screen split; Menu/Core responsibility itself is settled.

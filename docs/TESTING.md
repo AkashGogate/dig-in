@@ -1,42 +1,46 @@
-# TESTING.md
+# Testing and evidence
 
-## Why this is a first-class deliverable
-The hardest part of this project — noise-robust, multi-speaker, overlapping call parsing — is exactly the kind of thing that "works in the quiet demo room, breaks in the real room." A rigorous eval suite is both the engineering safety net and the better live demo.
+Use [STATUS](STATUS.md) for actual current results, [DEMO_PLAN](DEMO_PLAN.md) for the six beats and failure probes, and [analytics README](../analytics/README.md) for simulated data/SQL/metric limitations. Mock observations/transcripts do not measure CV/STT/hardware performance.
 
-## 1. Tooling
-- Pipecat → Coval integration (documented) — use it rather than building an eval harness from scratch.
+From `backend/`:
 
-## 2. Synthetic test set
-1. Single clean call (baseline).
-2. Two overlapping calls, different stations (core hard case).
-3. Three+ simultaneous calls (stress case).
-4. Call against a sustained noise bed.
-5. Truncated/shouted/non-standard phrasing.
-6. Accented speech — don't skip, known weak spot.
-7. False-trigger check — background chatter that is not a call.
+```bash
+uv sync --locked --python 3.11
+uv run pytest -q
+uv run ruff check app/mvp app/analytics app/coordination scripts tests/test_mvp_*.py tests/test_coordination.py
+uv run ruff format --check app/mvp app/analytics app/coordination scripts tests/test_mvp_*.py tests/test_coordination.py
+# Start a fresh backend first; smoke adds uniquely identified demo records:
+uv run python -m scripts.mvp_smoke --base-url http://127.0.0.1:8000
+uv run python -m app.analytics.analyze fixtures/analytics/ten_scripted_orders.jsonl --summary
+uv run python -m app.analytics.export fixtures/analytics/ten_scripted_orders.jsonl --simulate-failures 1 --attempts 3
+```
 
-## 3. Metrics
-Call-parse accuracy per condition, false-trigger rate, missed-call rate under overlap, end-to-end latency.
+No paid keys are required. CI runs the locked tests/scoped Python checks plus Node syntax checks; locally a Node VM/tool runtime may supply syntax validation if shell Node is unavailable. No separate static typechecker or frontend build is configured; runtime Pydantic schemas validate inputs/outputs. Full server startup/HTTP smoke complements route-isolated TestClient checks.
 
-## 4. The interview narrative
-Pick one specific failure Coval caught, show the condition, what broke, the fix, and the before/after metric.
+## Meaningful invariants
 
-## 5. Live-demo safety net
-Every synthetic clip doubles as a "play a test scenario" option in the public demo UI.
+- Voice cannot send; current revision and explicit human Confirm tap required. Unknown/ambiguous menu terms and table mismatch block until explicit review. Edits do not erase flags silently. Correction count uses stable line baseline/final differences, not number of edit taps.
+- Menu aliases/modifiers and nullable kitchen fields work for a second JSON menu without new hardcoded names. Unknowns/candidates never guess. Kitchen table/item utterances must not select the first same-table order or repeated unit.
+- Submit/ack/start/ready/pickup/delivery are distinct. Quantity2 yields two physical dish units/zones. Acknowledgment reserves all K atomically or waits with none; concurrent orders cannot overbook. Release retries waiting orders; stale assignment versions fail.
+- Stable no-hand ready-only occupancy/removal can drive default ready/pickup; hand/unstable/blocked/offline/unknown/empty-before-ready cannot silently complete/free. Unassigned/returned plates require review. Tap-ready/pickup works when camera blocked, without fabricating a start timestamp.
+- Partial ready is not all-ready. Aggregate notification occurs once; duplicate event IDs do not repeat state/notification/export rows. Changed payload under the same ID fails.
+- Recipe expectation and accepted observed stock stay separate; hand/change evidence alone does not deduct or imply progress.
+- Analytics failure/slow drain does not block operations. Exact pending rows/time/ID survive retries within the process. Missing/uncompleted stages are null/censored; eligible manual/fallback denominator excludes mandatory Confirm and optional Delivered. Raw capture content cannot enter analytics.
 
-## 6. Live-mic path status (fixed 2026-11-06)
-Live-mic used to send browser SpeechRecognition transcripts straight to the backend — that never touched Deepgram, so it wasn't the thing being applied for. Fixed: browser MediaRecorder now streams raw webm/opus audio over the WebSocket as binary frames; the backend forwards it to Deepgram's live STT (`backend/app/deepgram_live.py`) and the resulting transcript runs through the identical `parse_call -> check_mismatch -> log` path the scenario fallback uses. Unverified end-to-end against a real `DEEPGRAM_API_KEY` as of this fix — only the degrade-gracefully-without-a-key branch has been exercised live.
+## Browser and real rig limits
 
-## 7. Audio-level corpus + eval harness (built 2026-11-06)
-Real audio now exists: `backend/audio_gen/generate_samples.py` generates 7 WAV clips into `audio-samples/` via macOS `say` + real numpy/soundfile signal mixing — genuine overlapping speech (TC2/TC3) and a genuine escalating white-noise bed (TC4), not just text fixtures. `audio-samples/manifest.json` holds each clip's ground truth.
+Exercise the default two-screen v2 against one shared backend with multiple actor sessions, long/empty/error/unknown states, explicit flag resolution, capacity, status and tap recovery. Verify phone reflow, keyboard/focus, labels,200%zoom and screen reader as available; record precise coverage rather than claiming broad accessibility. STATUS records the current Chrome path and explicitly untested checks.
 
-`backend/eval/run_eval.py` runs that corpus through Deepgram's prerecorded STT (`backend/eval/deepgram_prerecorded.py`) and the SAME `parse_call`/`check_mismatch` code the live server uses, scores call-parse accuracy / false-trigger / missed-call / latency, and writes `audio-samples/scorecard.md`.
+Real STT requires deliberate capture/privacy review and noisy-room tests; real CV requires calibrated overhead zones, stable interval/no-hand evidence, blocked/offline/returned plate scenarios and actual hardware timing. Cloud connector/SQL/dashboard work requires official capability verification and live workspace credentials. Synthetic fixture timings are not restaurant or staff benchmarks.
 
-**The Coval gap, stated plainly:** this project's docs call for Pipecat → Coval integration specifically. Coval (coval.dev) is a third-party hosted product needing its own account/API key, which this build doesn't have — so it isn't wired in. What's built instead is a local, Deepgram-grounded harness covering the same test classes and metrics. If a `COVAL_API_KEY` shows up later, swap `transcribe_file` for Coval's ingestion API; the manifest/scoring logic doesn't need to change.
+## Preserved regressions
 
-**Verified:** the scorer itself is unit-tested (`tests/test_eval_scoring.py`) to actually catch a misheard quantity and a false-trigger, not just pass cleanly — and `--mode mock` ran clean (trivially 100%, since it skips real STT) to prove the harness runs end to end. **Not verified:** real Deepgram transcription of the generated audio — needs `DEEPGRAM_API_KEY`, same gap as the live-mic path.
+The existing parser/mismatch/eval tests and broad `/api/v1` coordination tests remain regression coverage, not new MVP semantics. `scripts.smoke_demo` is v1 only. The original seven synthetic WAV clips/manifest and legacy eval remain available:
 
-Accented-speech caveat (TC6): uses a different macOS `say` voice/locale (en_IN) as a stand-in for a real accent — a known limitation of synthetic TTS, not a substitute for real accented speakers.
+```bash
+uv run python -m eval.run_eval --mode mock
+# Real STT only with explicit provider configuration/usage:
+# uv run python -m eval.run_eval --mode deepgram
+```
 
-## 8. Current status
-`backend/tests/test_call_parser.py` and `backend/tests/test_mismatch.py` cover synthetic cases 1, 2, 5, 7 at the **transcript** level (text in, structured call out) — this is the logic Claude Code can verify without touching audio. `backend/tests/fixtures/transcripts.json` holds the corpus, reused by the parser tests now and by the demo's "play a test scenario" button once audio clips exist. Audio-level noise/overlap/Coval testing is not implemented yet (step 5 of CLAUDE.md's build order) — that requires real or synthesized audio files in `audio-samples/`, which don't exist yet.
+Mock eval feeds ground-truth transcripts and proves scoring/plumbing, not microphone quality. The harness writes the checked-in scorecard; preserve provenance and do not claim regenerated mock scores as speech improvement. Legacy voice lab logging remains separate from v2 capture privacy. The optional Pipecat extra is outside the default checks.

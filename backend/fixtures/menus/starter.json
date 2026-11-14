@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "id": "starter",
+  "name": "SIMULATED two-dish kitchen menu",
+  "ingredient_zones": {"salmon": "salmon", "greens": "greens", "rice": "rice"},
+  "items": [
+    {
+      "id": "salmon", "name": "Salmon & greens", "aliases": ["salmon", "grilled salmon"], "price_cents": 2400,
+      "modifiers": [{"id": "no_butter", "name": "No butter", "aliases": ["without butter"]}, {"id": "sauce_side", "name": "Sauce on side", "aliases": ["sauce on the side"]}],
+      "call_out_name": "salmon", "station": "grill", "typical_minutes": 8,
+      "recipe": [{"ingredient": "salmon", "qty": 1, "zone_id": "salmon"}, {"ingredient": "greens", "qty": 1, "zone_id": "greens"}]
+    },
+    {
+      "id": "risotto", "name": "Garden risotto", "aliases": ["risotto"], "price_cents": 1800,
+      "modifiers": [{"id": "no_cheese", "name": "No cheese", "aliases": ["without cheese"]}, {"id": "sauce_side", "name": "Sauce on side", "aliases": ["sauce on the side"]}],
+      "call_out_name": "risotto", "station": "saute", "typical_minutes": 12,
+      "recipe": [{"ingredient": "rice", "qty": 1, "zone_id": "rice"}, {"ingredient": "greens", "qty": 1, "zone_id": "greens"}]
+    }
+  ]
+}

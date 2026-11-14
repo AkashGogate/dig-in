@@ -1,11 +1,17 @@
-# REQUIREMENTS.md
+# MVP requirements map
 
-One-sentence project statement: kitchen-copilot is a voice-native agent that listens to a live, noisy kitchen, turns shouted fire calls into structured records in real time, and catches ticket mismatches before the wrong plate goes out.
+[PROJECT_SPEC](../PROJECT_SPEC.md) owns intent; [STATUS](STATUS.md) owns actual implementation. The normalized [team brief](MVP_TEAM_BRIEF.md) and [decision ledger](DECISIONS.md) explain narrowed scope.
 
-| # | Requirement | How kitchen-copilot satisfies it |
-|---|---|---|
-| 1 | Voice-native application | Every core function depends entirely on live spoken audio in a hands-busy, screen-free kitchen; no keyboard/button substitute. |
-| 2 | Technically sound and impressive | Real-time, multi-speaker, overlapping-speech parsing under sustained kitchen noise, validated through a Coval-connected simulation suite with a documented failure-found-and-fixed story. |
-| 3 | Live demoable | A hosted, public demo page lets anyone speak a live call themselves or trigger pre-recorded hard-condition test clips through the identical pipeline. |
-| 4 | Benefits people | Cuts order errors and mental load on kitchen staff mid-service. |
-| Bonus | Personal relevance | Motivated by Akash's own frustration with low-effort food culture and respect for kitchens that still do it right. |
+| Requirement | Executable boundary / evidence |
+| --- | --- |
+| Human-reviewed table/menu draft; unknown/mismatch blocked | `app/mvp/contracts.py`, `menu.py`, `voice.py`, `domain.py`; menu/voice and MVP domain tests |
+| One physical dish per zone; all K reserved on ack | MVP domain allocation, zone versions, capacity/retry tests |
+| Stable no-hand ready-only occupancy/removal and tap recovery | Zone observation/status/reconciliation actions; mock evidence, not live CV |
+| Partial progress then one all-ready notification; timers | Per-dish timestamps and aggregate notifications; no percent cooked |
+| Menu independent, alias/modifier IDs, null kitchen details | Canonical menu schema, starter/second JSON and matcher/import-status tests |
+| No double stock deduction | Separate recipe expectation/observation/accepted movement; ingredient scaffold second priority |
+| Nonblocking analytics, identity/time/outcome and retry dedup | CanonicalEvent, outbox, fake/JSONL adapters; failure tests and labeled ten-order fixture |
+| Four lanes with owned core integration responsibility | Menu owner also owns Core/integration; names and proposed screen split pending |
+| Two primary screens and portable context | Server/Kitchen v2 default; Git docs/handoffs; isolated legacy demos |
+
+Deferred: positioning, shared queue/helpers/priority, courses, spoken responses, POS/payments. Production auth/durability/cloud/hardware and noisy-hall performance require later evidence. No dining-room camera or raw capture analytics.
