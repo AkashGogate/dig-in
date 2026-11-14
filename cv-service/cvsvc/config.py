@@ -44,6 +44,8 @@ class IngredientConfig(BaseModel):
     mode: Literal["trips", "slots"] = "trips"
     min_trip_s: float = 0.25        # shorter motion bursts are noise
     trip_settle_s: float = 0.6      # no motion this long ends a trip
+    body_motion_fraction: float = 0.25  # share of the frame occupied by something new => a person in front, not a reach
+    body_hold_s: float = 1.0        # keep treating motion as "body" this long after the person leaves
     settle_s: float = 1.0
     occlusion_timeout_s: float = 6.0
     snapshot_interval_s: float = 10
@@ -60,6 +62,15 @@ class BayConfig(BaseModel):
     max_plate_area_px: int = 60000
     min_circularity: float = 0.6
     diff_threshold: int = 30
+    # diff: foreground = difference vs the empty reference (CV_SPEC 7.2)
+    # white: foreground = bright, low-saturation pixels (white plates on a coloured counter);
+    #        independent of the reference, so exposure drift and wood grain don't matter
+    detector: Literal["diff", "white"] = "diff"
+    white_s_max: int = 80      # absolute bounds ...
+    white_v_min: int = 130
+    white_s_rel: float = 0.7   # ... and relative to the bay's median (the counter), which
+    white_v_rel: float = 1.1   # survives the camera's auto white balance / exposure shifts
+    min_solidity: float = 0.9  # area / convex hull: plates are solid, wood-grain noise is not
 
 
 class PlatingConfig(BaseModel):
@@ -81,6 +92,7 @@ class HealthConfig(BaseModel):
     degraded_light_shift: float = 0.25
     degraded_focus_drop: float = 0.40
     recovery_wait_s: float = 2.0
+    warmup_s: float = 2.0  # ignore the first seconds of frames (auto-exposure settling)
     heartbeat_s: float = 5.0
 
 

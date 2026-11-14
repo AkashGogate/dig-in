@@ -41,6 +41,7 @@ class HealthMonitor:
         self.since = 0.0
         self.last_frame_ts: float | None = None
         self.bg: np.ndarray | None = None
+        self.first_frame_ts: float | None = None
         self.big_change_since: float | None = None
         self.ref_lum: float | None = None
         self.ref_focus: float | None = None
@@ -80,10 +81,14 @@ class HealthMonitor:
         self.last_lum, self.last_focus = lum, focus
         g = gray.astype(np.float32)
         big = False
-        if self.bg is None:
-            self.bg = g.copy()
+        if self.first_frame_ts is None:
+            self.first_frame_ts = ts
+        if self.bg is None or ts - self.first_frame_ts < self.cfg.warmup_s:
+            self.bg = g.copy()  # camera auto-exposure settles during warm-up; don't judge yet
         else:
-            frac = float((cv2.absdiff(g, self.bg) > 30).mean())
+            # match overall brightness first so an auto-exposure shift is not a "blocked view"
+            g_n = g * (float(self.bg.mean()) / max(float(g.mean()), 1.0))
+            frac = float((cv2.absdiff(g_n, self.bg) > 30).mean())
             big = frac > self.cfg.big_change_fraction
             if not big:
                 cv2.accumulateWeighted(g, self.bg, 0.05)  # don't learn the obstruction into the background
@@ -92,6 +97,8 @@ class HealthMonitor:
         else:
             self.big_change_since = None
 
+        if ts - (self.first_frame_ts or ts) < self.cfg.warmup_s:
+            return None  # camera still settling (first frames are often black)
         if lum < self.cfg.dark_threshold:
             return self._set(ts, "obstructed", "dark")
         # blur only counts relative to the calibrated scene: a plain, low-texture counter

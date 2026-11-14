@@ -42,6 +42,17 @@ class BayCounter:
 
     def foreground(self, frame: np.ndarray) -> np.ndarray:
         """`frame` is the full camera frame; returns the foreground mask in ROI coordinates."""
+        if self.cfg.detector == "white":
+            hsv = cv2.cvtColor(self.crop(frame), cv2.COLOR_BGR2HSV)
+            inside = self.mask > 0
+            sat, val = hsv[..., 1], hsv[..., 2]
+            s_thr = min(self.cfg.white_s_max, self.cfg.white_s_rel * float(np.median(sat[inside])))
+            v_thr = max(self.cfg.white_v_min, self.cfg.white_v_rel * float(np.median(val[inside])))
+            fg = ((sat <= s_thr) & (val >= v_thr) & inside).astype(np.uint8) * 255
+            # fill printed logos/text inside the plate before the usual cleanup
+            fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, _KERNEL, iterations=3)
+            fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, _KERNEL)
+            return fg
         diff = normalized_diff(self.crop(frame), self.reference, self.mask)
         _, fg = cv2.threshold(diff, self.cfg.diff_threshold, 255, cv2.THRESH_BINARY)
         fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, _KERNEL)
@@ -60,7 +71,9 @@ class BayCounter:
                 continue
             perim = cv2.arcLength(c, True)
             circ = 4 * math.pi * area / (perim * perim) if perim > 0 else 0.0
-            if lo <= area <= hi and circ >= self.cfg.min_circularity:
+            hull = cv2.contourArea(cv2.convexHull(c))
+            solidity = area / hull if hull > 0 else 0.0
+            if lo <= area <= hi and circ >= self.cfg.min_circularity and solidity >= self.cfg.min_solidity:
                 n += 1
                 kept.append(c)
                 continue
@@ -69,8 +82,10 @@ class BayCounter:
             if split >= 2:
                 n += split
                 conf_penalty += 0.1
+            elif solidity < self.cfg.min_solidity or circ < 0.45:
+                continue  # irregular blob (wood grain, glare, shadow): not a plate
             elif area <= hi * 1.2:
-                n += 1  # one plate, unusual shape
+                n += 1  # one plate, unusual shape (e.g. clipped by the bay edge)
                 conf_penalty += 0.2
             else:
                 n += max(1, round(area / ((lo + hi) / 2)))

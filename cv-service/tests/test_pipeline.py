@@ -108,7 +108,7 @@ def test_plate_arrival_removal_with_context(setup):
 
 def test_obstruction_freezes_and_reconciles(setup):
     w, ctx, events, feed, _ = setup
-    feed(scene(tokens=range(8)), 1.0)
+    feed(scene(tokens=range(8)), 2.5)  # past the camera warm-up
     n = len(events)
     dark = np.full((H, W, 3), 5, np.uint8)
     feed(dark, 0.2)
@@ -230,14 +230,21 @@ def test_brief_flicker_is_not_a_trip(trip_setup):
     assert of(events, "INGREDIENT_TRIP") == []
 
 
-def test_person_passing_both_zones_is_pending(trip_setup):
+def test_arm_passing_through_another_zone_credits_only_the_target(trip_setup):
     w, ctx, events, feed = trip_setup
     feed(base(), 1.0)
-    feed(hand_frames(60, 40, 1.0, w=330, h=200))   # big blob over Z1 and Z2
+    # forearm clips the corner of Z1 while the hand fills Z2
+    frames = []
+    for i in range(FPS):
+        img = base()
+        dx = (i % 4) * 6
+        cv2.rectangle(img, (280 + dx, 70), (400 + dx, 210), (120, 160, 220), -1)   # hand in Z2
+        cv2.rectangle(img, (170 + dx, 150), (280 + dx, 190), (120, 160, 220), -1)  # forearm across Z1 edge
+        frames.append(img)
+    feed(frames)
     feed(base(), 2.0)
     trips = of(events, "INGREDIENT_TRIP")
-    assert len(trips) == 2
-    assert all(t["status"] == "pending_review" and t["payload"]["reason"] == "multi_zone" for t in trips)
+    assert [(t["zone_id"], t["status"]) for t in trips] == [("Z2", "observed")]
 
 
 def test_long_occlusion_pending_once(trip_setup):
@@ -247,3 +254,58 @@ def test_long_occlusion_pending_once(trip_setup):
     feed(base(), 2.0)
     trips = of(events, "INGREDIENT_TRIP")
     assert len(trips) == 1 and trips[0]["payload"]["reason"] == "long_occlusion"
+
+
+def test_exposure_shift_is_not_obstruction():
+    from cvsvc.config import HealthConfig
+    from cvsvc.health import HealthMonitor
+    rng = np.random.default_rng(3)
+    scene_img = rng.integers(60, 200, (H, W, 3), dtype=np.uint8)
+    hm = HealthMonitor(HealthConfig(), reference=scene_img)
+    t = 0.0
+    for _ in range(40):  # warm-up + settle
+        t += 1 / FPS
+        hm.update(t, scene_img)
+    darker = cv2.convertScaleAbs(scene_img, alpha=0.75)
+    for _ in range(60):
+        t += 1 / FPS
+        hm.update(t, darker)
+    assert hm.state != "obstructed", hm.reason
+    blocked = np.full((H, W, 3), 120, np.uint8)  # e.g. a hand over the lens, still lit
+    for _ in range(40):
+        t += 1 / FPS
+        hm.update(t, blocked)
+    assert hm.state == "obstructed"
+
+
+
+def test_walking_past_registers_nothing(trip_setup):
+    w, ctx, events, feed = trip_setup
+    feed(base(), 1.0)
+    # a person crosses the frame left to right, between the camera and the board
+    frames = []
+    for i in range(int(2.5 * FPS)):
+        img = base()
+        x = -250 + i * 24
+        cv2.rectangle(img, (x, 0), (x + 260, H), (90, 110, 150), -1)
+        frames.append(img)
+    feed(frames)
+    feed(base(), 2.0)
+    assert of(events, "INGREDIENT_TRIP") == []
+
+
+def test_reach_still_counts_after_someone_passed(trip_setup):
+    w, ctx, events, feed = trip_setup
+    feed(base(), 1.0)
+    frames = []
+    for i in range(int(2.5 * FPS)):
+        img = base()
+        x = -250 + i * 24
+        cv2.rectangle(img, (x, 0), (x + 260, H), (90, 110, 150), -1)
+        frames.append(img)
+    feed(frames)
+    feed(base(), 2.0)
+    feed(hand_frames(90, 80, 1.0))
+    feed(base(), 2.0)
+    trips = of(events, "INGREDIENT_TRIP")
+    assert [(t["zone_id"], t["status"]) for t in trips] == [("Z1", "observed")]

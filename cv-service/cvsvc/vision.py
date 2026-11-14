@@ -67,3 +67,34 @@ class MotionDetector:
         moving = (d > self.threshold) & (self.mask > 0)
         self.last_area = int(moving.sum())
         return self.last_area >= self.min_area_px
+
+
+class PresenceDetector:
+    """Share of the frame that differs from a slowly learned picture of the empty scene.
+
+    Unlike frame differencing, a person standing still in front of the camera keeps counting
+    at their full size. The background only learns where nothing is present (plus a very slow
+    global drift so lighting changes are absorbed)."""
+
+    def __init__(self, size: tuple[int, int] = (160, 90), threshold: int = 30,
+                 alpha_free: float = 0.05, alpha_drift: float = 0.002) -> None:
+        self.size = size
+        self.threshold = threshold
+        self.alpha_free = alpha_free
+        self.alpha_drift = alpha_drift
+        self.bg: np.ndarray | None = None
+        self.fraction = 0.0
+
+    def update(self, gray: np.ndarray) -> float:
+        g = cv2.GaussianBlur(cv2.resize(gray, self.size, interpolation=cv2.INTER_AREA), (5, 5), 0)
+        g = g.astype(np.float32)
+        if self.bg is None:
+            self.bg = g.copy()
+            return 0.0
+        # no brightness matching here: a person entering shifts the frame mean and would cancel out
+        present = np.abs(g - self.bg) > self.threshold
+        self.fraction = float(present.mean())
+        free = (~present).astype(np.uint8)
+        cv2.accumulateWeighted(g, self.bg, self.alpha_free, mask=free)
+        cv2.accumulateWeighted(g, self.bg, self.alpha_drift)
+        return self.fraction

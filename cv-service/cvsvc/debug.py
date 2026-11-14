@@ -45,6 +45,7 @@ def draw_bay(img, polygon, state: str, bay_id: str, count: int, assignment, cont
     if contours:
         cv2.drawContours(img, contours, -1, (255, 200, 0), 2)
     x, y = polygon[0]
+    y = max(y, 32)  # keep the label below the camera banner
     label = f"Bay {bay_id}"
     if assignment is not None:
         label += f" - table {assignment.table}, {assignment.course}" if assignment.table else f" - {assignment.ticket_id}"

@@ -15,11 +15,15 @@ default_trip_qty: 1           # INGREDIENT_TRIP: qty when the recipe has no line
 # Stock is owned here (dummy values for now). In trip mode the camera only reports
 # "a hand reached into zone X"; each trip subtracts the recipe qty for that zone.
 zones:
-  Z1: {ingredient: lettuce, on_hand: 20}
-  Z2: {ingredient: tomato, on_hand: 20}
-  Z3: {ingredient: cheese, on_hand: 20}
+  Z1: {ingredient: bun, on_hand: 20}
+  Z2: {ingredient: lettuce, on_hand: 20}
+  Z3: {ingredient: tomato, on_hand: 20}
+  Z4: {ingredient: patty, on_hand: 20}
+  Z5: {ingredient: cheese, on_hand: 20}
+  Z6: {ingredient: onion, on_hand: 20}
+  Z7: {ingredient: sauce, on_hand: 20}
 
 recipes:                      # qty per trip; 1 for everything for now
-  burger: [{zone: Z1, qty: 1}, {zone: Z2, qty: 1}, {zone: Z3, qty: 1}]
-  salad: [{zone: Z1, qty: 1}, {zone: Z2, qty: 1}]
-  grilled_cheese: [{zone: Z3, qty: 1}]
+  burger: [{zone: Z1, qty: 1}, {zone: Z2, qty: 1}, {zone: Z3, qty: 1}, {zone: Z4, qty: 1}, {zone: Z5, qty: 1}, {zone: Z7, qty: 1}]
+  salad: [{zone: Z2, qty: 1}, {zone: Z3, qty: 1}, {zone: Z6, qty: 1}]
+  grilled_cheese: [{zone: Z1, qty: 1}, {zone: Z5, qty: 1}]

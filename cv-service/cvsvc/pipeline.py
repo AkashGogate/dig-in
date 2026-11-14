@@ -24,7 +24,7 @@ from cvsvc.ingredient.zones import ZoneCounter
 from cvsvc.plating.bays import BayCounter
 from cvsvc.plating.tracker import BayTracker
 from cvsvc.sources import FrameSource
-from cvsvc.vision import MotionDetector, mean_luminance
+from cvsvc.vision import MotionDetector, PresenceDetector, mean_luminance
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +86,8 @@ class CameraWorker:
         self.captured_path: str | None = None
         self.recovering_since: float | None = None
         self.occluded_bays: set[str] = set()
+        self.scene_motion: PresenceDetector | None = None
+        self.body_until = 0.0
         self.stop = threading.Event()
 
     # ---- emit helpers ----
@@ -259,12 +261,25 @@ class CameraWorker:
             self.emit(em.pending(zid, z.cfg.ingredient, res.reason or "unstable_count", res.before, res.after,
                                  res.confidence, attr, ts))
 
+    def _scene_moving_fraction(self, gray) -> float:
+        """Share of the frame occupied by something that isn't normally there (a person)."""
+        if self.scene_motion is None:
+            self.scene_motion = PresenceDetector()
+        return self.scene_motion.update(gray)
+
     def _process_trips(self, ts, gray) -> None:
         motions = {zid: z.motion.update(gray) for zid, z in self.zones.items()}
+        icfg = self.cfg.ingredient
+        if self._scene_moving_fraction(gray) > icfg.body_motion_fraction:
+            self.body_until = ts + icfg.body_hold_s
+        # fraction of each zone's area that is moving; the largest moving fraction is "dominant"
+        frac = {zid: z.motion.last_area / max(1, int((z.motion.mask > 0).sum())) for zid, z in self.zones.items()}
+        moving = [zid for zid, m in motions.items() if m]
+        dominant = max(moving, key=lambda zid: frac[zid]) if moving else None
+        crowded = sum(1 for zid in moving if frac[zid] > 0.3) >= 3 or ts < self.body_until
         version = self.o.context.active_version()
         for zid, z in self.zones.items():
-            other = any(m for k, m in motions.items() if k != zid)
-            res = z.trip.update(ts, motions[zid], other, version)
+            res = z.trip.update(ts, motions[zid], dominant == zid, crowded, version)
             if res is None:
                 continue
             attr = self.o.context.attribution(res.version_at_start)
