@@ -13,7 +13,7 @@ import httpx
 
 DEEPGRAM_PRERECORDED_URL = (
     "https://api.deepgram.com/v1/listen"
-    "?model=nova-3&diarize=true&smart_format=true&punctuate=true"
+    "?model=nova-3&diarize=true&utterances=true&smart_format=true&punctuate=true"
 )
 
 

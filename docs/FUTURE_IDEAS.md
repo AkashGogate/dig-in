@@ -16,5 +16,15 @@ Rough directions worth exploring later:
 - Real-time push mechanism — webhook out from the FastAPI backend, or does the menu system poll?
 - Does this stay back-of-house-only (PROJECT_SPEC.md's current non-goal boundary around front-of-house/customer-facing features), or does it deliberately cross that line? Worth deciding explicitly rather than drifting into it.
 
+## Async kitchen-to-server comms / "heard" paging system
+Core idea: a second, two-way channel distinct from fire-call capture. Servers get kitchen state (queue position, backed-up orders, item-ready pages) asynchronously - via a mic at a station they walk up to and trigger themselves, or an earpiece/phone feed - and pull messages on their own downtime rather than being interrupted mid-table. Includes a lightweight "heard" acknowledgment so a page is marked handled without needing a full reply.
+
+Deliberately asynchronous by design: the explicit goal is to NOT erode the social/table-side interaction servers are mid-task on. This is the opposite direction of the current pipeline (kitchen voice -> structured log); this would be kitchen state -> server, pulled on demand.
+
+Open questions before this gets scoped:
+- This is kitchen-to-FLOOR-STAFF comms, not customer ordering, so it doesn't trip the "no customer-facing ordering" non-goal literally - but it's a second, much larger product (two-way dispatch/paging) layered on top of the current one (one-directional call capture). Worth deciding explicitly whether this becomes v2 of kitchen-copilot or a separate project, rather than drifting into it.
+- Where does the "heard" ack get stored/surfaced - same structured log as fire calls, or a separate message queue entity?
+- Earpiece/phone delivery implies a whole notification-delivery mechanism (push, SMS, a companion app) that doesn't exist anywhere in the current scaffold.
+
 ## Why this is a note, not a build
 PROJECT_SPEC.md's whole discipline is "ship one scoped thing end-to-end, resist scope creep." This is exactly the kind of idea that's worth capturing before it's forgotten, but wrong to start building before the current scope (noise-robustness, Coval/eval, live-mic verification) is actually finished and demoable.

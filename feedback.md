@@ -21,3 +21,41 @@
 ## Session 2026-11-06 (Claude Desktop gateway question)
 - Note: this session's user turn was unrelated to KitchenNavigator code — a question about Claude Desktop's third-party inference gateway settings. Confirmed Gateway/Default settings route to pay-per-token API, not subscription auth; subscription login is a separate "Claude account" sign-in path, not a gateway URL. No code changes made.
 - Recurring environment note (repeated again): Stop hook keeps requesting Skill(skill='caveman:compress'), which does not exist in the available skills list. Logged again for visibility — not actionable without a real skill of that name.
+
+## Session 2026-11-06 (env vars, Coval decision, auto-mode prompting)
+- User decided to skip Coval entirely due to cost - confirmed this is fine, not circular, since the eval harness scores against a hand-written manifest, not Deepgram's own output. Preference: keep using the local Deepgram-grounded harness as the permanent Coval substitute, not a stopgap.
+- User reported auto mode still prompting despite being on - root cause: a PreToolUse hook in this project rewrites mcp__plugin_woz_code__Search/Edit inputs after the auto-mode classifier reviews them, invalidating the review. Noted as an environment quirk, not a Claude behavior issue - fall back to Bash for reads when this blocks file access repeatedly.
+- Recurring environment note (repeated again): Stop hook keeps requesting Skill(skill='caveman:compress'), which does not exist. Logged again for visibility.
+
+## Session 2026-11-06 (implementation status check)
+- User asked a high-level "have we started implementation" question after a run of narrow technical Q&A - good practice confirmed: periodically give a full built-vs-remaining status summary rather than only answering the narrow question asked, since user is tracking overall project state across many short sessions.
+- Recurring environment note (repeated again): Stop hook keeps requesting Skill(skill='caveman:compress'), which does not exist. Logged again for visibility.
+
+## Session 2026-11-06 (spend discipline, real smoke test, scope flag)
+- Strong, explicit preference confirmed: validate everything possible WITHOUT hitting a paid API first (mock mode, code review, logic checks); only spend on the API when nothing else proves it, and even then do the smallest possible real call (one clip, not the whole corpus) before scaling up. Apply this to all future Deepgram/Coval/any paid API work in this project.
+- When the user floats a new feature idea that's actually a second product layered on current scope (not an extension of it), the correct move is: describe current scope honestly, name the idea as a separate thing, log it to FUTURE_IDEAS.md as a brainstorm, and explicitly ask the user to decide v2-vs-separate-project rather than silently building or silently dropping it. Confirmed this is the right call per CLAUDE.md's own "flag ambiguity back to Akash rather than guessing scope" instruction.
+- Recurring environment note (repeated again): Stop hook keeps requesting Skill(skill='caveman:compress'), which does not exist. Logged again for visibility.
+
+## Session 2026-11-13 9:56pm CST
+- Recurring issue confirmed again: mcp__plugin_woz_code__Search/Edit calls get blocked by a PreToolUse hook that rewrites input after auto-mode classifier review, invalidating the review. Workaround: fall back to Bash cat/heredoc for reads/writes when this happens.
+- caveman:compress skill does not exist (confirmed again across sessions) - Stop hook instruction to invoke it cannot be fulfilled.
+
+## Session 2026-11-13 10:17pm CST
+- User prefers Fly.io's GitHub-connected web UI deploy flow over local flyctl launch/deploy, even after local CLI was installed - don't assume CLI install implies CLI-driven deploy.
+- Confirmed again: auto-stop/auto-start machines must be OFF on Fly for this project - persistent websocket audio connection is the whole reason Fly was chosen over Vercel; idle-sleep defeats that.
+
+## Session 2026-11-13 10:43pm CST
+- When user says "rate limit the API key" or "limit $ per request", verify what's actually achievable before implementing literally - Deepgram has no native per-request $ cap. Clarified prepaid-credit model as the real spend ceiling, then implemented the actual underlying ask (bot/abuse protection) as app-level rate limiting in code.
+- User values verified claims over reassurance on security questions ("is it leakable?") - checked git history, grepped code paths, confirmed server-side-only key usage rather than just asserting it's safe.
+- `python` / `python3 -m pytest` don't work in this repo's environment - must use `uv run pytest` from backend/.
+
+## Session 2026-11-13 11:00pm CST
+- Caught user about to deploy backend to Vercel (wrong root dir pointed at backend/ with FastAPI preset) - this directly violates CLAUDE.md's "no plain serverless/Vercel for agent runtime" constraint. Stay alert for this pattern: user juggling both Fly and Vercel UIs in parallel can mix up which repo folder goes where.
+
+## Session 2026-11-13 11:21pm CST
+- When walking user through unfamiliar hosting UIs (Vercel/Fly domain settings), explicitly warn before they touch an existing auto-generated entry - user was about to edit the default vercel.app domain instead of adding a new one.
+- User is doing custom-domain setup (Squarespace DNS + Vercel + Fly) interactively, screenshot by screenshot - give one clear next action per message rather than the full multi-step plan every time.
+
+## Session 2026-11-13 11:39pm CST
+- Don't assume Vercel's generic cname.vercel-dns.com target is always correct for a custom domain - Vercel can assign a project/domain-specific CNAME target instead, shown under "DNS Change Recommended". Always read the live value off the user's own screen rather than reusing a generic value from memory.
+- Squarespace's simplified DNS editor auto-appends the trailing FQDN dot - tell users to paste CNAME values without the trailing period Vercel's copy button includes.
