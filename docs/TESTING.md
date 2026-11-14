@@ -44,3 +44,15 @@ uv run python -m eval.run_eval --mode mock
 ```
 
 Mock eval feeds ground-truth transcripts and proves scoring/plumbing, not microphone quality. The harness writes the checked-in scorecard; preserve provenance and do not claim regenerated mock scores as speech improvement. Legacy voice lab logging remains separate from v2 capture privacy. The optional Pipecat extra is outside the default checks.
+
+## DIG IN voice eval
+
+Server orders and Kitchen callouts, each clean / kitchen noise bed / overlapping second speaker (18 synthetic `say` clips, 52s, `audio-samples/dig-in/`). From `backend/`:
+
+```bash
+uv run python -m audio_gen.generate_dig_in            # macOS only; regenerates clips + manifest
+uv run python -m eval.run_dig_in_eval --mode mock     # free: ground-truth text through the v2 parser; plumbing proof, not speech accuracy
+uv run python -m eval.run_dig_in_eval --mode deepgram # BILLABLE: prints seconds/cost and refuses without --confirm-billable
+```
+
+Live scoring uses the same nova-3/keyterm/`mip_opt_out` params as the live adapter. Run it only with explicit approval for that run, then add `--confirm-billable` (needs `DEEPGRAM_API_KEY`). The scorecard (`audio-samples/dig-in/scorecard.md`) states its mode; synthetic TTS is not a real kitchen.
