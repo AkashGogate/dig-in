@@ -9,6 +9,7 @@ const uid = () => globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math
 const human = value => String(value || "").replaceAll("_", " ");
 let state = null, actor = null, session = null, busy = false, uncertain = null;
 let draftId = "", draftSignature = "", menuSignature = "", view = "server", holding = false;
+let suggested = new Set();
 
 function feedback(message, error = false) {
   $("feedback").textContent = message;
@@ -55,6 +56,7 @@ async function dispatch(payload, source = "tap", existing = null) {
     $("retry-bar").hidden = true;
     state = data.state;
     if (payload.action === "start_order") draftId = data.result.order_id;
+    suggested = new Set(payload.action === "kitchen_voice" ? (data.result?.flags || []).flatMap(flag => flag.candidates || []) : []);
     render();
     const flags = data.result?.flags;
     if (Array.isArray(flags) && flags.length) {
@@ -196,7 +198,8 @@ function dishMarkup(dish, kitchen) {
     if (["queued", "started"].includes(dish.stage) && dish.zone_id) controls += `<button class="small" data-action="ready-dish" data-id="${esc(dish.id)}" data-command>Tap ready</button>`;
   }
   if (!kitchen && dish.stage === "ready") controls += `<button class="small primary" data-action="pickup-dish" data-id="${esc(dish.id)}" data-command>Confirm plate pickup</button>`;
-  return `<div class="dish"><div><p><strong>${esc(dish.item_name || menuItem(dish.menu_id)?.name || dish.menu_id)}</strong>${dish.seat ? ` · seat ${dish.seat}` : ""}</p><small>Unit ${esc(dish.id)} · ${dish.zone_id ? `Zone ${esc(dish.zone_id)}` : "No zone assigned"}${dish.station ? ` · ${esc(dish.station)}` : " · station unknown"}</small><p class="dish-timer">${esc(elapsed(dish.started_at))} · ${dish.typical_minutes == null ? "typical time unknown" : `typical ${esc(dish.typical_minutes)} min`}</p>${dish.modifiers?.length ? `<small>${esc(modifierNames(dish.menu_id, dish.modifiers).join(", "))}</small>` : ""}${dish.requests ? `<small><strong>Guest request:</strong> ${esc(dish.requests)}</small>` : ""}<span class="dish-stage">${esc(human(dish.stage))}</span></div><div class="actions">${controls}</div></div>`;
+  const mark = kitchen && dish.stage === "queued" && suggested.has(dish.menu_id);
+  return `<div class="dish${mark ? " suggested" : ""}"><div>${mark ? '<span class="suggested-tag">Suggested by voice, tap to confirm</span>' : ""}<p><strong>${esc(dish.item_name || menuItem(dish.menu_id)?.name || dish.menu_id)}</strong>${dish.seat ? ` · seat ${dish.seat}` : ""}</p><small>Unit ${esc(dish.id)} · ${dish.zone_id ? `Zone ${esc(dish.zone_id)}` : "No zone assigned"}${dish.station ? ` · ${esc(dish.station)}` : " · station unknown"}</small><p class="dish-timer">${esc(elapsed(dish.started_at))} · ${dish.typical_minutes == null ? "typical time unknown" : `typical ${esc(dish.typical_minutes)} min`}</p>${dish.modifiers?.length ? `<small>${esc(modifierNames(dish.menu_id, dish.modifiers).join(", "))}</small>` : ""}${dish.requests ? `<small><strong>Guest request:</strong> ${esc(dish.requests)}</small>` : ""}<span class="dish-stage">${esc(human(dish.stage))}</span></div><div class="actions">${controls}</div></div>`;
 }
 function renderTickets() {
   const orders = Object.values(state.orders).filter(order => order.status !== "draft" && order.status !== "delivered");
@@ -242,13 +245,17 @@ async function loadVoiceStatus() {
     voice.authRequired = Boolean(status.auth_required);
   } catch { voice.live = false; }
   $("voice-mode-tag").textContent = voice.live ? "LIVE MIC · DEEPGRAM" : "SIMULATED TRANSCRIPTION";
-  $("kitchen-hold").hidden = !voice.live;
+  updateKitchenMic();
   if (voice.live) {
     $("voice-note").textContent = "Hold to talk: say the table first, then each dish. Audio streams to Deepgram and is discarded after transcription. Release to build an editable draft; nothing is sent until you review and tap Confirm and send.";
     $("hold-talk").textContent = "Hold to talk";
     $("capture-status").textContent = "Live mic ready. Hold with pointer, Space or Enter; release to stop.";
     $("transcript").labels[0].firstChild.textContent = "Transcript (live words appear here; you can also type)";
   }
+}
+const kitchenRole = () => ["cook", "lead"].includes(actor?.role);
+function updateKitchenMic() {
+  $("kitchen-hold").hidden = !(voice.live && kitchenRole());
 }
 const captureUi = target => target === "kitchen"
   ? {field: $("kitchen-transcript"), status: $("kitchen-capture-status"), button: $("kitchen-hold")}
@@ -280,6 +287,7 @@ async function startLive(target) {
         const message = JSON.parse(event.data);
         if (message.type === "interim" || message.type === "final") ui.field.value = message.text;
         if (message.type === "limit" || message.type === "error") ui.status.textContent = message.message;
+        if (message.type === "error") cap.error = message.message;
         if (message.type === "done") { cap.text = message.text; resolve(); }
       });
       ws.addEventListener("close", () => resolve());
@@ -313,7 +321,7 @@ async function finishLive(cap) {
   if (capture === cap) capture = null;
   const text = cap.text.trim();
   if (cap.cancelled) { cap.ui.field.value = ""; return; }
-  if (!text) { cap.ui.status.textContent = "Nothing was heard. Try again, type it, or use manual entry."; return; }
+  if (!text) { cap.ui.status.textContent = cap.error || "Nothing was heard. Try again, type it, or use manual entry."; return; }
   cap.ui.field.value = text;
   if (cap.target === "kitchen") {
     const data = await dispatch({action: "kitchen_voice", text}, "voice");
@@ -326,12 +334,14 @@ async function finishLive(cap) {
 }
 function beginHold(event, target = "order") {
   if (busy || uncertain || !session || holding) return;
+  if (target === "kitchen" && !kitchenRole()) { feedback("Kitchen voice is for cook or lead sessions. Enter a kitchen session first.", true); return; }
   if (target === "order" && !state?.orders[draftId]) { feedback("Start an order before capturing a read-back.", true); return; }
   event?.preventDefault();
   holding = true;
   const ui = captureUi(target);
   ui.button.classList.add("holding");
-  if (voice.live) { ui.status.textContent = "Starting live mic…"; startLive(target).then(ok => { if (!ok) { holding = false; ui.button.classList.remove("holding"); } }); }
+  ui.button.setAttribute("aria-pressed", "true");
+  if (voice.live) { ui.status.textContent = "Starting live mic…"; startLive(target).then(ok => { if (!ok) { holding = false; ui.button.classList.remove("holding"); ui.button.setAttribute("aria-pressed", "false"); } }); }
   else ui.status.textContent = "Holding simulated capture. Release to build an editable menu-constrained draft; no audio is recording.";
 }
 function endHold(event, cancelled = false, target = "order") {
@@ -339,6 +349,7 @@ function endHold(event, cancelled = false, target = "order") {
   event?.preventDefault();
   holding = false;
   captureUi(target).button.classList.remove("holding");
+  captureUi(target).button.setAttribute("aria-pressed", "false");
   if (capture) {
     capture.stopped = true;
     capture.cancelled = cancelled;
@@ -356,6 +367,7 @@ $("connect").addEventListener("click", async () => {
     session = data.session_id; actor = data.actor; draftId = ""; draftSignature = "";
     $("identity").textContent = `${actor.name} · ${actor.role} · simulated sign-in`;
     showView(actor.role === "cook" ? "kitchen" : "server");
+    updateKitchenMic();
     render();
     feedback("Demo session active. Other devices share this backend, with their own sessions.");
   } catch (error) { feedback(`Cannot enter session: ${error.message}`, true); }

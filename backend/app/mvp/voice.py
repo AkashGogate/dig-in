@@ -200,8 +200,11 @@ def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
     }
 
 
+KITCHEN_FILLER = r"(?:\s+(?:thanks|thank you|please|chef|ok|okay))+$"
+
+
 def parse_kitchen(menu: MenuDocument, text: str) -> dict:
-    clean = normalize(text)
+    clean = re.sub(KITCHEN_FILLER, "", normalize(text))
     heard = re.fullmatch(r"heard table (" + NUMBER + r")", clean)
     if heard:
         return {
@@ -212,15 +215,17 @@ def parse_kitchen(menu: MenuDocument, text: str) -> dict:
         }
     started = re.fullmatch(r"start table (" + NUMBER + r") (.+)", clean)
     if started:
-        matched = match_menu(menu, started[2])
+        # "start table four two bulldozers": quantity is not a unit choice, drop it.
+        dish = re.sub(r"^" + NUMBER + r"\s+", "", started[2]) or started[2]
+        matched = match_menu(menu, dish)
         return {
             "action": "start_dish"
             if matched["status"] == "matched" and not matched["modifiers"]
             else None,
             "table_id": _number(started[1]),
-            "dish_phrase": started[2],
+            "dish_phrase": dish,
             "menu_id": matched["menu_id"],
-            "flags": _with_suggestions(menu, started[2], matched["flags"])
+            "flags": _with_suggestions(menu, dish, matched["flags"])
             or (
                 [
                     {
