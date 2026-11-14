@@ -5,3 +5,15 @@ __pycache__/
 .env
 node_modules/
 .pytest_cache/
+.DS_Store
+.env.*
+!.env.example
+*.db-shm
+*.db-wal
+.coverage
+htmlcov/
+outputs/
+playwright-report/
+test-results/
+.venv-*/
+.ruff_cache/

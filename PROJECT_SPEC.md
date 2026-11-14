@@ -1,42 +1,39 @@
-# Project Spec — Voice-Native Kitchen Operations Agent
+# Dig In — current product specification
 
-Working name: kitchen-copilot (placeholder)
-Author: Akash
+Decision date: 2026-11-14. This is the authoritative product intent; [STATUS](docs/STATUS.md) distinguishes implemented, mocked, and planned behavior. The original kitchen-copilot experiment remains available, but its kitchen-only/microphone-only restrictions are superseded. Its parser, mismatch checks, recordings, and evaluation code are preserved. See [decision ledger](docs/DECISIONS.md) and [legacy context](docs/archive/2026-11-14-legacy-context.md).
 
-## 1. The problem, precisely
-Professional kitchens run on an existing verbal protocol — "calling the pass," "86 the salmon," "fire table 12" — because hands are full and the floor is too loud/fast to type or tap a screen. This project digitizes a behavior that already exists; it doesn't invent a new one.
+## Service workflow
 
-What's missing today: verbal fire calls aren't captured anywhere. A mismatch between what was called and what the ticket says isn't caught until the wrong plate is already out. There's no timestamped record of calls, and no safety net for a misheard count beyond another human's attention — the one resource a loud kitchen doesn't have spare.
+Dig In coordinates restaurant staff through a phone-friendly server app, kitchen display, and shift overview. The backend owns shared state and validates transitions. Manual operation must work with voice, camera, or positioning adapters unavailable. A disconnected client visibly becomes unsynced; it cannot promise completed offline transactions. Staff identity comes from a signed-in session, not diarization. Demo actor selection is not production authentication.
 
-The governing test for every feature: remove the microphone — does the task still work, just worse (typing, tapping, writing)? If yes, cut it.
+The server selects a table, seat/guest, configured menu items and quantities, allowed modifiers, course if used, and explicit allergy/dietary requests. Menu configuration owns prices/options. Deliberately captured voice during the server's read-back supplements this structured record: propose missing items or corrections, show a diff, and ask targeted questions for ambiguity. Partial corrections preserve unrelated lines; repeated dishes need seat/item clarification. Every revised draft needs review. Only a human tap **Confirm and send** approves the current table and food revision. Spoken yes, model output, and sensor events cannot submit. Sending an order never authorizes payment. Post-send amendments require explicit kitchen acknowledgment.
 
-## 2. Why this, personally
-Frustration with how easy it's become to do the bare minimum in food service, and real respect for kitchens that still put in the work. The throughline is cost, not front-of-house romance — lower error rates and less labor friction in the back of house is what lets a kitchen that cares charge less and still do it right. Scoped to the kitchen specifically — does not extend to customer-facing ordering.
+Table suggestion is optional and triggered only when a signed-in server taps **Start order**. Suggestions are prominent, manually correctable, and freeze when selected for a draft. Movement never reassigns a draft. Ambiguous/unavailable suggestions fall back to manual selection. One stationary range sensor cannot uniquely locate and identify a server: validated positioning needs independent geometry (multiple known anchors or range plus direction) and association, potentially a tag. Hardware remains unverified; the baseline uses mock/disabled adapters.
 
-## 3. Non-goals
-- Front-of-house / table-side / customer ordering — already built and crowded (Tablevoice, PopID's Genius Handheld, SoundHound for Restaurants, ConverseNow, VoicePlug, Checkmate).
-- Drive-thru / QSR ordering — Deepgram's own OfOne acquisition's lane.
-- Any feature with a trivial non-voice substitute.
-- Voice-stress/emotion-based inference of anything — not scientifically defensible, not in this project at any scope.
+## Kitchen and two camera concepts
 
-## 4. Core functionality (v1 scope)
-1. Live fire-call capture — transcribe and structure spoken calls into order-line objects.
-2. Mismatch detection — cross-reference spoken calls against the active ticket queue, flag discrepancies before the plate goes out.
-3. Timestamped structured log — every call logged with speaker-turn attribution and timestamp, matched or not.
-4. Noise-robust turn handling — tolerate overlapping/simultaneous calls plus ambient kitchen noise without breaking. This is the real technical difficulty of the project.
+No dining-room video, facial recognition, or guest tracking. There are exactly two conceptual kitchen views: fixed known ingredient zones and fixed physical plating bays. Default camera processing should emit events without retaining raw video. Capture must be visible and pausable.
 
-## 5. Success criteria
-- Working pipeline: live or pre-recorded kitchen audio in → structured, timestamped, mismatch-flagged log out.
-- Coval-based synthetic test suite with pass/fail scorecard and a documented failure-found-and-fixed story.
-- A public, demoable surface with a safe fallback.
-- An honest account of what breaks under hard conditions and what was done about it.
+Submission, kitchen acknowledgment, and preparation are different stages. Cook voice **or** tap may acknowledge; acknowledgment does not imply preparing. Dishes progress through preparing, partial/plated evidence, ready, picked up, and served. Tickets aggregate all dish units; the first ready dish never makes an entire ticket ready. Staff may correct observations. Camera plate arrival establishes staging evidence, not verified contents, modifiers, doneness, or readiness. Default readiness is a cook command. Optional automatic readiness is allowed only under an explicit feature flag and the bay convention “only complete ready batches placed here”; initially restrict this experiment to a single plate.
 
-## 6. Target users / advertisable reach
-Small/independent restaurant kitchens, reached through Akash's existing network — not an invented user base.
+Ingredient regions contain known items. Detect stable before/after changes, never decrement merely because a hand enters a region. Start with visibly separated countable portions. Keep expected recipe reservations/consumption, raw observations, accepted movements, and balance distinct. Recipe expectation and visual consumption must not both deduct stock. Movement types include consumption/removal, return, restock, waste, and correction. Removal alone reveals neither exact count, ticket ownership, nor cooking completion. An explicitly active prep ticket may supply attribution; otherwise leave observations unresolved/unassigned. No cooking percentages from withdrawals. Preserve provenance for observations and accepted commands.
 
-## 7. Alignment notes (Deepgram JD, for reference)
-- Scoped project, shipped end-to-end — resist scope creep.
-- Contribute to production Deepgram codebase — build on Pipecat, scope a real example/PR.
-- Agentic tooling as default — use Claude Code throughout, keep notes on specific instances.
-- Improve a workflow with AI tools — the Coval eval loop is this bullet.
-- First-principles reasoning — design decisions defensible on their own terms, not copied from a competitor.
+Plating bays A/B/C are fixed labels dynamically assigned to ticket/course/batch with prominent table number. Table number alone is not unique over additions/courses; a bay can hold a dish batch rather than a whole table. Current user rule assigns at order arrival, with waiting-for-zone when full and no overlaps. A later recommendation is to allocate near plating to avoid bottlenecks; do not silently substitute it. Do not reuse a bay containing food or unresolved pickup. Reject stale assignment-version observations.
+
+## Running and shared tasks
+
+Readiness creates an actionable food-running task. A server claims it; everyone sees ownership. Camera removal associates with a claimed run only when unambiguous; otherwise ask for clarification. Plate return is a separate event, never a new order or stock decrement. Staff explicitly confirm served because there is no dining-room camera. IDs must distinguish two tables ordering the same salmon and multi-dish tickets.
+
+Default queue shows the top three available actionable tasks across the restaurant, optionally filtering to one's section **before** ranking, plus colleagues needing help. Task records include table/section/type, creation time, readiness/blocker, priority reason, owner, helper slots, and status. Atomic claims prevent double assignment. Release, cancel, complete, and block are supported workflow targets. A lead requesting N helpers means N **additional** people in individual slots. A group is ready only when food and enough helpers are present; blockers stay visible, and staff choose wait or split. Hot food/readiness and wait time dominate; VIP is secondary; explicit urgency and shift-lead overrides are visible. Aging avoids starvation. LLMs may interpret categories, not assign hidden arbitrary priority. Tone is at most a weak clarification cue. No worker emotion/performance surveillance.
+
+## Shared interfaces and boundaries
+
+Every command/observation has a stable ID, schema version, source/time, known actor/device, correlation target, and command-vs-observation distinction. Retry duplicates must not create extra orders, tasks, movements, or notifications. Validate draft revisions, amendment acknowledgment, assignment versions, and concurrent claims server-side. A small domain core is preferred over an event-sourcing migration.
+
+Modes must compose: manual web; voice with web; cameras with human confirmation; combined. Display degraded adapter state honestly. Deepgram transcription/optional diarization and ElevenLabs speech are candidate adapters, not required paid dependencies. Qualcomm Arduino UNO Q camera ingestion is a core work lane, with board/camera processing and bandwidth unverified; do not promise two real-time model feeds. Databricks is optional analytics, never the live authority. Standalone demo backend first; Square/POS later. No real card handling. A sandbox API test cannot establish real POS/KDS integration; TastyIgniter is an optional ordering platform requiring deployment work, not a drop-in processor.
+
+Target prize: Qualcomm, based on the user's description; category/rules eligibility is unverified. Production CV, payments, cloud speech, hardware positioning, deployment, and production auth/durability are outside this scaffold.
+
+## Reproducible fixture target
+
+Three tables, two dishes sharing an ingredient, two server actors plus a cook, countable ingredient zones, and two or three bays. Demonstrate structured draft/read-back mismatch/review/human send; same dish at another table; kitchen acknowledgment and prep selection; ingredient remove/return; partial plating without readiness; ready task; extra helper; pickup and served; obstruction/unavailable speech fallback. Measure duplicates, wrong ticket/table, false ready, stock error/corrections, clarification burden, claim collisions, and ready-to-pickup delay. The [demo runbook](docs/DEMO_PLAN.md) states which parts currently run.

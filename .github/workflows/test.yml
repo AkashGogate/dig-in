@@ -1,21 +1,27 @@
-name: backend tests
+name: scaffold checks
 
 on:
   push:
-    paths: ["backend/**", ".github/workflows/test.yml"]
+    paths: ["backend/**", "frontend/**", ".github/workflows/test.yml"]
   pull_request:
-    paths: ["backend/**", ".github/workflows/test.yml"]
+    paths: ["backend/**", "frontend/**", ".github/workflows/test.yml"]
 
 jobs:
-  pytest:
+  check:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.11"
-      - run: pip install pytest sqlalchemy aiosqlite greenlet httpx
-      - run: pytest -v
+          version: "0.13.8"
+      - run: uv sync --locked --python 3.11
+      - run: uv run ruff check app/coordination scripts tests/test_coordination.py
+      - run: uv run ruff format --check app/coordination scripts tests/test_coordination.py
+      - run: uv run pytest -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check ../frontend/app.js && node --check ../frontend/config.js

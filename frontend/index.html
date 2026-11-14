@@ -1,135 +1,65 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>kitchen-copilot demo</title>
-<style>
-  :root { color-scheme: dark; }
-  body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; background: #0f1115; color: #e8e8e8; }
-  h1 { font-size: 1.3rem; }
-  .controls { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
-  button { background: #2a2f3a; color: #fff; border: 1px solid #444; border-radius: 6px; padding: .5rem .9rem; cursor: pointer; font-size: .9rem; }
-  button:hover { background: #3a4150; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  #log { border: 1px solid #333; border-radius: 8px; padding: .75rem; height: 360px; overflow-y: auto; background: #15181e; }
-  .entry { padding: .4rem .2rem; border-bottom: 1px solid #22262e; font-size: .9rem; }
-  .entry.matched { color: #7bdc8f; }
-  .entry.mismatch { color: #ff8a8a; }
-  .entry.ignored { color: #777; }
-  .meta { color: #999; font-size: .78rem; }
-  select { background: #2a2f3a; color: #fff; border: 1px solid #444; border-radius: 6px; padding: .5rem; }
-  .note { font-size: .8rem; color: #999; margin-top: .5rem; }
-</style>
-<script src="config.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Dig In local restaurant coordination demo: reviewed orders, kitchen stages, and shared running tasks.">
+  <title>Dig In · service desk</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+  <script src="app.js" defer></script>
 </head>
 <body>
-  <h1>kitchen-copilot — live demo</h1>
-  <p class="note">Ticket queue is seeded/mocked for this demo (TECH_STACK.md) — not a real POS. Session auto-expires per ARCHITECTURE.md's abuse cap.</p>
-
-  <div class="controls">
-    <button id="startBtn">Start session</button>
-    <button id="micBtn" disabled>🎙️ Use your own mic</button>
-    <select id="scenarioSelect" disabled><option>Loading scenarios…</option></select>
-    <button id="playBtn" disabled>▶ Play test scenario</button>
-    <button id="killBtn" disabled>⏹ Kill session</button>
-  </div>
-  <p id="status" class="meta">No session yet.</p>
-
-  <div id="log"></div>
-
-  <script>
-    const API = window.KITCHEN_COPILOT_API || "http://localhost:8000";
-    let sessionId = null, ws = null;
-
-    const logEl = document.getElementById("log");
-    const statusEl = document.getElementById("status");
-    const startBtn = document.getElementById("startBtn");
-    const micBtn = document.getElementById("micBtn");
-    const killBtn = document.getElementById("killBtn");
-    const playBtn = document.getElementById("playBtn");
-    const scenarioSelect = document.getElementById("scenarioSelect");
-
-    function addEntry(call) {
-      const div = document.createElement("div");
-      const cls = !call.is_call ? "ignored" : call.matched ? "matched" : "mismatch";
-      div.className = "entry " + cls;
-      const headline = !call.is_call
-        ? `(ignored — not a fire call) "${call.raw_text}"`
-        : call.matched
-          ? `✓ ${call.quantity} ${call.item ?? "?"}${call.station ? " @ " + call.station : ""} — ${call.ticket_id ?? "logged"}`
-          : `✗ MISMATCH: "${call.raw_text}" — ${call.reason}`;
-      div.innerHTML = `${headline}<div class="meta">${call.speaker_turn}</div>`;
-      logEl.prepend(div);
-    }
-
-    async function startSession() {
-      const res = await fetch(`${API}/session/start`, { method: "POST" });
-      if (!res.ok) { statusEl.textContent = "Could not start session (" + res.status + ")"; return; }
-      const data = await res.json();
-      sessionId = data.session_id;
-      statusEl.textContent = `Session ${sessionId.slice(0, 8)} — ${Math.round(data.max_seconds)}s cap`;
-      ws = new WebSocket(`${API.replace(/^http/, "ws")}/ws/${sessionId}`);
-      ws.onmessage = (ev) => addEntry(JSON.parse(ev.data));
-      ws.onclose = () => { statusEl.textContent = "Session ended."; micBtn.disabled = true; playBtn.disabled = true; killBtn.disabled = true; };
-      micBtn.disabled = false; playBtn.disabled = false; killBtn.disabled = false; startBtn.disabled = true;
-    }
-
-    async function killSession() {
-      if (!sessionId) return;
-      await fetch(`${API}/session/${sessionId}/kill`, { method: "POST" });
-      ws?.close();
-      stopMic();
-      startBtn.disabled = false;
-    }
-
-    function playScenario() {
-      if (!ws || ws.readyState !== 1) return;
-      ws.send(JSON.stringify({ type: "scenario", name: scenarioSelect.value }));
-    }
-
-    // Live-mic path: raw browser audio (webm/opus via MediaRecorder) is streamed
-    // as binary WebSocket frames straight to the backend, which forwards it to
-    // Deepgram's live STT and runs the result through the SAME parse_call ->
-    // check_mismatch -> log path the test-scenario button uses (ARCHITECTURE.md
-    // #2.2 — one real pipeline, two audio sources, not two pipelines behind one UI).
-    let mediaRecorder = null, micStream = null;
-
-    async function startMic() {
-      if (!ws || ws.readyState !== 1) { statusEl.textContent = "Start a session first."; return; }
-      if (!navigator.mediaDevices?.getUserMedia) { statusEl.textContent = "This browser can't capture mic audio — use a test scenario instead."; return; }
-      try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (e) {
-        statusEl.textContent = "Mic permission denied — use a test scenario instead.";
-        return;
-      }
-      mediaRecorder = new MediaRecorder(micStream, { mimeType: "audio/webm;codecs=opus" });
-      mediaRecorder.ondataavailable = async (ev) => {
-        if (ev.data.size > 0 && ws?.readyState === 1) ws.send(await ev.data.arrayBuffer());
-      };
-      mediaRecorder.start(250); // 250ms chunks, streamed live to the backend
-      micBtn.textContent = "🛑 Stop mic";
-    }
-
-    function stopMic() {
-      mediaRecorder?.stop();
-      micStream?.getTracks().forEach((t) => t.stop());
-      mediaRecorder = null;
-      micStream = null;
-      ws?.send(JSON.stringify({ type: "mic_stop" }));
-      micBtn.textContent = "🎙️ Use your own mic";
-    }
-
-    micBtn.addEventListener("click", () => (mediaRecorder ? stopMic() : startMic()));
-    startBtn.addEventListener("click", startSession);
-    killBtn.addEventListener("click", killSession);
-    playBtn.addEventListener("click", playScenario);
-
-    fetch(`${API}/scenarios`).then(r => r.json()).then(list => {
-      scenarioSelect.innerHTML = list.map(s => `<option value="${s.name}" title="${s.description}">${s.name}</option>`).join("");
-      scenarioSelect.disabled = false;
-    }).catch(() => { scenarioSelect.innerHTML = "<option>backend unreachable</option>"; });
-  </script>
+  <a class="skip" href="#workspace">Skip to workspace</a>
+  <header class="masthead">
+    <div><a class="wordmark" href="./">Dig In<span class="dot">.</span></a><p class="eyebrow">THE SERVICE DESK</p></div>
+    <div class="connection"><span id="connection">Connecting to shared backend…</span><small>Local mock demo · state resets on backend restart</small></div>
+  </header>
+  <section class="session-bar" aria-label="Demo session">
+    <label for="actor">Simulated staff session<select id="actor"><option value="server-1">Server One · window</option><option value="server-2">Server Two · patio</option><option value="cook-1">Cook · kitchen</option><option value="lead-1">Shift Lead · all</option></select></label>
+    <button id="connect">Enter demo session</button>
+    <p id="identity">Select a staff session. This is simulated authentication.</p>
+  </section>
+  <nav aria-label="Workspaces" class="view-nav"><button data-view="server" aria-pressed="true">Server</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button data-view="overview" aria-pressed="false">Shift overview</button><a href="legacy.html">Legacy voice lab ↗</a></nav>
+  <div id="feedback" role="status" aria-live="polite">Manual ordering works without speech or cameras.</div>
+  <div id="retry-bar" hidden><p>The last command has an uncertain result. Review shared state, then retry the exact command safely.</p><button id="retry">Retry last command</button></div>
+  <main id="workspace" tabindex="-1">
+    <section id="server-view" class="view">
+      <div class="section-heading"><div><p class="eyebrow">01 / SERVER</p><h1>Get the order right.</h1></div><p>Structured entries first. Read-back proposes changes.<br>Only your final tap sends the reviewed revision.</p></div>
+      <div class="server-grid">
+        <section class="panel order-panel" aria-labelledby="order-title">
+          <h2 id="order-title">Order desk</h2>
+          <form id="start-form" class="inline-form"><label for="start-table">Table<select id="start-table"></select></label><label class="check"><input id="positioning" type="checkbox"> Try mock table suggestion</label><button type="submit" class="primary" data-command>Start order</button></form>
+          <p id="position-hint" class="note">Table selection stays fixed during the draft unless you explicitly correct it.</p>
+          <label for="draft-select">Your drafts<select id="draft-select"><option value="">Start an order to begin</option></select></label>
+          <div id="draft-summary" class="empty">No draft selected. Start with a table above.</div>
+          <div id="editor" hidden>
+            <form id="table-form" class="inline-form"><label for="draft-table">Correct table<select id="draft-table"></select></label><button type="submit" data-command>Save table correction</button></form>
+            <form id="line-form">
+              <div class="form-grid"><label for="edit-line">Add or edit line<select id="edit-line"><option value="">New dish line</option></select></label><label for="seat">Guest / seat<select id="seat"></select></label><label for="menu">Menu item<select id="menu"></select></label><label for="quantity">Quantity<input id="quantity" type="number" min="1" max="12" value="1" required></label><label for="course">Course<input id="course" value="main" maxlength="80" required></label><label for="modifier">Modifier<select id="modifier" multiple size="3"><option value="">No modifier</option></select></label></div>
+              <label for="requests">Explicit allergy / dietary request<textarea id="requests" rows="2" maxlength="500" placeholder="Record the guest’s request explicitly"></textarea></label>
+              <div class="actions"><button type="submit" data-command>Save dish line</button><button type="button" id="remove-line" data-command>Remove selected line</button></div>
+            </form>
+            <div class="readback"><h3>Read-back check <span class="tag">MOCK</span></h3><p class="note">No microphone is recording. This constrained transcript simulator compares one dish at a time. Use the form for missing items or complex corrections.</p><form id="readback-form"><label for="transcript">Transcript<textarea id="transcript" rows="2" required placeholder="seat 1 salmon quantity 2"></textarea></label><button type="submit" data-command>Compare read-back</button></form><div id="proposal"></div></div>
+            <div class="send-review"><p id="send-note">Review table, seats, food and allergy requests before sending.</p><button id="confirm-send" class="primary" data-command>Confirm and send</button></div>
+          </div>
+        </section>
+        <aside id="task-panel" class="panel" aria-labelledby="task-title"><div class="panel-heading"><h2 id="task-title">Next up</h2><span class="tag">SHARED QUEUE</span></div><label class="check"><input id="section-only" type="checkbox"> Show my section only before ranking</label><p class="note">Top three available tasks. Hot food and wait time lead; every ranking has a reason.</p><div id="ranked-tasks"></div><details open><summary>Claims & colleagues needing help</summary><div id="other-tasks"></div></details><form id="request-form" class="request-form"><h3>Add a request</h3><div class="form-grid"><label for="request-table">Table<select id="request-table"></select></label><label for="request-type">Type<select id="request-type"><option value="guest_request">Guest request</option><option value="help">Helping hands</option></select></label></div><label for="request-reason">What is needed?<input id="request-reason" required maxlength="500" placeholder="Water for table 3"></label><button type="submit" data-command>Add shared task</button></form></aside>
+      </div>
+      <section class="panel"><h2>Sent orders & delivery</h2><div id="server-orders"></div></section>
+    </section>
+    <section id="kitchen-view" class="view" hidden>
+      <div class="section-heading"><div><p class="eyebrow">02 / KITCHEN</p><h1>One ticket. Every dish.</h1></div><p>Acknowledge, prepare, stage, then mark ready.<br>Plate presence alone never verifies food or modifiers.</p></div>
+      <section class="panel"><div class="panel-heading"><h2>Physical plating bays</h2><span class="tag">FIXED A / B / C</span></div><p class="note">Assigned on order arrival in this demo. A full bay waits; food or unresolved pickup prevents reuse. Mock events never imply live camera processing.</p><div id="bays" class="bay-grid"></div></section>
+      <section class="panel"><h2>Kitchen tickets</h2><div id="tickets"></div></section>
+    </section>
+    <section id="overview-view" class="view" hidden>
+      <div class="section-heading"><div><p class="eyebrow">03 / SHIFT OVERVIEW</p><h1>See the gaps in service.</h1></div><p>Coverage, waiting food and inventory uncertainty.<br>No staff performance or emotion scoring.</p></div>
+      <div id="overview-summary" class="summary-strip"></div>
+      <div class="overview-grid"><section class="panel"><h2>Ingredient zones</h2><p class="note">Expected recipes reserve nothing physically here. Only accepted movements change stock. Observations remain evidence until reviewed; removal alone does not identify a ticket or quantity.</p><div id="inventory"></div><form id="stock-form"><h3>Review a stock movement</h3><div class="form-grid"><label for="stock-zone">Zone<select id="stock-zone"></select></label><label for="stock-kind">Movement<select id="stock-kind"><option value="consume">Consume</option><option value="return">Return</option><option value="restock">Restock</option><option value="waste">Waste</option><option value="correction">Correction (signed delta)</option></select></label><label for="stock-quantity">Count / signed correction<input id="stock-quantity" type="number" value="1" required></label><label for="stock-order">Ticket attribution<select id="stock-order"><option value="">Unassigned</option></select></label></div><label for="stock-observation">Observed change<select id="stock-observation"><option value="">Manual movement / no observation</option></select></label><label for="stock-reason">Reason<input id="stock-reason" required maxlength="500" placeholder="Counted one portion removed; reviewed by cook"></label><button type="submit" data-command>Accept inventory movement</button></form></section>
+      <section class="panel"><h2>Adapters & uncertainty</h2><div id="adapters"></div><h3>Recent observations</h3><div id="observations"></div><h3>Recent accepted commands</h3><div id="events"></div></section></div>
+    </section>
+  </main>
+  <footer>Dig In · Manual first, shared state, visible evidence. <a href="http://localhost:8000/docs" id="api-link">API contracts</a><span>Demo identities · no payments · no dining-room video</span></footer>
 </body>
 </html>

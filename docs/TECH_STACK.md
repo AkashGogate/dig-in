@@ -1,28 +1,16 @@
-# TECH_STACK.md
+# Actual stack and candidate adapters
 
-## Backend / agent runtime
-- Python 3.11+
-- Pipecat — audio pipeline orchestration (transport → VAD/turn-detection → STT → processing → TTS).
-- Daily transport (WebRTC) via Pipecat's native integration.
-- Deepgram STT (Nova-3 or Flux) with `diarize=true` for per-speaker-turn labels.
-- Turn-taking: Pipecat's Silero VAD + Deepgram's end-of-utterance signal.
-- Call-parsing layer: keyword/rule-based first pass (menu item names, quantities, station keywords) with a small LLM fallback for ambiguous phrasing.
-- Ticket/order queue: mocked — a seeded SQLite table standing in for a real POS feed.
-- Structured log store: SQLite via SQLAlchemy (async).
-- API/WebSocket layer: FastAPI + WebSocket.
-- TTS (mismatch alerts): Deepgram TTS (Aura).
+| Component | Current source / status |
+| --- | --- |
+| Backend | Python 3.11+, FastAPI, uvicorn; `backend/pyproject.toml` + `uv.lock` own dependencies |
+| Coordination state | Single-process in-memory domain with lock; demo sessions; no production persistence/auth |
+| Frontend | Static HTML/CSS/JS, served by any static HTTP server; no npm setup/build required |
+| Legacy call log | SQLAlchemy + aiosqlite SQLite; separate from coordination state |
+| Legacy voice experiment | Deepgram WebSocket/prerecorded modules; Pipecat code retained with optional `live-pipeline` dependency extra; paid live integration needs configuration and verification |
+| Tests/eval | pytest; transcript fixtures; synthetic WAV corpus; local mock/Deepgram eval harness |
+| Position/camera/structured read-back | Mock/disabled seams; actual board, sensors, streams, accuracy, and live capture not established |
+| Candidate speech output | ElevenLabs optional; not a required paid dependency |
+| Optional analytics | Databricks lane only; no critical-path database dependency |
+| POS/payment | Standalone demo; future research only, no real cards/payments |
 
-## Frontend / demo surface
-- Next.js/React. Minimal by design.
-
-## Eval/testing
-- Coval, via Pipecat's documented Coval integration.
-
-## Hosting
-- Backend: a persistent-connection host — Fly.io (default) or Render/AWS Fargate/EC2. Not Vercel for the agent runtime.
-- Frontend: Vercel.
-
-## Explicitly not used
-- Vercel for the agent runtime.
-- Any voice-stress/emotion/deception inference.
-- Real POS/kitchen-display integration (mocked instead, stated honestly).
+Qualcomm Arduino UNO Q ingestion is the intended hardware work lane, not a verified board capability. Exactly two conceptual kitchen views do not imply two proven simultaneous real-time model feeds. Prize category/rules remain unverified. Existing Fly/Docker/CI files are retained scaffolding; no deployment is performed by this change. Coval is not integrated; mock eval is not STT quality evidence.

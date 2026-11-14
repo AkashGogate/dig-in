@@ -23,6 +23,7 @@ from app.mismatch import check_mismatch
 from app.deepgram_live import stream_transcripts
 from app.session import KitchenSession, SessionLimitExceeded
 from app.ticket_queue import TicketQueue
+from app.coordination.api import router as coordination_router
 
 engine, SessionFactory = make_session_factory()
 
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(coordination_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # ponytail: wide open for a public demo; narrow to the Vercel origin once that URL exists.

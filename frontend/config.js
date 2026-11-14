@@ -1,3 +1,5 @@
-// Fill this in once the backend is deployed (e.g. to Fly.io): the public URL
-// uvicorn is reachable at. Left as localhost until then — DEMO_PLAN.md/README.md.
-window.KITCHEN_COPILOT_API = window.KITCHEN_COPILOT_API || "http://localhost:8000";
+// Local demo defaults to the machine serving this page, port 8000. To use a
+// shared backend, set DIG_IN_API to its reachable http(s)://host:port here.
+// This config contains no keys. Paid credentials belong only on the backend.
+window.DIG_IN_API = window.DIG_IN_API || window.KITCHEN_COPILOT_API || `${location.protocol}//${location.hostname || "localhost"}:8000`;
+window.KITCHEN_COPILOT_API = window.KITCHEN_COPILOT_API || window.DIG_IN_API;
