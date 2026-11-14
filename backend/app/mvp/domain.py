@@ -157,6 +157,18 @@ class Restaurant:
     def _validate_table(self, table_id):
         require(table_id in self.state.tables, "Choose a configured table")
 
+    def _voice_fallback(self):
+        """Ack/start automation is kitchen voice: record if it was available."""
+        if self._current.source == "voice":
+            return {"automation_available": True, "fallback_reason": None}
+        live = live_enabled()
+        return {
+            "automation_available": live,
+            "fallback_reason": None
+            if live
+            else "Live kitchen voice is off on this server; staff used the tap",
+        }
+
     def _fallback(self, dish, reason=None):
         zone = self.state.zones.get(dish.zone_id)
         camera = self.state.cameras[zone.camera_id] if zone else None
@@ -702,7 +714,7 @@ class Restaurant:
         self._emit(
             "order.acknowledged",
             order.id,
-            payload={"automation_available": None, "fallback_reason": None},
+            payload=self._voice_fallback(),
         )
         self.waiting.append(order.id)
         self._allocate()
@@ -772,8 +784,7 @@ class Restaurant:
             {
                 "station": dish.station,
                 "typical_minutes": dish.typical_minutes,
-                "automation_available": None,
-                "fallback_reason": None,
+                **self._voice_fallback(),
             },
         )
         return {"dish_id": dish.id}
