@@ -1,38 +1,41 @@
 # Development across computers
 
-Each person/agent uses their own clone and task branch, optionally a separate worktree for concurrent tasks. Use Python 3.11+ and the committed `backend/uv.lock`; the frontend is buildless HTML/CSS/JS. Start with the [README](../README.md). Do not add a second frontend framework, package manager, or database merely for scaffolding.
+Each collaborator uses a separate clone/task branch, optionally separate local worktrees. Use the committed uv lock and Python 3.11+; static frontend needs no Node build. Read [AGENTS](../AGENTS.md), [STATUS](STATUS.md) and [WORKSTREAMS](WORKSTREAMS.md). **Menu owns Core/backend and integration** as a role; no personal names are assigned.
 
-## Before editing
+## Before editing and handoff
 
-1. `git status --short` and `git branch --show-current`; read root/scoped AGENTS and the context map. Investigate pre-existing changes before touching their files.
-2. Agree task ID, owner role, claimed paths, dependency owners, and integration-owner slot through the team's chosen channel. No teammate names/count are assumed. A handoff/STATUS file is information, not an atomic claim lock.
-3. Create `codex/<task>` (or team convention) from the agreed integration base. Avoid overlapping files. If work must overlap, sequence it through the integration owner.
-4. Copy `docs/handoffs/TEMPLATE.md` to a unique task filename, recording scope/base/paths. Keep changes small and reviewable.
+1. Inspect `git status --short`, branch/worktree and scoped instructions. Preserve pre-existing edits.
+2. Agree task ID, role owner, exact claimed paths and schema dependencies with Menu/Core integration. A STATUS/handoff file is information, not an atomic lock.
+3. Create a separate `codex/<task>` branch from the agreed checkpoint. Avoid shared-file overlap; sequence schemas/entry points through Menu/Core. Copy [handoff template](handoffs/TEMPLATE.md) to a unique filename.
+4. Consume v2 menu/operational/canonical event contracts rather than inventing parallel shapes. Compatible additions may remain v2; breaking field/meaning/state changes require explicit version/migration plan, fixtures/tests/consumer review.
+5. Run relevant checks, record actual gaps/evidence and changed status, then submit small scoped commits for integration. Do not force-push/main overwrite or ask an agent to discard someone else’s uncommitted work.
 
-Example after obtaining the shared repository URL and integration base:
+## This checkpoint and remote transfer
+
+Configured remote is [AkashGogate/dig-in](https://github.com/AkashGogate/dig-in.git). Local `main` tracks `origin/main`; `codex/collaboration-scaffold` has no upstream until explicitly pushed. A read-only `git ls-remote --heads origin main codex/collaboration-scaffold` check found origin/main at051296de and no remote scaffold branch; this was not a fetch or push. The scaffold is prepared locally, **not pushed** by this task.
+
+After review and explicit authorization, the integrator can transfer the checkpoint:
 
 ```bash
-git clone <shared-repository-url> dig-in
-cd dig-in
-git switch -c codex/<task>
+git switch codex/collaboration-scaffold
+git push -u origin codex/collaboration-scaffold
 ```
 
-For another local task, create a separate worktree on a separate branch. A worktree shares Git history, not another computer's filesystem. Never delete/overwrite another collaborator's uncommitted work; ask its owner to commit/stash it themselves. Do not force-push or replace main to resolve conflicts.
+Only **after that push**, teammates can create their own task branches:
 
-## Contracts and review
+```bash
+git clone https://github.com/AkashGogate/dig-in.git
+cd dig-in
+git fetch origin
+git switch -c codex/<lane-task> origin/codex/collaboration-scaffold
+```
 
-`backend/app/coordination/contracts.py` is the shared contract source; fixtures live alongside it. Read [API](API.md) before changing fields or semantics. Frontend, speech, hardware, and analytics lanes consume those interfaces rather than introducing parallel types. Additive optional fields can stay in schema v1 if compatible. Renames/removals, meaning changes, required fields, or transition changes require a version/migration plan, fixture updates, tests, and dependent-lane review before integration. Record compatibility explicitly in the task handoff. Do not casually change fixture IDs consumed by the demo.
+Existing clones begin with a clean/reviewed status, then fetch and branch from the checkpoint. Do not make everyone commit to the same shared branch. The Menu/Core integrator reviews/merges lane work through the agreed PR workflow. A local worktree shares Git objects on one computer, not another machine’s files.
 
-Before handoff, run relevant checks, record actual results and gaps, update STATUS only for changed capabilities, and include screenshots or request examples when useful. Submit scoped commits for review; the integration-owner slot sequences merges and resolves shared-file changes. A local branch has not reached teammates until its commits are transferred and integrated through the team's Git remote/PR workflow. No remote push is implied by local scaffold work.
+## Code sync and runtime state differ
 
-## Code sync and runtime state are separate
+Git transfers tracked code/docs/fixtures/lockfiles, not live orders or sessions. To coordinate phones/kitchen/hardware, point all clients at **one reachable backend process/base URL**. Separate backends have isolated in-memory states; multiple workers/reload/restart break the demo continuity. Durable/multi-instance operation needs a transaction-capable shared store, auth and durable outbox.
 
-Git transfers tracked code, fixtures, lockfiles, and docs; it does not share running orders or sessions. To test two servers against one restaurant, point both browsers and hardware adapters at **one** backend process and base URL. Separate backend processes have separate demo state. The scaffold's authoritative state is in memory, resets on restart, and must run with one worker. Do not use reload during a stateful demo. Multi-process/multi-instance or durable use needs a transaction-capable shared store.
+Default ports: API8000, static5173. For trusted LAN testing, bind both to `0.0.0.0`, use the host’s reachable LAN address in `frontend/config.js` and any adapter configuration, and verify frontend origin/CORS/connectivity before service. A phone’s localhost is the phone. Demo actor/device sessions are not production security.
 
-Local backend defaults to port 8000 and static frontend to 5173. For phones on a trusted LAN, bind the backend and static server to `0.0.0.0`, use the host computer's reachable LAN address in the frontend configuration, and allow the actual frontend origin if CORS is restricted. `localhost` on a phone means the phone itself. Use the frontend's configured base URL for the shared backend; verify connectivity before beginning the demo. The demo actor selector/session token is simulated identity, not a security boundary for public exposure.
-
-`.env.example` documents optional configuration; copy it to ignored `.env` only where the runtime loads it. Never commit keys/tokens, local databases, recordings, generated scorecards/screenshots, caches, or virtual environments. Review staged diffs before committing. Existing checked-in audio fixtures/scorecard are historical test assets; do not confuse regeneration with a live-quality result.
-
-## Good next-task boundaries
-
-Make an adapter work through the validated command/observation seam, with degraded status and deterministic tests, before changing role screens. Hardware observations must not directly mutate orders/stock. Payment, publication, and external messaging remain outside this task's authorization. Do not take historical deployment notes as instructions to execute them.
+`.env.example` documents active mode variables. Copy to ignored `.env` only where deliberately loaded (`uvicorn --env-file ../.env` from backend, or export variables). Never commit keys, raw recordings, local DBs, generated exports/screenshots/caches/environments. Checked-in synthetic audio and ten-order JSONL are labeled fixtures, not real restaurant observations. No live credentials, remote push, deployment or external messages are part of this local task.

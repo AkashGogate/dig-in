@@ -1,55 +1,74 @@
-# Coordination API and event contract
+# V2 operational, menu and event contracts
 
-Source of truth: [`contracts.py`](../backend/app/coordination/contracts.py), [`domain.py`](../backend/app/coordination/domain.py), [`fixtures.py`](../backend/app/coordination/fixtures.py). Runtime schemas: [contracts](http://localhost:8000/api/v1/contracts), [OpenAPI](http://localhost:8000/openapi.json), [interactive API](http://localhost:8000/docs). Use your actual shared backend host in place of localhost. Frontend/voice/vision consumers must not independently redefine these shapes.
+New work uses `/api/v2`. Sources: [`mvp/contracts.py`](../backend/app/mvp/contracts.py) for commands/state; [`mvp/menu.py`](../backend/app/mvp/menu.py) for MenuDocument/items/modifiers; [`analytics/events.py`](../backend/app/analytics/events.py) for CanonicalEvent. Generated schemas at [v2 contracts](http://localhost:8000/api/v2/contracts) and [OpenAPI](http://localhost:8000/openapi.json) are authoritative; no lane independently redefines shapes.
 
-## Surface
-
-| Endpoint | Purpose |
+| Endpoint | Meaning |
 | --- | --- |
-| `POST /api/v1/sessions` | Select a fixture actor and obtain a simulated staff session; not production login |
-| `GET /api/v1/state` | Shared snapshot, derived views, and adapter availability |
-| `POST /api/v1/commands` | Validated command/observation envelope; domain owns transitions and deduplication |
-| `GET /api/v1/contracts` | Schema version and generated JSON Schemas for commands/state |
+| `POST /api/v2/sessions` | `{actor_id}`→session_id/actor; simulated device/staff identity |
+| `GET /api/v2/state` | Shared snapshot, physical zones/cameras/progress/stock/export health |
+| `POST /api/v2/commands` | Validated command, `X-Demo-Session` header; returns result/state/replayed |
+| `GET /api/v2/contracts` | Command/state/canonical event JSON Schemas |
+| `GET /api/v2/menu`, `POST /menu/match` | Canonical configured menu and deterministic candidate/flag matcher |
+| `GET /api/v2/menu/import-status`, `/voice/status` | Explicit adapter-only importer and mock transcript availability |
+| `GET /api/v2/events?format=jsonl` | Canonical accepted/observed log, original IDs/source times preserved |
+| `POST /api/v2/events` | Supported canonical adapter **intent**, translated/validated by Core, never arbitrary fact insertion |
+| `GET /api/v2/analytics/health`, `/analytics/pending` | Retry health/exact pending rows; not live cloud dashboard |
 
-`POST /sessions` accepts `{ "actor_id": "server-1" }` and returns `session_id` plus `actor`. Send that token as the `X-Demo-Session` header on commands. A successful command returns `{result, state, replayed}`; a domain conflict is HTTP 409 and schema validation is HTTP 422. `GET /state?section=window` (or the same `section` query on `POST /commands` for its response snapshot) filters the available-task ranking before selecting its top three. State snapshots include a `computed` view for balances, recipe expectations, ticket aggregates, ranked tasks and blockers. `Snapshot`, `SessionResponse`, and `CommandResponse` validate the API responses, and `/contracts` exports the full Snapshot schema. The retained `/session/start`, `/scenarios`, and `/ws/{session_id}` serve the original audio-call experiment and use a separate session/queue. They are not the coordination order API.
+Use the actual shared backend host instead of localhost. Domain conflicts are409; invalid schemas are422. Demo actor/device identity is not production authentication. Source fields describe provenance, not independent proof a trusted device/human acted.
 
-## Version 1 envelope
+## Command and identity
 
-`Command` forbids extra fields and contains stable `id`, literal `schema_version: 1`, source, `kind` (command/observation), occurrence time, optional device/correlation identifiers, and an action-discriminated payload. Source values are manual, voice, mock_camera, camera, or positioning. Actor comes from the staff session rather than an untrusted speaker label. For a retry, preserve the entire original serialized envelope, including `occurred_at`, payload, source/device/correlation fields and stable ID. Do not regenerate a timestamp or rely on its default on retry: the same ID with changed content conflicts. Different operations require new IDs. Idempotency is scoped to the lifetime of this in-memory backend.
-
-Example draft-start envelope (with `X-Demo-Session`):
+Command v2 contains `event_id`, `schema_version:2`, source (`tap|voice|camera|system`), timezone-aware `time`, optional device/run IDs, simulation label, and action-discriminated payload. Keep the **exact serialized envelope including time** on retry; changed content/identity under an existing ID is rejected. Distinct actions need new IDs. Idempotency lasts only this in-memory process.
 
 ```json
 {
-  "id": "demo-server-1-start-001",
-  "schema_version": 1,
-  "source": "manual",
-  "kind": "command",
-  "occurred_at": "2026-11-14T18:00:00Z",
+  "schema_version": 2,
+  "event_id": "demo-order-start-001",
+  "source": "tap",
+  "time": "2026-11-14T20:00:00Z",
   "device_id": "demo-phone-1",
-  "correlation_id": "demo-run-001",
-  "payload": {"action": "start_order", "table_id": "1", "use_positioning": false}
+  "run_id": "interactive-demo",
+  "simulated": true,
+  "payload": {"action": "start_order", "table_id": "1"}
 }
 ```
 
-Only `confirm_send` with manual source and explicit current-revision human confirmation submits. A source field is protocol provenance, not proof a human acted: the browser approval UX and eventual production auth/trust boundary remain essential. Speech is allowed to propose/cook-command within authorized semantics; it cannot bypass order approval.
-
-## Actions and identifiers
+Core takes actor/role from the demo session. Device identifiers are honest simulated provenance, never diarization. Only current-revision tap `confirm_send` with `human_confirmed:true` and no unresolved flags submits. Capture text is ephemeral input, not retained/exported event payload.
 
 | Domain | Actions / safeguards |
 | --- | --- |
-| Draft/read-back | `start_order`, `edit_draft`, `readback`, `accept_correction`, `confirm_send`; revision/proposal IDs prevent stale approvals |
-| Kitchen | `acknowledge`, `select_prep`, `advance_dish`; active prep context is recorded per cook, distinct from acknowledgment/stages; staff correction reason where required |
-| Amendment | `amend`, `ack_amendment`; acknowledged changes are separate from original submission |
-| Bays | `assign_bay`, `reconcile_bay`, `release_bay`; physical bay ID + expected assignment version, ticket/course/dish batch mapping |
-| Evidence | `observe`; ingredient change, plate arrival/removal/return, obstruction; envelope kind is observation |
-| Inventory | `accept_movement`; consume, return, restock, waste, correction, reason, optional observation and order attribution |
-| Tasks | `create_task`, `task_action`; claim/release/join/leave/helpers/split/block/cancel/complete/urgent; additional helper count is explicit |
+| Draft | start_order, edit_draft, capture_voice, resolve_flag, confirm_send; stable line IDs/revision, unknown/mismatch review, mandatory human tap |
+| Kitchen/order | acknowledge, retry_zones, deliver_order; acknowledgment separate from start; all-K zone capacity/FIFO; delivered optional after pickups |
+| Physical dish | start_dish, ready_dish, pickup_dish; timestamps, one unit/zone; camera uses evidence rather than bypassing commands |
+| Camera | camera_status, zone_observation, reconcile_zone; occupancy/unknown, stable_ms/no hand, assignment version and source-time checks |
+| Constrained speech | kitchen_voice; menu parser plus authoritative order/unit ambiguity checks, not freeform speaker auth |
+| Ingredient | stock_observation, accept_stock; reviewed countable movement/provenance, no recipe double deduction |
 
-Table IDs identify physical tables; order IDs distinguish additions/tickets at that table. Line IDs identify configured order lines and seat/course; dish IDs distinguish individual units. Bay ID is physical location; assignment version guards late events after reassignment. Never match two salmon dishes solely by menu name or table number. Raw observations retain source/time/device and unresolved disposition until reviewed; accepted inventory movements are separate records with provenance. `select_prep` records active cook context, but observation `order_id` attribution remains explicit and optional; the mock does not infer it. `reconcile_bay` requires manual cook/lead review, current assignment version, observed occupancy and a reason. It can clear pickup ambiguity while food remains; clearing occupancy requires every assigned dish already picked up/served through its validated claimed-run path. Recipe reservations are expected usage, not an extra stock deduction.
+## Menu and correction counts
 
-The deterministic `MockReadback` supports one explicit quantity phrase such as `seat 1 salmon quantity 2`. Compound/ambiguous speech asks for clarification; missing items can be added manually. This is not a live transcript/NLU integration. Mock positioning suggests table 1 with an explicit review label; it is not measured range/triangulation. Fixtures configure three tables, two menu dishes sharing greens, countable zones, three capacity-two bays, two server actors, cook, and lead.
+Menu item IDs/names/aliases/modifier IDs drive all new paths. Optional station/call-out/typical_minutes/recipe/ingredient mapping remain null if unknown. Orders snapshot name/kitchen fields. Reviewed JSON loads through DIG_IN_MENU_PATH; arbitrary photo/PDF/model import is a protocol/status stub. Second fixture loads without code changes.
 
-## Compatibility policy
+`corrected_draft_lines` compares the latest voice baseline and final reviewed lines by stable ID and menu_id/quantity/modifiers/seat/requests: distinct changed/added/removed IDs count once; reverting to baseline counts zero. `initial_voice_draft_line_count`, final_line_count and capture_mode define denominators/context. Additions can make count exceed baseline; do not call this recognition accuracy or edit-tap count. Pure manual capture has no voice baseline.
 
-Schema version 1 covers current executable shapes. Optional compatible additions may retain v1. Breaking field/meaning changes require a new version or explicit migration with dependent-lane review, fixture/consumer updates, and regression tests. Preserve stable IDs in replay fixtures. Check expected revisions and assignment versions at the domain boundary, not just in UI controls. Do not introduce a second schema in adapter payloads. See [DEVELOPMENT](DEVELOPMENT.md) for review and handoff requirements.
+## Canonical events and accepted facts
+
+CanonicalEvent retains event_id, nullable order_id/dish_id, dotted type, tap/voice/camera/system source, actor, source time and structured payload. V2 adds received_at, run_id, simulated and `outcome:accepted|observed`. Original time/identity survive export; receipt time never replaces source time. The canonical vocabulary includes the brief’s submitted/acknowledged/zones assigned/waiting/dish started/ready/picked_up/order ready/delivered/zone unexpected/camera status/stock changed, plus aggregate order.picked_up and explicit draft/observation/clarification/reconciliation/retry facts declared alongside the model.
+
+Incoming camera `dish.ready` intent still needs current zone/version/stability/no-hand evidence. Rejected/stale input does not become an accepted milestone. Ignored evidence emits an observed camera.observation; raw stock evidence emits stock.observation, and only accepted review emits stock.changed. Derived system facts get deterministic related IDs. Local state/event/outbox commit is coordinated; sink I/O is background, and failures remain pending. No raw transcripts/audio/video in canonical payloads. See [analytics mapping/SQL](../analytics/README.md).
+
+## Explicit v1 compatibility boundary
+
+`/api/v1` + `coordination-v1.html` retain the prior broad scaffold with **separate state**; the original legacy.html WebSocket voice lab is separate again. They are preservation surfaces, not a second MVP authority. No automatic migration or dual-write exists. Schema version changes are intentional because allocation/readiness/draft semantics changed.
+
+| Earlier concept | Current v2 meaning |
+| --- | --- |
+| manual source | tap |
+| mock_camera | camera with simulated:true |
+| id + occurred_at | event_id + time; preserve identity/time explicitly when preparing an intentional import |
+| command/observation envelope kind | canonical outcome distinguishes accepted fact vs observed evidence after Core validation |
+| batch bay/course assigned on send | one dish unit/zone, all K atomically on acknowledgment; courses deferred |
+| staff-ready default/optional camera experiment | ready-only zone convention and stable occupancy default; tap fallback |
+| speech supplement-only draft | deliberate menu-constrained editable capture; human Confirm gate retained |
+| per-dish running task/helper/priority | deferred; partial count + once-only all-ready notification |
+
+The mapping describes semantics, not a working legacy importer. Never silently relabel old/rejected observations as accepted facts. Menu/Core coordinates any future version/migration and dependent review; preserve stable examples/fixtures and tests.

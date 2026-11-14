@@ -1,0 +1,18 @@
+{
+  "schema_version": 2,
+  "id": "second",
+  "name": "SIMULATED imported customer menu — kitchen details unknown",
+  "ingredient_zones": {},
+  "items": [
+    {
+      "id": "burger", "name": "Cheeseburger", "aliases": ["burger", "cheese burger"], "price_cents": 1400,
+      "modifiers": [{"id": "no_onion", "name": "No onions", "aliases": ["hold the onions", "no onion"]}],
+      "call_out_name": null, "station": null, "typical_minutes": null, "recipe": null
+    },
+    {
+      "id": "salad", "name": "Garden salad", "aliases": ["salad"], "price_cents": 900,
+      "modifiers": [{"id": "dressing_side", "name": "Dressing on side", "aliases": ["dressing on the side"]}],
+      "call_out_name": null, "station": null, "typical_minutes": null, "recipe": null
+    }
+  ]
+}

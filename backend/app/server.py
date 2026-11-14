@@ -24,6 +24,7 @@ from app.deepgram_live import stream_transcripts
 from app.session import KitchenSession, SessionLimitExceeded
 from app.ticket_queue import TicketQueue
 from app.coordination.api import router as coordination_router
+from app.mvp.api import router as mvp_router, export_loop
 
 engine, SessionFactory = make_session_factory()
 
@@ -31,11 +32,20 @@ engine, SessionFactory = make_session_factory()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db(engine)
-    yield
+    exporter = asyncio.create_task(export_loop())
+    try:
+        yield
+    finally:
+        exporter.cancel()
+        try:
+            await exporter
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(coordination_router)
+app.include_router(mvp_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # ponytail: wide open for a public demo; narrow to the Vercel origin once that URL exists.

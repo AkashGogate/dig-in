@@ -1,21 +1,23 @@
-# Decision ledger
+# Decisions and supersession ledger
 
-Current product decisions supplied 2026-11-14. Full invariants live in [PROJECT_SPEC](../PROJECT_SPEC.md); this ledger explains the consequential choices without asserting implementation.
+Current decision date: 2026-11-14. Product intent is [PROJECT_SPEC](../PROJECT_SPEC.md); implementation evidence is [STATUS](STATUS.md). This ledger records current choices, not every brainstorming proposal.
 
-| Decision | Reason / consequence |
+| Decision | Current meaning / superseded behavior |
 | --- | --- |
-| Expand the earlier kitchen-only voice experiment into Dig In coordination | Preserve the working parser/evaluation harness; supersede its “no manual substitute” and no-front-of-house restrictions. Manual role screens are now required. |
-| Structured phone draft is the order record; read-back speech proposes a reviewed diff | Speech never silently overwrites or submits. Human tap confirms the current table+food revision; payment is separate. |
-| Optional positioning only on Start order; table then freezes | Prevent casual proximity from creating/reassigning orders. Hardware geometry and staff association are unverified; always keep manual selection. |
-| Reject dining-room monitoring; use exactly two conceptual kitchen views | Ingredient zones and physical plating bays only. No facial recognition/guest tracking; event processing/no raw recording by default. |
-| Keep observation evidence distinct from commands | A hand/withdrawal cannot establish quantity, ownership, readiness, or completion. Staff may correct; preserve provenance/unresolved uncertainty. |
-| Keep acknowledgment, preparation, partial plating, ready, pickup, served distinct | Cook voice or tap is sufficient. Aggregate dish units rather than first-ready plate. Staff explicitly confirms served. |
-| Assign bays at order arrival, queue when full | Current requested rule. Allocating near plating is a later recommendation to reduce bottlenecks, not an adopted silent change. Batch/course identity and stale assignment protection matter. |
-| Default readiness is cook command | Optional auto-ready requires explicit convention/flag and initial single-plate restriction; no claim that vision verifies food/modifiers/doneness. |
-| Separate recipe expectations, raw observations, accepted movements and stock | Prevent double deduction. Support return/restock/waste/correction and unresolved attribution. |
-| Shared authoritative backend and atomic/idempotent transitions | Independent browser localStorage cannot coordinate staff. Single-process in-memory demo is acceptable; production durability/auth is future work. |
-| Explain task priority; N helpers means N additional people | Ready food/wait time dominate, aging limits starvation, VIP secondary; no hidden LLM/emotion rank or worker surveillance. |
-| Keep stack and paid/hardware seams small | Existing FastAPI/uv/static HTML remain. Deepgram/ElevenLabs optional; UNO Q feasibility unverified; Databricks optional analytics; no live POS/payments. |
-| Target Qualcomm prize; rules unverified | Do not present user-described categories as audited eligibility or promise board throughput. No deployment/push authorized by scaffold work. |
+| Menu owns Core/backend and integration | Confirmed role assignment; personal names remain unassigned. Supersedes the brief’s unowned core concern |
+| Four workstreams, two primary screens | Voice, CV, Menu/Core, Databricks; default Server/Kitchen only. Voice→Server and CV→Kitchen zones are proposed UI splits, not assigned people |
+| Voice can create the draft | Deliberate read-back produces menu-constrained editable entries; manual baseline retained. Supersedes earlier supplement-only capture; no voice submission |
+| Table mismatch/unknowns block send | Explicit review/resolution, current revision and human Confirm tap required. Diarization is not identity |
+| One dish unit per zone | Reserve all K free zones on acknowledgment or wait with none. Quantity two has two zones. Supersedes arrival-time batch bays/courses |
+| Camera readiness is in MVP | Ready-only convention; stable no-hand occupancy/removal, default1500ms. Supersedes v1 staff-ready default/optional single-plate auto-ready flag |
+| Unknown is not empty | Blocked/offline/uncertain feeds never free zones. Unexpected/returned plates and stale assignments require safe rejection/review; tap recovery retained |
+| All-ready notification | Current task adopts one notification after every required dish ready, partial count before it. Pickup and optional delivered remain distinct |
+| Timers, not percentages | Actual per-dish start and known typical minutes; missing fields stay unknown |
+| Ingredients second priority | Countable observed/reviewed movement scaffold; no recipe double deduction or progress from hands |
+| Databricks a fourth lane | Analyze service waits and voice/camera failures through canonical events, batch outbox and simulated data. Never live operational authority |
+| No raw capture analytics | Preserve structured facts/counts, source identity/time and simulation/outcome labels; no audio/transcripts/video |
+| Explicit breaking version v2 | New lanes use `/api/v2`; frozen `/api/v1`/legacy UI isolated, no automatic migration/dual-write |
+| Deferred | Positioning, tasks/helpers/priority, POS/payments, courses, spoken responses; retained code does not put them back into MVP |
+| Kitchen-only views | No dining-room camera, faces/guest tracking or raw video retention |
 
-Historical deployment, Coval, and stack claims are archived in [legacy context](archive/2026-11-14-legacy-context.md). Current status must come from checked source and recorded checks.
+Still provisional: individual owner names, proposed screen split, real kitchen mic/hold-to-talk details, 60-second escalation, workspace edition/warehouse/quota/Zerobus and actual hardware/noise performance. No live speech/CV/cloud integration or remote push/publication is implied. The original brief’s Free Edition claims are unverified inputs, not implemented guarantees.

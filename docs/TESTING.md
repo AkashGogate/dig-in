@@ -1,53 +1,46 @@
 # Testing and evidence
 
-Current run results belong in [STATUS](STATUS.md), including environment gaps. Tests verify behavior at their actual layer; transcript checks and mock observations do not prove microphone quality, vision accuracy, hardware throughput, or production concurrency.
-
-## Local checks
+Use [STATUS](STATUS.md) for actual current results, [DEMO_PLAN](DEMO_PLAN.md) for the six beats and failure probes, and [analytics README](../analytics/README.md) for simulated data/SQL/metric limitations. Mock observations/transcripts do not measure CV/STT/hardware performance.
 
 From `backend/`:
 
 ```bash
+uv sync --locked --python 3.11
 uv run pytest -q
-uv run ruff check app/coordination scripts tests/test_coordination.py
-uv run ruff format --check app/coordination scripts tests/test_coordination.py
-# Fresh backend must already be running; this adds demo records:
-uv run python -m scripts.smoke_demo
+uv run ruff check app/mvp app/analytics app/coordination scripts tests/test_mvp_*.py tests/test_coordination.py
+uv run ruff format --check app/mvp app/analytics app/coordination scripts tests/test_mvp_*.py tests/test_coordination.py
+# Start a fresh backend first; smoke adds uniquely identified demo records:
+uv run python -m scripts.mvp_smoke --base-url http://127.0.0.1:8000
+uv run python -m app.analytics.analyze fixtures/analytics/ten_scripted_orders.jsonl --summary
+uv run python -m app.analytics.export fixtures/analytics/ten_scripted_orders.jsonl --simulate-failures 1 --attempts 3
 ```
 
-The heavier Pipecat pipeline is an optional extra (`uv sync --locked --extra live-pipeline`), outside the baseline checks. Default `uv sync --locked` should cover the server, tests, and direct Deepgram WebSocket/eval modules. If a full locked default install cannot be completed, use the exact verification environment documented in STATUS and state that limitation; do not silently treat a partial install as passing. Frontend is buildless; JavaScript syntax checks and browser smoke tests are appropriate, not an invented npm build. API schemas are available at `/api/v1/contracts` and `/openapi.json`.
+No paid keys are required. CI runs the locked tests/scoped Python checks plus Node syntax checks; locally a Node VM/tool runtime may supply syntax validation if shell Node is unavailable. No separate static typechecker or frontend build is configured; runtime Pydantic schemas validate inputs/outputs. Full server startup/HTTP smoke complements route-isolated TestClient checks.
 
-## Coordination invariants
+## Meaningful invariants
 
-The automated domain/API checks should exercise these meaningful failures alongside successful transitions:
+- Voice cannot send; current revision and explicit human Confirm tap required. Unknown/ambiguous menu terms and table mismatch block until explicit review. Edits do not erase flags silently. Correction count uses stable line baseline/final differences, not number of edit taps.
+- Menu aliases/modifiers and nullable kitchen fields work for a second JSON menu without new hardcoded names. Unknowns/candidates never guess. Kitchen table/item utterances must not select the first same-table order or repeated unit.
+- Submit/ack/start/ready/pickup/delivery are distinct. Quantity2 yields two physical dish units/zones. Acknowledgment reserves all K atomically or waits with none; concurrent orders cannot overbook. Release retries waiting orders; stale assignment versions fail.
+- Stable no-hand ready-only occupancy/removal can drive default ready/pickup; hand/unstable/blocked/offline/unknown/empty-before-ready cannot silently complete/free. Unassigned/returned plates require review. Tap-ready/pickup works when camera blocked, without fabricating a start timestamp.
+- Partial ready is not all-ready. Aggregate notification occurs once; duplicate event IDs do not repeat state/notification/export rows. Changed payload under the same ID fails.
+- Recipe expectation and accepted observed stock stay separate; hand/change evidence alone does not deduct or imply progress.
+- Analytics failure/slow drain does not block operations. Exact pending rows/time/ID survive retries within the process. Missing/uncompleted stages are null/censored; eligible manual/fallback denominator excludes mandatory Confirm and optional Delivered. Raw capture content cannot enter analytics.
 
-- Speech/model/observation cannot submit; manual human confirmation references the current reviewed draft revision. Corrections preserve unrelated lines, and stale revisions fail.
-- A repeated dish/ambiguous read-back asks for seat/item clarification. The deterministic mock recognizes one quantity correction; it is not freeform speech understanding.
-- Replayed stable IDs do not duplicate orders, tasks, observations, or accepted stock movements. An ID reused for different content must fail rather than mask new work.
-- Submitted is not kitchen-acknowledged; acknowledged is not preparing. Partial plating does not make food ready. One ready dish does not make all dish units ready. Pickup is not served.
-- Accepted inventory movement is separate from observation and recipe expectation; duplicate acceptance does not deduct twice. Returns/restock/waste/corrections preserve a reviewable reason/provenance.
-- Full bays create waiting work, never overlapping assignments. Occupied/unresolved bays cannot be reused. Delayed events for an old assignment version fail.
-- Two simultaneous claims yield one owner. Helpers are distinct additional staff slots; readiness requires ready food plus enough helpers. Release/block/cancel/complete follow validation.
-- Missing positioning/speech/camera falls back to manual paths, with adapter state visible. Network failure is unsynced, not a fabricated successful order.
+## Browser and real rig limits
 
-Use deterministic fixture IDs from `backend/app/coordination/fixtures.py`; tests should consume contracts rather than reproduce an alternative schema. Live-adapter changes require their own contract tests and regression scenarios.
+Exercise the default two-screen v2 against one shared backend with multiple actor sessions, long/empty/error/unknown states, explicit flag resolution, capacity, status and tap recovery. Verify phone reflow, keyboard/focus, labels,200%zoom and screen reader as available; record precise coverage rather than claiming broad accessibility. STATUS records the current Chrome path and explicitly untested checks.
 
-## Browser/manual smoke
+Real STT requires deliberate capture/privacy review and noisy-room tests; real CV requires calibrated overhead zones, stable interval/no-hand evidence, blocked/offline/returned plate scenarios and actual hardware timing. Cloud connector/SQL/dashboard work requires official capability verification and live workspace credentials. Synthetic fixture timings are not restaurant or staff benchmarks.
 
-Use [DEMO_PLAN](DEMO_PLAN.md) with two browser sessions and a cook, one backend. Check a narrow phone viewport, keyboard navigation, long requests, empty queues, form labels, disabled/loading controls, invalid commands, and backend outage. Verify claims and updates appear in another tab/device. Browser UI checks complement API tests; they do not establish production authentication or real network persistence.
+## Preserved regressions
 
-Record measured counts for duplicate effects, wrong table/ticket association, false ready, stock error and corrections, clarification/prompt count, claim conflicts, and ready-to-pickup delay. No benchmark values are claimed until measured. Record timestamps and fixture/scenario version when collecting them. Do not introduce staff performance/emotion surveillance.
-
-## Preserved kitchen-call experiment
-
-`backend/tests/test_call_parser.py`, `test_mismatch.py`, and `test_eval_scoring.py` cover transcript interpretation and evaluation scoring. `backend/tests/fixtures/transcripts.json` is reused by the original scenario fallback. `audio-samples/` already contains seven synthetic WAV clips and a manifest; earlier docs incorrectly said audio did not exist.
+The existing parser/mismatch/eval tests and broad `/api/v1` coordination tests remain regression coverage, not new MVP semantics. `scripts.smoke_demo` is v1 only. The original seven synthetic WAV clips/manifest and legacy eval remain available:
 
 ```bash
-cd backend
 uv run python -m eval.run_eval --mode mock
-# Requires a Deepgram key and incurs provider usage:
+# Real STT only with explicit provider configuration/usage:
 # uv run python -m eval.run_eval --mode deepgram
 ```
 
-Check the harness's `--help` before real usage; do not assume optional modes or provider availability. Mock mode proves harness plumbing and scorer execution, not transcription quality. The harness writes `audio-samples/scorecard.md`; preserve its provenance rather than silently treating regenerated mock scores as an improvement. Generating audio again with `audio_gen/generate_samples.py` uses macOS `say`, NumPy, and soundfile; checked-in fixtures allow other machines to run tests without macOS.
-
-Synthetic conditions include clean, two overlapping stations, three simultaneous voices, escalating noise, truncated/shouted phrasing, a different TTS locale as an accent proxy, and background chatter. TTS accent variation is not a substitute for real diverse speakers. Real Deepgram microphone/prerecorded quality and noisy-room behavior need configured tests; no Coval connection is implemented. The retained legacy microphone has capped sessions and a scenario fallback; it does not submit Dig In structured orders.
+Mock eval feeds ground-truth transcripts and proves scoring/plumbing, not microphone quality. The harness writes the checked-in scorecard; preserve provenance and do not claim regenerated mock scores as speech improvement. Legacy voice lab logging remains separate from v2 capture privacy. The optional Pipecat extra is outside the default checks.

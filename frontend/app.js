@@ -1,23 +1,20 @@
-/* Plain-JS client. Executable shapes live in backend/app/coordination/contracts.py.
- * Shared backend state is authoritative; no localStorage orders or inventory.
+/* MVP client. Contracts are owned by backend/app/mvp; no localStorage authority.
+ * Text simulators never claim microphone/camera processing or live Databricks.
  */
 "use strict";
 const API = (window.DIG_IN_API || "http://localhost:8000").replace(/\/$/, "");
 const $ = id => document.getElementById(id);
-const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
-const money = cents => new Intl.NumberFormat("en-US", {style:"currency", currency:"USD"}).format(cents / 100);
-const human = text => String(text || "").replaceAll("_", " ");
+const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
 const uid = () => globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const human = value => String(value || "").replaceAll("_", " ");
 let state = null, actor = null, session = null, busy = false, uncertain = null;
-let draftId = "", draftSignature = "", bootstrap = false, currentView = "server";
-let suggestion = null, lastConnection = false;
+let draftId = "", draftSignature = "", menuSignature = "", view = "server", holding = false;
 
-function feedback(text, error = false) {
-  $("feedback").textContent = text;
+function feedback(message, error = false) {
+  $("feedback").textContent = message;
   $("feedback").classList.toggle("error", error);
 }
-function connection(ok) {
-  lastConnection = ok;
+function connected(ok) {
   $("connection").textContent = ok ? "Shared backend connected" : "Backend unavailable · UNSYNCED";
   $("connection").style.color = ok ? "var(--green)" : "var(--danger)";
 }
@@ -25,18 +22,17 @@ async function request(path, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch(`${API}${path}`, {...options, signal:controller.signal});
-    const data = await res.json();
-    if (!res.ok) {
-      const detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data);
-      const error = new Error(`${res.status}: ${detail}`);
+    const response = await fetch(`${API}${path}`, {...options, signal: controller.signal});
+    const data = await response.json();
+    if (!response.ok) {
+      const error = new Error(`${response.status}: ${typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data)}`);
       error.rejected = true;
       throw error;
     }
-    connection(true);
+    connected(true);
     return data;
   } catch (error) {
-    if (!error.rejected) connection(false);
+    if (!error.rejected) connected(false);
     throw error;
   } finally { clearTimeout(timer); }
 }
@@ -44,231 +40,274 @@ function setBusy(value) {
   busy = value;
   document.querySelectorAll("[data-command]").forEach(button => button.disabled = value || !session || Boolean(uncertain));
   $("retry").disabled = value;
+  const order = state?.orders[draftId];
+  $("confirm-send").disabled = value || !session || Boolean(uncertain) || !order?.lines.length || Boolean(order?.flags?.length);
 }
-async function dispatch(payload, source = "manual", existing = null) {
+async function dispatch(payload, source = "tap", existing = null) {
   if (!session) { feedback("Enter a simulated staff session first.", true); return null; }
-  if (busy || (uncertain && !existing)) { feedback("Resolve the uncertain command with Retry before sending another change.", true); return null; }
-  const command = existing || {id:uid(),schema_version:1,source,kind:payload.action === "observe" ? "observation" : "command",occurred_at:new Date().toISOString(),device_id:"web-demo",payload};
+  if (busy || (uncertain && !existing)) { feedback("Resolve the uncertain event with Retry before making another change.", true); return null; }
+  const envelope = existing || {event_id: uid(), schema_version: 2, source, time: new Date().toISOString(), run_id: "web-demo", simulated: true, payload};
   setBusy(true);
   feedback("Sending to shared backend…");
   try {
-    const section = $("section-only").checked && actor.section !== "all" ? `?section=${encodeURIComponent(actor.section)}` : "";
-    const data = await request(`/api/v1/commands${section}`, {method:"POST",headers:{"Content-Type":"application/json","X-Demo-Session":session},body:JSON.stringify(command)});
+    const data = await request("/api/v2/commands", {method: "POST", headers: {"Content-Type": "application/json", "X-Demo-Session": session}, body: JSON.stringify(envelope)});
     uncertain = null;
     $("retry-bar").hidden = true;
     state = data.state;
-    if (payload.action === "start_order") {
-      draftId = data.result?.order_id || Object.values(state.orders).find(o => o.owner === actor.id && o.status === "draft" && !state.orders[draftId])?.id || draftId;
-      suggestion = data.result?.positioning;
-    }
+    if (payload.action === "start_order") draftId = data.result.order_id;
     render();
-    feedback(payload.action === "confirm_send" ? "Order sent. Kitchen acknowledgment is a separate next step." : "Change accepted by the shared backend.");
+    const flags = data.result?.flags;
+    if (Array.isArray(flags) && flags.length) {
+      const message = flags.map(flag => typeof flag === "string" ? flag : flag.message || flag.code).join(" ");
+      feedback(`Clarification needed: ${message}`, true);
+      if (payload.action === "kitchen_voice") $("kitchen-clarification").textContent = message;
+    } else {
+      feedback(payload.action === "confirm_send" ? "Order submitted. Kitchen acknowledgment is a separate next step." : "Change accepted by the shared backend.");
+      if (payload.action === "kitchen_voice") $("kitchen-clarification").textContent = "Kitchen phrase accepted. Check the exact ticket and dish below.";
+    }
     return data;
   } catch (error) {
-    if (!error.rejected) { uncertain = command; $("retry-bar").hidden = false; }
-    feedback(error.rejected ? `${error.message}. Refresh state and review before trying again.` : "Connection interrupted. Your command may have arrived; nothing is assumed saved. Retry uses the same event ID.", true);
+    if (!error.rejected) { uncertain = envelope; $("retry-bar").hidden = false; }
+    feedback(error.rejected ? `${error.message}. Refresh and review the shared state before trying again.` : "Connection interrupted. The event may have arrived. Reconnect, then Retry reuses its exact ID and timestamp.", true);
     return null;
   } finally { setBusy(false); }
 }
 async function refresh() {
-  if (busy) return;
+  if (busy || holding) return;
   try {
-    const section = $("section-only").checked && actor && actor.section !== "all" ? `?section=${encodeURIComponent(actor.section)}` : "";
-    state = await request(`/api/v1/state${section}`);
+    state = await request("/api/v2/state");
     render();
   } catch (error) {
-    if (!state) $("draft-summary").textContent = `Cannot reach ${API}. Start the backend, then Refresh. No orders are stored only in this browser.`;
-    if (lastConnection) feedback("Shared state is unavailable. Keep draft edits visible and reconnect; offline transactions are not supported.", true);
+    feedback("Shared backend unavailable · UNSYNCED. Draft text stays visible, but offline orders are not completed. Reconnect before sending.", true);
   }
 }
 function fillSelect(id, options, placeholder) {
-  const el = $(id), before = el.value;
-  el.innerHTML = (placeholder !== undefined ? `<option value="">${esc(placeholder)}</option>` : "") + options.map(([value,label]) => `<option value="${esc(value)}">${esc(label)}</option>`).join("");
-  if ([...el.options].some(option => option.value === before)) el.value = before;
+  const element = $(id), before = element.value;
+  element.innerHTML = (placeholder === undefined ? "" : `<option value="">${esc(placeholder)}</option>`) + options.map(([value, text]) => `<option value="${esc(value)}">${esc(text)}</option>`).join("");
+  if ([...element.options].some(option => option.value === before)) element.value = before;
 }
-function orderDishes(orderId) { return Object.values(state.dishes).filter(d => d.order_id === orderId); }
-function taskBlockers(task) { const computed = state.computed?.task_blockers?.[task.id]; return Array.isArray(computed) ? computed : task.blocker ? [task.blocker] : []; }
+function items() { return state?.menu?.items || []; }
+function menuItem(id) { return items().find(item => item.id === id); }
+function modifierNames(menuId, ids = []) {
+  const modifiers = menuItem(menuId)?.modifiers || [];
+  return ids.map(id => modifiers.find(modifier => modifier.id === id)?.name || id);
+}
+function dishesFor(orderId) { return Object.values(state.dishes).filter(dish => dish.order_id === orderId); }
+function progress(order) {
+  const supplied = state.computed?.order_progress?.[order.id];
+  if (supplied) return supplied;
+  const dishes = dishesFor(order.id);
+  return {ready: dishes.filter(dish => dish.ready_at).length, total: dishes.length, picked_up: dishes.filter(dish => dish.stage === "picked_up").length};
+}
+function updateUnlessEditing(id, renderFunction) {
+  const container = $(id), focused = document.activeElement;
+  if (container.contains(focused) && ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName)) return;
+  const dataset = container.contains(focused) && focused.matches("button") ? {...focused.dataset} : null;
+  renderFunction();
+  if (dataset) [...container.querySelectorAll("button")].find(button => Object.entries(dataset).every(([key,value]) => button.dataset[key] === value))?.focus({preventScroll: true});
+}
 function render() {
   if (!state) return;
-  if (!bootstrap) {
-    const tables = Object.values(state.tables).map(t => [t.id, `Table ${t.id} · ${t.section}`]);
-    ["start-table","draft-table","request-table"].forEach(id => fillSelect(id,tables));
-    fillSelect("menu",Object.values(state.menu).map(m => [m.id,`${m.name} · ${money(m.price_cents)}`]));
-    fillSelect("stock-zone",Object.values(state.zones).map(z => [z.id,`${z.ingredient} · ${z.unit}`]));
-    refreshModifiers(); refreshSeats(); bootstrap = true;
+  const currentMenuSignature = JSON.stringify(state.menu);
+  if (menuSignature !== currentMenuSignature) {
+    menuSignature = currentMenuSignature;
+    const tables = Object.values(state.tables).map(table => [table.id, `Table ${table.id}`]);
+    fillSelect("start-table", tables);
+    fillSelect("draft-table", tables);
+    fillSelect("actor", Object.values(state.actors).map(person => [person.id, `${person.name} · ${person.role}`]));
+    fillSelect("menu", items().map(item => [item.id, item.name]));
+    refreshModifiers();
+    const examples = items().slice(0, 2).map(item => `one ${item.aliases?.[0] || item.name}`).join(" and ");
+    $("transcript").placeholder = `Table ${tables[0]?.[0] || "N"}: ${examples || "one configured menu item"}`;
+    $("menu-summary").innerHTML = items().map(item => `<div class="menu-item"><strong>${esc(item.name)}</strong><p>${item.price_cents == null ? "Price unknown" : new Intl.NumberFormat("en-US", {style: "currency", currency: "USD"}).format(item.price_cents / 100)}</p><p class="note">${item.station ? esc(item.station) : "Station unknown"} · ${item.typical_minutes == null ? "Typical time unknown" : `Typical ${esc(item.typical_minutes)} min`}</p></div>`).join("");
   }
   renderDraft();
-  renderUnlessFocused("task-panel", renderTasks);
-  renderUnlessFocused("tickets", renderTickets);
-  renderUnlessFocused("bays", renderBays);
-  renderUnlessFocused("server-orders", renderServerOrders);
-  renderOverview();
+  updateUnlessEditing("server-orders", renderServerOrders);
+  updateUnlessEditing("tickets", renderTickets);
+  updateUnlessEditing("zones", renderZones);
+  updateUnlessEditing("cameras", renderCameras);
+  renderNotifications();
+  const health = state.computed?.analytics_health || state.analytics_health;
+  $("analytics-health").textContent = health ? Object.entries(health).filter(([,value]) => typeof value !== "object").map(([key,value]) => `${human(key)}: ${value}`).join(" · ") : "Outbox status is available through the API. Cloud export is not connected.";
   setBusy(busy);
 }
-function renderUnlessFocused(id, fn) {
-  const active = document.activeElement, container = $(id);
-  if (container.contains(active) && ["INPUT","SELECT","TEXTAREA"].includes(active.tagName)) return;
-  const data = container.contains(active) && active.matches("button") ? {...active.dataset} : null;
-  fn();
-  if (data) [...container.querySelectorAll("button")].find(b => Object.entries(data).every(([k,v])=>b.dataset[k]===v))?.focus({preventScroll:true});
-}
 function renderDraft() {
-  const drafts = Object.values(state.orders).filter(o => o.status === "draft" && o.owner === actor?.id);
-  fillSelect("draft-select",drafts.map(o => [o.id,`Table ${o.table_id || "unselected"} · ${o.id.slice(0,8)} · r${o.revision}`]),"Choose a draft");
-  if (!drafts.some(o => o.id === draftId)) draftId = drafts[0]?.id || "";
+  const drafts = Object.values(state.orders).filter(order => order.status === "draft" && order.owner === actor?.id);
+  fillSelect("draft-select", drafts.map(order => [order.id, `Table ${order.table_id || "—"} · ${order.id.slice(0,8)} · r${order.revision}`]), "Choose a draft");
+  if (!drafts.some(order => order.id === draftId)) draftId = drafts[0]?.id || "";
   $("draft-select").value = draftId;
   const order = state.orders[draftId];
   $("editor").hidden = !order;
-  if (!order) { $("draft-summary").innerHTML = '<p class="empty">No draft selected. Start with a table above.</p>'; draftSignature = ""; return; }
+  if (!order) { $("draft-summary").innerHTML = '<p class="empty">Start with a table, then enter dishes manually or use the read-back simulator.</p>'; draftSignature = ""; return; }
   const signature = JSON.stringify(order);
   if (signature === draftSignature) return;
   draftSignature = signature;
-  $("draft-summary").innerHTML = `<div class="draft-title"><strong>Table ${esc(order.table_id || "—")}</strong><span class="status">Draft · revision ${order.revision}</span></div>${lineList(order)}<p class="note">Ticket ${esc(order.id)} · never submitted by speech</p>`;
+  $("draft-summary").innerHTML = `<div class="draft-title"><strong>Table ${esc(order.table_id)}</strong><span class="status">Draft · revision ${order.revision}</span></div>${lineList(order)}<p class="note">Ticket ${esc(order.id)} · corrections measured at submission</p>`;
   $("draft-table").value = order.table_id || "";
-  fillSelect("edit-line",order.lines.map(l => [l.id,`Seat ${l.seat} · ${state.menu[l.menu_id]?.name || l.menu_id}`]),"New dish line");
-  refreshSeats();
-  if (suggestion) $("position-hint").textContent = `MOCK suggestion: table ${suggestion.suggested_table_id || "unavailable"}. ${suggestion.reason || "Review manually before sending."} The displayed table is manually correctable.`;
-  $("send-note").textContent = `Review table ${order.table_id || "—"}, ${order.lines.reduce((n,l)=>n+l.quantity,0)} dishes, seats and requests. This tap approves revision ${order.revision}; it does not authorize payment.`;
-  const p = order.proposal;
-  $("proposal").innerHTML = p ? `<div class="proposal"><strong>${p.question ? "Clarification needed" : "Proposed correction — not applied"}</strong><p>${p.question ? esc(p.question) : `${esc(p.line_id)}: quantity ${order.lines.find(l=>l.id===p.line_id)?.quantity ?? "?"} → <strong>${p.quantity}</strong>`}</p><p class="note">Transcript: ${esc(p.transcript)}</p>${!p.question && p.quantity ? `<button data-action="accept" data-id="${esc(p.id)}" data-command>Accept correction for review</button>` : ""} <button data-action="keep-draft" data-command>Keep current entries</button></div>` : "";
+  fillSelect("edit-line", order.lines.map(line => [line.id, `${line.quantity} × ${line.item_name || menuItem(line.menu_id)?.name || line.menu_id}`]), "New dish line");
+  $("draft-flags").innerHTML = (order.flags || []).map(flagMarkup).join("");
+  const count = order.lines.reduce((total, line) => total + line.quantity, 0);
+  $("send-note").textContent = `Review table ${order.table_id}, ${count} physical dish units, modifiers and requests. Your tap approves revision ${order.revision}.`;
+  $("confirmation-blocker").textContent = order.flags?.length ? "Submission blocked: resolve each table/menu flag above, then review the draft." : !count ? "Add at least one dish before sending." : "Ready for human review. Voice never submits.";
 }
 function lineList(order) {
-  if (!order.lines.length) return '<p class="empty">Add a dish line. Nothing has been sent.</p>';
-  return order.lines.map(l => `<div class="order-line"><div><strong>${l.quantity} × ${esc(state.menu[l.menu_id]?.name || l.menu_id)}</strong><small>Seat ${l.seat} · ${esc(l.course)}${l.modifiers.length ? ` · ${esc(l.modifiers.join(", "))}` : ""}</small>${l.requests ? `<small><strong>Guest request:</strong> ${esc(l.requests)}</small>` : ""}</div><span class="price">${money((state.menu[l.menu_id]?.price_cents || 0) * l.quantity)}</span></div>`).join("");
+  return order.lines.length ? order.lines.map(line => `<div class="order-line"><div><strong>${line.quantity} × ${esc(line.item_name || menuItem(line.menu_id)?.name || line.menu_id)}</strong><small>${line.seat ? `Seat ${line.seat} · ` : ""}${esc(modifierNames(line.menu_id, line.modifiers).join(", ") || "No modifiers")}</small>${line.requests ? `<small><strong>Guest request:</strong> ${esc(line.requests)}</small>` : ""}</div></div>`).join("") : '<p class="empty">No dishes entered. Nothing has been sent.</p>';
 }
-function refreshSeats() {
-  const table = state?.tables[$("draft-table").value || $("start-table").value];
-  fillSelect("seat",(table?.seats || [1,2,3,4]).map(n=>[n,`Seat ${n}`]));
+function flagMarkup(flag) {
+  const mismatch = flag.code === "table_mismatch";
+  const tableRequired = flag.code === "table_required";
+  const candidates = flag.candidates?.map(id => menuItem(id)?.name || (typeof id === "string" ? id : JSON.stringify(id))) || [];
+  return `<article class="review-flag"><strong>${mismatch ? "Resolve the table mismatch" : tableRequired ? "Confirm the selected table" : "Review an uncertain draft"}</strong><p>${esc(flag.message || human(flag.code))}</p>${candidates.length ? `<p>Candidates: ${esc(candidates.join(", "))}</p>` : ""}<div class="actions">${mismatch || tableRequired ? `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="keep_selected_table" data-command>Keep selected table</button>${mismatch ? `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="use_spoken_table" data-command>Use spoken table</button>` : ""}` : `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="reviewed_remove_unknown" data-command>Reviewed — omit uncertain words</button>`}</div><p class="note">Use manual entries below for the intended item. No candidate is chosen automatically.</p></article>`;
 }
 function refreshModifiers() {
-  fillSelect("modifier",(state?.menu[$("menu").value]?.modifiers || []).map(m=>[m,m]),"No modifier");
+  const modifiers = menuItem($("menu").value)?.modifiers || [];
+  fillSelect("modifier", modifiers.map(modifier => [modifier.id, modifier.name]), "No modifier");
 }
 function loadLine() {
-  const line = state.orders[draftId]?.lines.find(l=>l.id===$("edit-line").value);
-  $("seat").value = line?.seat || 1;
-  $("menu").value = line?.menu_id || Object.keys(state.menu)[0];
+  const line = state.orders[draftId]?.lines.find(entry => entry.id === $("edit-line").value);
+  $("menu").value = line?.menu_id || items()[0]?.id || "";
   $("quantity").value = line?.quantity || 1;
-  $("course").value = line?.course || "main";
+  $("seat").value = line?.seat || "";
   $("requests").value = line?.requests || "";
-  refreshModifiers(); [...$("modifier").options].forEach(o=>o.selected=Boolean(line?.modifiers.includes(o.value)));
+  refreshModifiers();
+  [...$("modifier").options].forEach(option => option.selected = Boolean(line?.modifiers?.includes(option.value)));
 }
-function renderTasks() {
-  const ranked = state.computed?.ranked_tasks || Object.values(state.tasks).filter(t=>t.status === "available").slice(0,3);
-  const rankIds = new Set(ranked.map(t=>t.id));
-  $("ranked-tasks").innerHTML = ranked.length ? ranked.map(taskMarkup).join("") : '<p class="empty">No available tasks. Ready food and requests appear here.</p>';
-  const others = Object.values(state.tasks).filter(t=>!["cancelled","completed"].includes(t.status) && !rankIds.has(t.id));
-  $("other-tasks").innerHTML = others.length ? others.map(taskMarkup).join("") : '<p class="note">No open claims or helper requests.</p>';
-}
-function taskMarkup(task) {
-  const blockers = taskBlockers(task), mine = task.owner === actor?.id;
-  const helpers = task.helper_slots || [], joined = helpers.includes(actor?.id);
-  const buttons = [];
-  const button = (operation,label) => `<button class="small" data-action="task" data-operation="${operation}" data-id="${esc(task.id)}" data-command>${label}</button>`;
-  if (task.status === "available") buttons.push(button("claim","Claim task"));
-  if (mine) {
-    buttons.push(button("release","Release"));
-    if (task.type !== "food_run") buttons.push(button("complete","Complete"));
-    if (task.type === "food_run" && !blockers.length && task.dish_ids.some(id=>state.dishes[id]?.stage === "ready")) buttons.push(`<button class="small primary" data-action="pickup" data-id="${esc(task.id)}" data-command>Confirm pickup</button>`);
-    buttons.push(button("helpers","Ask 1 additional helper"),button("split","Split delivery / clear helper need"),button("block","Block"),button("cancel","Cancel"));
-  }
-  if (task.owner && !mine && helpers.some(h=>!h)) buttons.push(button("join","Join as helper"));
-  if (joined) buttons.push(button("leave","Leave helper slot"));
-  if (actor?.role === "lead") buttons.push(button("urgent","Shift-lead urgency"));
-  const names = helpers.map(h=>h ? state.actors[h]?.name || h : "Open slot").join(" · ");
-  return `<article class="task"><div class="task-head"><h3>Table ${esc(task.table_id)} · ${human(task.type)}</h3><span class="status">${esc(task.status)}</span></div><p>${esc(task.priority_reason)} · ${esc(task.section)}</p><p>${task.owner ? `Claimed by ${esc(state.actors[task.owner]?.name || task.owner)}` : "Available to staff"} · ${Math.max(0,Math.floor((Date.now()-Date.parse(task.created_at))/60000))}m waiting</p>${helpers.length ? `<p>Additional helpers: ${esc(names)}</p>` : ""}${blockers.length ? `<p class="blocker">Waiting: ${esc(blockers.join("; "))}</p>` : ""}<div class="actions">${buttons.join("")}</div></article>`;
+function renderNotifications() {
+  const notices = (state.notifications || []).filter(notice => state.orders[notice.order_id]?.owner === actor?.id);
+  $("notifications").innerHTML = notices.map(notice => `<article class="ready-notice"><h2>Table ${esc(state.orders[notice.order_id]?.table_id)} · all dishes ready</h2><p>One order-ready notification · ticket ${esc(notice.order_id)}. ${state.orders[notice.order_id]?.status === "delivered" ? "Delivered confirmed." : "Review the dish pickup status below."}</p></article>`).join("");
 }
 function renderServerOrders() {
-  const orders = Object.values(state.orders).filter(o=>o.status !== "draft" && (o.owner === actor?.id || actor?.role === "lead"));
-  $("server-orders").innerHTML = orders.length ? orders.map(o=>`<article class="ticket"><div class="ticket-heading"><h3>Table ${esc(o.table_id)} · ${esc(state.computed?.ticket_stages?.[o.id] || o.status)}</h3><small>${esc(o.id)} · ${o.acknowledged ? "Kitchen acknowledged" : "Awaiting kitchen acknowledgment"}</small></div>${orderDishes(o.id).map(d=>dishMarkup(d,false)).join("")}</article>`).join("") : '<p class="empty">Your submitted tickets will appear here. Served needs an explicit staff confirmation.</p>';
+  const orders = Object.values(state.orders).filter(order => order.status !== "draft" && order.owner === actor?.id);
+  $("server-orders").innerHTML = orders.length ? orders.map(order => {
+    const counts = progress(order);
+    return `<article class="ticket"><div class="ticket-heading"><h3>Table ${esc(order.table_id)} · ${esc(human(order.status))}</h3><small>Ticket ${esc(order.id)}</small></div><p class="ticket-progress">${counts.ready} of ${counts.total} ready · ${counts.picked_up} picked up</p>${dishesFor(order.id).map(dish => dishMarkup(dish, false)).join("")}${order.status === "picked_up" ? `<button class="primary" data-action="deliver" data-id="${esc(order.id)}" data-command>Confirm delivered (optional)</button>` : ""}</article>`;
+  }).join("") : '<p class="empty">Your submitted orders will appear here. Partial readiness never sends an all-ready notification.</p>';
 }
-function dishMarkup(d,kitchen) {
-  const stages = {queued:"preparing",preparing:"partially_plated",partially_plated:"plated",plated:"ready"};
+function elapsed(timestamp) {
+  if (!timestamp) return "Start time unknown";
+  const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(timestamp)) / 1000));
+  return `Started ${Math.floor(seconds / 60)}m ${seconds % 60}s ago`;
+}
+function dishMarkup(dish, kitchen) {
+  const order = state.orders[dish.order_id];
   let controls = "";
-  if (kitchen && ["cook","lead"].includes(actor?.role) && stages[d.stage]) controls = `<button class="small" data-action="advance" data-id="${esc(d.id)}" data-stage="${stages[d.stage]}" data-command>${d.stage === "plated" ? "Mark ready" : `Mark ${human(stages[d.stage])}`}</button>`;
-  if (!kitchen && d.stage === "picked_up" && ["server","lead"].includes(actor?.role)) controls = `<button class="small primary" data-action="advance" data-id="${esc(d.id)}" data-stage="served" data-command>Confirm served</button>`;
-  return `<div class="dish"><div><p><strong>${esc(state.menu[d.menu_id]?.name || d.menu_id)}</strong> · seat ${d.seat}</p><small>${esc(d.id)} · ${esc(d.course)} · ${d.bay_id ? `Bay ${esc(d.bay_id)}` : "Waiting for bay"}${d.modifiers.length ? ` · ${esc(d.modifiers.join(", "))}` : ""}</small>${d.requests ? `<small>Guest request: <strong>${esc(d.requests)}</strong></small>` : ""}<span class="status">${human(d.stage)}</span></div><div class="actions">${controls}</div></div>`;
+  if (kitchen && order?.status !== "submitted") {
+    if (dish.stage === "queued") controls += `<button class="small" data-action="start-dish" data-id="${esc(dish.id)}" data-command>Start dish</button>`;
+    if (["queued", "started"].includes(dish.stage) && dish.zone_id) controls += `<button class="small" data-action="ready-dish" data-id="${esc(dish.id)}" data-command>Tap ready</button>`;
+  }
+  if (!kitchen && dish.stage === "ready") controls += `<button class="small primary" data-action="pickup-dish" data-id="${esc(dish.id)}" data-command>Confirm plate pickup</button>`;
+  return `<div class="dish"><div><p><strong>${esc(dish.item_name || menuItem(dish.menu_id)?.name || dish.menu_id)}</strong>${dish.seat ? ` · seat ${dish.seat}` : ""}</p><small>Unit ${esc(dish.id)} · ${dish.zone_id ? `Zone ${esc(dish.zone_id)}` : "No zone assigned"}${dish.station ? ` · ${esc(dish.station)}` : " · station unknown"}</small><p class="dish-timer">${esc(elapsed(dish.started_at))} · ${dish.typical_minutes == null ? "typical time unknown" : `typical ${esc(dish.typical_minutes)} min`}</p>${dish.modifiers?.length ? `<small>${esc(modifierNames(dish.menu_id, dish.modifiers).join(", "))}</small>` : ""}${dish.requests ? `<small><strong>Guest request:</strong> ${esc(dish.requests)}</small>` : ""}<span class="dish-stage">${esc(human(dish.stage))}</span></div><div class="actions">${controls}</div></div>`;
 }
 function renderTickets() {
-  const orders = Object.values(state.orders).filter(o=>o.status === "submitted");
-  $("tickets").innerHTML = orders.length ? orders.map(o=>`<article class="ticket"><div class="ticket-heading"><h3>Table ${esc(o.table_id)} · ${esc(state.computed?.ticket_stages?.[o.id] || "submitted")}</h3><small>${esc(o.id)} · revision ${o.revision}</small></div><p class="note">${o.acknowledged ? "Acknowledged; preparation is tracked per dish." : "Awaiting acknowledgment. This does not start preparation."}</p>${!o.acknowledged ? `<button data-action="ack" data-id="${esc(o.id)}" data-command>Acknowledge ticket</button>` : `<button data-action="select-prep" data-id="${esc(o.id)}" data-command>Select active prep ticket</button><span class="note"> ${state.active_prep?.[actor?.id] === o.id ? "Active for this cook" : "Sets the visible inventory attribution default; review before accepting"}</span>`}${o.amendments?.some(a=>!a.acknowledged) ? `<div class="proposal"><p>Pending amendment: ${esc(o.amendments.filter(a=>!a.acknowledged).map(a=>`${a.line_id} quantity ${a.quantity}`).join(", "))}</p><button data-action="ack-amendment" data-id="${esc(o.id)}" data-command>Acknowledge amendment</button></div>` : ""}${orderDishes(o.id).map(d=>dishMarkup(d,true)).join("")}</article>`).join("") : '<p class="empty">No submitted tickets. A server must review and send an order first.</p>';
+  const orders = Object.values(state.orders).filter(order => order.status !== "draft" && order.status !== "delivered");
+  $("tickets").innerHTML = orders.length ? orders.map(order => {
+    const counts = progress(order);
+    return `<article class="ticket"><div class="ticket-heading"><h3>Table ${esc(order.table_id)} · ${esc(human(order.status))}</h3><small>Ticket ${esc(order.id)}</small></div><p class="ticket-progress">${counts.ready} of ${counts.total} ready · ${counts.picked_up} picked up</p>${order.status === "submitted" ? `<button class="primary" data-action="acknowledge" data-id="${esc(order.id)}" data-command>Acknowledge & reserve zones</button>` : ""}${order.zone_status === "waiting" ? `<div class="review-flag"><strong>Waiting for ${counts.total} free zones</strong><p>Nothing is partially allocated. Pickup/recovery frees capacity.</p><button data-action="retry-zones" data-id="${esc(order.id)}" data-command>Retry zone reservation</button></div>` : ""}${dishesFor(order.id).map(dish => dishMarkup(dish, true)).join("")}</article>`;
+  }).join("") : '<p class="empty">No active tickets. A server must review and send an order first.</p>';
 }
-function renderBays() {
-  $("bays").innerHTML = Object.values(state.bays).map(b=> {
-    const o = state.orders[b.order_id];
-    const labels = b.dish_ids.map(id=>{ const d=state.dishes[id]; return d ? `${state.menu[d.menu_id]?.name || d.menu_id} · seat ${d.seat} · ${human(d.stage)}` : id; });
-    return `<article class="bay"><h3>Bay ${esc(b.id)} <span class="tag">v${b.assignment_version}</span></h3><div class="table-number">${o ? `Table ${esc(o.table_id)}` : "Available"}</div><p>${b.order_id ? `${esc(b.order_id)} · ${esc(b.course)} · ${b.dish_ids.length}/${b.capacity} dishes` : `Capacity ${b.capacity} dish units`}</p>${labels.map(l=>`<p>${esc(l)}</p>`).join("")}<p><strong>${b.occupied ? "Food present" : "No food observed"}${b.unresolved_pickup ? " · UNRESOLVED PICKUP" : ""}</strong></p><div class="actions">${b.order_id ? `<button class="small" data-action="bay-observe" data-kind="plate_arrival" data-id="${esc(b.id)}" data-command>Mock plate arrival</button><button class="small" data-action="bay-observe" data-kind="plate_removal" data-id="${esc(b.id)}" data-command>Mock plate removal</button><button class="small" data-action="bay-observe" data-kind="plate_return" data-id="${esc(b.id)}" data-command>Mock plate return</button><button class="small" data-action="reconcile-bay" data-occupied="true" data-id="${esc(b.id)}" data-command>Confirm food still present</button><button class="small" data-action="reconcile-bay" data-occupied="false" data-id="${esc(b.id)}" data-command>Confirm bay empty after pickup</button><button class="small" data-action="release-bay" data-id="${esc(b.id)}" data-command>Review & release bay</button>` : ""}<button class="small" data-action="bay-observe" data-kind="obstruction" data-id="${esc(b.id)}" data-command>Mock obstruction</button></div></article>`;
+function renderCameras() {
+  $("cameras").innerHTML = Object.values(state.cameras || {}).map(camera => `<div class="camera-row"><p><strong>${esc(camera.id)}</strong> · ${esc(human(camera.status))}<br><small>${esc(camera.reason || "Status from simulated device adapter")}</small></p><div class="actions">${["ok", "blocked", "offline"].map(status => `<button class="small" data-action="camera-status" data-id="${esc(camera.id)}" data-status="${status}" data-command>Simulate ${status}</button>`).join("")}</div></div>`).join("") || '<p class="empty">No camera configured. Use tap actions; camera integration is unavailable.</p>';
+}
+function renderZones() {
+  $("zones").innerHTML = Object.values(state.zones).map(zone => {
+    const order = state.orders[zone.order_id], dish = state.dishes[zone.dish_id];
+    const review = zone.needs_review || zone.blocked_reason;
+    return `<article class="mvp-zone${review ? " needs-review" : ""}"><h3>Zone ${esc(zone.id)} <span class="tag">v${zone.assignment_version}</span></h3><div class="zone-label">${order ? `Table ${esc(order.table_id)}` : "Unassigned"}</div><p>${dish ? esc(dish.item_name || menuItem(dish.menu_id)?.name || dish.menu_id) : "One physical plate per assigned zone"}</p>${dish ? `<small>Unit ${esc(dish.id)}</small>` : ""}<p><strong>${esc(human(zone.occupancy))}</strong> · ${esc(zone.camera_id || "camera unknown")}</p>${review ? `<div class="review-flag"><strong>Staff review required</strong><p>${esc(zone.blocked_reason || "Unexpected/uncertain plate. Check the physical zone and assigned ticket.")}</p></div>` : ""}<div class="actions"><button class="small" data-action="zone-observation" data-id="${esc(zone.id)}" data-occupied="true" data-command>Simulate stable plate</button><button class="small" data-action="zone-observation" data-id="${esc(zone.id)}" data-occupied="false" data-command>Simulate stable empty</button><button class="small" data-action="hand-pass" data-id="${esc(zone.id)}" data-command>Simulate hand passing</button>${review || zone.occupancy === "unknown" ? `<button class="small" data-action="reconcile-zone" data-id="${esc(zone.id)}" data-occupied="true" data-command>Reviewed: plate present</button><button class="small" data-action="reconcile-zone" data-id="${esc(zone.id)}" data-occupied="false" data-command>Reviewed: zone empty</button>` : ""}</div><p class="note">Stable simulation: 1.6s, no hand. Camera does not identify food or check doneness.</p></article>`;
   }).join("");
 }
-function renderOverview() {
-  const tasks=Object.values(state.tasks), dishes=Object.values(state.dishes), observations=Object.values(state.observations);
-  $("overview-summary").innerHTML = `<p><strong>${dishes.filter(d=>d.stage === "ready").length}</strong>ready dish units</p><p><strong>${tasks.filter(t=>t.status === "claimed").length}</strong>claimed tasks</p><p><strong>${observations.filter(o=>["unresolved","needs_staff_review","clarify_removed_dish_and_runner","clarify_staged_dish","return_needs_reconciliation"].includes(o.disposition)).length}</strong>unresolved observations</p><p><strong>${dishes.filter(d=>!d.bay_id && !["served","picked_up"].includes(d.stage)).length}</strong>waiting for bay</p>`;
-  $("inventory").innerHTML = Object.values(state.zones).map(z=>`<div class="inventory-row"><p><strong>${esc(z.ingredient)}</strong><small>Accepted balance: ${esc(state.computed?.balances?.[z.id] ?? z.initial)} ${esc(z.unit)} · recipe expectation: ${esc(state.computed?.expected_consumption?.[z.id] ?? 0)}</small></p><button class="small" data-action="ingredient-observe" data-id="${esc(z.id)}" data-command>Mock stable change</button></div>`).join("");
-  $("adapters").innerHTML = Object.entries(state.adapter_status).map(([key,status])=>`<div class="adapter"><strong>${human(key)}</strong><p>${esc(status)}</p></div>`).join("") + `<p class="note">Automatic ready is ${state.auto_ready_enabled ? 'EXPERIMENTAL: complete-batch convention, single observed plate only' : 'disabled'}. No real positioning, camera inference, payment or POS integration is claimed.</p>`;
-  $("observations").innerHTML = observations.slice(-8).reverse().map(o=>`<div class="observation"><strong>${human(o.kind)} · ${esc(o.target_id)}</strong><br>${esc(o.disposition)} · ${esc(o.source)}<br><small>${esc(o.id)}</small></div>`).join("") || '<p class="empty">No observations yet.</p>';
-  $("events").innerHTML = state.events.slice(-6).reverse().map(e=>`<div class="event">${esc(e.action || e.payload?.action || e.type || e.id)} · ${esc(e.actor_id || e.actor || "unknown actor")} · ${esc(e.source || "")}<br><small>${esc(e.id || "")}</small></div>`).join("") || '<p class="empty">No accepted commands yet.</p>';
-  if (!$("stock-order").matches(":focus")) fillSelect("stock-order",Object.values(state.orders).filter(o=>o.status==="submitted").map(o=>[o.id,`Table ${o.table_id} · ${o.id}`]),"Unassigned");
-  if (!$("stock-observation").matches(":focus")) fillSelect("stock-observation",observations.filter(o=>o.kind==="ingredient_change" && o.disposition !== "accepted").map(o=>[o.id,`${o.target_id} · ${o.id}`]),"Manual movement / no observation");
+function fallbackReason(dish) {
+  const zone = state.zones[dish.zone_id];
+  const status = state.cameras?.[zone?.camera_id]?.status;
+  return status && status !== "ok" ? `Camera ${status}; staff used the tap alternative` : null;
 }
-
-$("connect").addEventListener("click",async()=> {
-  if (busy || uncertain) { feedback("Resolve the pending command before switching sessions.",true); return; }
-  try {
-    const data=await request("/api/v1/sessions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({actor_id:$("actor").value})});
-    session=data.session_id; actor=data.actor; draftId=""; draftSignature="";
-    $("identity").textContent=`${actor.name} · ${actor.role} · ${actor.section} · simulated sign-in`;
-    showView(actor.role==="cook" ? "kitchen" : actor.role==="lead" ? "overview" : "server");
-    await refresh(); feedback("Demo session active. Other tabs share backend state, with their own staff sessions.");
-  } catch(error) { feedback(`Cannot enter session: ${error.message}`,true); }
-});
 function showView(name) {
-  currentView=name;
-  document.querySelectorAll(".view").forEach(el=>el.hidden=el.id!==`${name}-view`);
-  document.querySelectorAll("[data-view]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.view===name)));
-  document.title=`Dig In · ${name === "overview" ? "Shift overview" : human(name)}`;
+  view = name;
+  document.querySelectorAll(".view").forEach(element => element.hidden = element.id !== `${name}-view`);
+  document.querySelectorAll("[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === name)));
+  document.title = `Dig In · ${name}`;
 }
-document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener("click",()=>showView(button.dataset.view)));
-$("retry").addEventListener("click",()=>uncertain && dispatch(uncertain.payload,uncertain.source,uncertain));
-$("section-only").addEventListener("change",refresh);
-$("draft-select").addEventListener("change",()=>{draftId=$("draft-select").value;draftSignature="";renderDraft();setBusy(busy);});
-$("menu").addEventListener("change",refreshModifiers);
-$("draft-table").addEventListener("change",refreshSeats);
-$("edit-line").addEventListener("change",loadLine);
-$("start-form").addEventListener("submit",event=>{event.preventDefault();dispatch({action:"start_order",table_id:$("start-table").value,use_positioning:$("positioning").checked});});
-$("table-form").addEventListener("submit",event=>{event.preventDefault();const o=state.orders[draftId]; if(!o.lines.length){feedback("Add the first dish line to save this table correction.",true);return;}dispatch({action:"edit_draft",order_id:o.id,revision:o.revision,table_id:$("draft-table").value,lines:o.lines});});
-$("line-form").addEventListener("submit",async event=> {
-  event.preventDefault(); const o=state.orders[draftId]; if(!o) return;
-  const selected=$("edit-line").value;
-  const old=o.lines.find(l=>l.id===selected);
-  const line={id:selected || `line-${uid()}`,seat:Number($("seat").value),menu_id:$("menu").value,quantity:Number($("quantity").value),modifiers:[...$("modifier").selectedOptions].map(o=>o.value).filter(Boolean),requests:$("requests").value.trim(),course:$("course").value.trim()};
-  // Fields outside this editor remain unchanged when correcting one selected line.
-  const lines=old ? o.lines.map(l=>l.id===selected ? line : l) : [...o.lines,line];
-  const data=await dispatch({action:"edit_draft",order_id:o.id,revision:o.revision,table_id:$("draft-table").value,lines});
-  if(data){$("edit-line").value="";loadLine();}
+async function captureText() {
+  const order = state?.orders[draftId];
+  if (!order) { feedback("Start an order before capturing a read-back.", true); return; }
+  const text = $("transcript").value.trim();
+  if (!text) { feedback("Enter a mock transcript first. No microphone is connected.", true); return; }
+  const data = await dispatch({action: "capture_voice", order_id: order.id, revision: order.revision, text}, "voice");
+  if (data) $("transcript").value = "";
+}
+function beginHold(event) {
+  if (busy || uncertain || !session || holding) return;
+  event?.preventDefault();
+  holding = true;
+  $("hold-talk").classList.add("holding");
+  $("capture-status").textContent = "Holding simulated capture. Release to build an editable menu-constrained draft; no audio is recording.";
+}
+function endHold(event, cancelled = false) {
+  if (!holding) return;
+  event?.preventDefault();
+  holding = false;
+  $("hold-talk").classList.remove("holding");
+  $("capture-status").textContent = cancelled ? "Capture cancelled. Nothing was sent." : "Released. The draft still needs human review and Confirm and send.";
+  if (!cancelled) captureText();
+}
+$("connect").addEventListener("click", async () => {
+  if (busy || uncertain) { feedback("Resolve the pending event before switching sessions.", true); return; }
+  try {
+    const data = await request("/api/v2/sessions", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({actor_id: $("actor").value})});
+    session = data.session_id; actor = data.actor; draftId = ""; draftSignature = "";
+    $("identity").textContent = `${actor.name} · ${actor.role} · simulated sign-in`;
+    showView(actor.role === "cook" ? "kitchen" : "server");
+    render();
+    feedback("Demo session active. Other devices share this backend, with their own sessions.");
+  } catch (error) { feedback(`Cannot enter session: ${error.message}`, true); }
 });
-$("remove-line").addEventListener("click",()=>{const o=state.orders[draftId], id=$("edit-line").value;if(!id){feedback("Select a saved line to remove.",true);return;}if(o.lines.length===1){feedback("A draft must retain at least one line. Edit this line instead.",true);return;}dispatch({action:"edit_draft",order_id:o.id,revision:o.revision,table_id:o.table_id,lines:o.lines.filter(l=>l.id!==id)});});
-$("readback-form").addEventListener("submit",event=>{event.preventDefault();const o=state.orders[draftId];dispatch({action:"readback",order_id:o.id,revision:o.revision,transcript:$("transcript").value},"voice");});
-$("confirm-send").addEventListener("click",()=>{const o=state.orders[draftId];dispatch({action:"confirm_send",order_id:o.id,revision:o.revision,human_confirmed:true});});
-$("request-form").addEventListener("submit",event=>{event.preventDefault();dispatch({action:"create_task",table_id:$("request-table").value,type:$("request-type").value,reason:$("request-reason").value.trim()});});
-$("stock-form").addEventListener("submit",event=>{event.preventDefault();dispatch({action:"accept_movement",zone_id:$("stock-zone").value,kind:$("stock-kind").value,quantity:Number($("stock-quantity").value),observation_id:$("stock-observation").value || null,order_id:$("stock-order").value || null,reason:$("stock-reason").value.trim()});});
-document.addEventListener("click",async event=> {
-  const button=event.target.closest("[data-action]"); if(!button || button.disabled || busy)return;
-  const {action,id,operation,stage,kind}=button.dataset;
-  if(action==="accept"){const o=state.orders[draftId];dispatch({action:"accept_correction",order_id:o.id,revision:o.revision,proposal_id:id});}
-  if(action==="keep-draft"){const o=state.orders[draftId];dispatch({action:"edit_draft",order_id:o.id,revision:o.revision,table_id:o.table_id,lines:o.lines});}
-  if(action==="select-prep"){const data=await dispatch({action:"select_prep",order_id:id});if(data)$("stock-order").value=id;}
-  if(action==="reconcile-bay"){const bay=state.bays[id];dispatch({action:"reconcile_bay",bay_id:id,assignment_version:bay.assignment_version,occupied:button.dataset.occupied==="true",reason:button.dataset.occupied==="true"?"Cook explicitly reviewed food still physically present":"Cook explicitly reviewed bay empty after claimed pickup"});}
-  if(action==="ack")dispatch({action:"acknowledge",order_id:id});
-  if(action==="ack-amendment")dispatch({action:"ack_amendment",order_id:id,revision:state.orders[id].revision});
-  if(action==="advance")dispatch({action:"advance_dish",dish_id:id,stage,reason:stage==="served" ? "Staff explicitly confirmed delivery to the guest" : "Cook confirmed stage by tap"});
-  if(action==="task")dispatch({action:"task_action",task_id:id,operation,additional_helpers:operation==="helpers"?1:0,reason:operation==="block"?"Staff requested a pause; review this task":operation==="urgent"?"Explicit shift-lead urgency override":"Staff task action"});
-  if(action==="pickup") {
-    const task=state.tasks[id];
-    for(const dishId of task.dish_ids){if(state.dishes[dishId]?.stage==="ready"){const result=await dispatch({action:"advance_dish",dish_id:dishId,stage:"picked_up",reason:"Claimed runner explicitly confirmed pickup"});if(!result)break;}}
-  }
-  if(action==="bay-observe"){const bay=state.bays[id];dispatch({action:"observe",kind,target_id:id,assignment_version:bay.assignment_version,quantity:1,order_id:bay.order_id},"mock_camera");}
-  if(action==="release-bay"){const bay=state.bays[id];dispatch({action:"release_bay",bay_id:id,assignment_version:bay.assignment_version,reason:"Staff reviewed bay state and requested release; backend validates food and unresolved pickup"});}
-  if(action==="ingredient-observe")dispatch({action:"observe",kind:"ingredient_change",target_id:id,quantity:1,order_id:null},"mock_camera");
+document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => showView(button.dataset.view)));
+$("retry").addEventListener("click", () => uncertain && dispatch(uncertain.payload, uncertain.source, uncertain));
+$("draft-select").addEventListener("change", () => { draftId = $("draft-select").value; draftSignature = ""; renderDraft(); setBusy(busy); });
+$("menu").addEventListener("change", refreshModifiers);
+$("edit-line").addEventListener("change", loadLine);
+$("start-form").addEventListener("submit", event => { event.preventDefault(); dispatch({action: "start_order", table_id: $("start-table").value}); });
+$("table-form").addEventListener("submit", event => { event.preventDefault(); const order = state.orders[draftId]; dispatch({action: "edit_draft", order_id: order.id, revision: order.revision, table_id: $("draft-table").value, lines: order.lines.map(editableLine)}); });
+function editableLine(line) { return {id: line.id, menu_id: line.menu_id, quantity: line.quantity, modifiers: line.modifiers || [], seat: line.seat || null, requests: line.requests || ""}; }
+$("line-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const order = state.orders[draftId];
+  if (!order) return;
+  const selected = $("edit-line").value;
+  const line = {id: selected || `line-${uid()}`, menu_id: $("menu").value, quantity: Number($("quantity").value), modifiers: [...$("modifier").selectedOptions].map(option => option.value).filter(Boolean), seat: $("seat").value ? Number($("seat").value) : null, requests: $("requests").value.trim()};
+  const exists = order.lines.some(entry => entry.id === selected);
+  const lines = exists ? order.lines.map(entry => entry.id === selected ? line : editableLine(entry)) : [...order.lines.map(editableLine), line];
+  const data = await dispatch({action: "edit_draft", order_id: order.id, revision: order.revision, table_id: $("draft-table").value, lines});
+  if (data) { $("edit-line").value = ""; loadLine(); }
 });
-$("api-link").href=`${API}/docs`;
+$("remove-line").addEventListener("click", () => {
+  const order = state.orders[draftId], selected = $("edit-line").value;
+  if (!selected) { feedback("Select a saved line to remove.", true); return; }
+  dispatch({action: "edit_draft", order_id: order.id, revision: order.revision, table_id: order.table_id, lines: order.lines.filter(line => line.id !== selected).map(editableLine)});
+});
+$("confirm-send").addEventListener("click", () => { const order = state.orders[draftId]; dispatch({action: "confirm_send", order_id: order.id, revision: order.revision, human_confirmed: true}); });
+$("use-transcript").addEventListener("click", captureText);
+$("hold-talk").addEventListener("pointerdown", event => { beginHold(event); if (holding) $("hold-talk").setPointerCapture(event.pointerId); });
+$("hold-talk").addEventListener("pointerup", event => endHold(event));
+$("hold-talk").addEventListener("pointercancel", event => endHold(event, true));
+$("hold-talk").addEventListener("keydown", event => { if ([" ", "Enter"].includes(event.key) && !event.repeat) beginHold(event); if (event.key === "Escape") endHold(event, true); });
+$("hold-talk").addEventListener("keyup", event => { if ([" ", "Enter"].includes(event.key)) endHold(event); });
+$("hold-talk").addEventListener("blur", event => endHold(event, true));
+$("kitchen-voice-form").addEventListener("submit", async event => { event.preventDefault(); const data = await dispatch({action: "kitchen_voice", text: $("kitchen-transcript").value.trim()}, "voice"); if (data) $("kitchen-transcript").value = ""; });
+document.addEventListener("click", event => {
+  const button = event.target.closest("[data-action]");
+  if (!button || button.disabled || busy) return;
+  const {action, id} = button.dataset;
+  if (action === "resolve-flag") { const order = state.orders[draftId]; dispatch({action: "resolve_flag", order_id: order.id, revision: order.revision, flag_id: id, resolution: button.dataset.resolution}); }
+  if (action === "acknowledge") dispatch({action: "acknowledge", order_id: id});
+  if (action === "retry-zones") dispatch({action: "retry_zones", order_id: id});
+  if (action === "start-dish") dispatch({action: "start_dish", dish_id: id});
+  if (action === "ready-dish") dispatch({action: "ready_dish", dish_id: id, fallback_reason: fallbackReason(state.dishes[id])});
+  if (action === "pickup-dish") dispatch({action: "pickup_dish", dish_id: id, fallback_reason: fallbackReason(state.dishes[id])});
+  if (action === "deliver") dispatch({action: "deliver_order", order_id: id});
+  if (action === "camera-status") dispatch({action: "camera_status", camera_id: id, status: button.dataset.status, reason: `Simulated ${button.dataset.status} camera state`}, "system");
+  if (action === "zone-observation" || action === "hand-pass") { const zone = state.zones[id]; dispatch({action: "zone_observation", zone_id: id, assignment_version: zone.assignment_version, occupied: action === "hand-pass" || button.dataset.occupied === "true", stable_ms: action === "hand-pass" ? 200 : Math.max(1600, state.stable_ms_required || 1500), hand_present: action === "hand-pass"}, "camera"); }
+  if (action === "reconcile-zone") { const zone = state.zones[id]; dispatch({action: "reconcile_zone", zone_id: id, assignment_version: zone.assignment_version, occupied: button.dataset.occupied === "true", reason: `Staff reviewed physical zone: ${button.dataset.occupied === "true" ? "plate present" : "empty"}`}); }
+});
+$("api-link").href = `${API}/docs`;
 refresh();
-setInterval(refresh,2500);
+setInterval(refresh, 2000);

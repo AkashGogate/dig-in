@@ -1,18 +1,22 @@
-# Workstream ownership slots
+# Four workstreams and integration ownership
 
-Assign names in the team's actual coordination channel. One slot may cover multiple lanes; no team size is assumed. Claims cover paths for a task, not permanent ownership of a product idea.
+**Confirmed role decision: the Menu workstream owner also owns Core/backend and integration.** No individual names were supplied; each personal owner slot below is unassigned until the team names someone. This is not a fifth unowned core lane. Suggested screen splits are recommendations awaiting agreement.
 
-| Role slot | Primary paths | Interface/review dependency | Next useful task |
-| --- | --- | --- | --- |
-| Integration owner | root instructions, CI, releases, shared docs | All lanes; sequences shared-file changes | Review branch, run baseline, coordinate integration; no deployment assumed |
-| Domain/contracts | `backend/app/coordination/contracts.py`, `domain.py`, `rules.py`, fixtures, domain tests | All consumers review breaking changes | Persist authoritative state/transactions; amendment and correction workflows |
-| Server/role UI | `frontend/` | API contract owner, kitchen/shift workflow users | Refine phone ordering and correction review; responsive/manual fallbacks |
-| Voice | new adapter modules under `backend/app/coordination/`, retained `deepgram_live.py`, `pipeline.py`, eval/audio tests | Session identity + proposal/command boundaries | Deliberate read-back capture, partial-diff clarification, unavailable fallback |
-| Qualcomm hardware/vision | `backend/app/coordination/kitchen.py`, new device adapters/tests | Observation schema; inventory/bay transitions | Validate UNO Q ingestion and two-view feasibility, stable change events, obstruction state |
-| Task coordination | `backend/app/coordination/tasks.py`, task-specific tests, agreed UI component paths | Atomic claims/helper model and domain owner | Group wait/split UX, targeted clarification, ranking evidence |
-| Optional analytics | new `analytics/` or adapter module after agreement | Versioned exported events, no critical-path writes | Optional Databricks aggregates and demo metrics |
-| QA/demo | `backend/tests/`, demo runbook, task-specific handoffs | Fixture/contract changes reviewed | Two-session smoke, stale observations, timing and prompt-burden measurements |
+| Lane / owner slot | Own paths and deliverables | Depends on / next concrete handoff |
+| --- | --- | --- |
+| Voice — person unassigned | `backend/app/mvp/voice.py`, voice tests; proposed `frontend` Server capture/review modules | Consume Menu IDs/aliases and v2 commands. Hand off deliberate provider adapter, constrained kitchen phrases/ambiguity and no-transcript retention; preserve manual/Confirm gates |
+| Computer vision — person unassigned | `backend/app/mvp/vision.py`, new device/CV adapters, zone-specific tests; proposed Kitchen zone panel paths agreed before edits | Consume core zone assignments/versions and ingredient map. Hand off stable occupancy/no-hand/status/unexpected cases; validate UNO Q/geometry/feed, never directly mutate state |
+| Menu **+ Core/backend/integration** — person unassigned | `backend/app/mvp/menu.py`, `contracts.py`, `domain.py`, `fixtures.py`, `api.py`; menus; root setup/CI/shared shell and integration docs | Menu contract owner, operational contract owner and integration-owner role. Review dependent changes; keep allocation/idempotency/flag gates authoritative; sequence entry-point/schema merges |
+| Databricks — person unassigned | `backend/app/analytics/`, `backend/fixtures/analytics/`, `analytics/`, analytics tests | Consume canonical events unchanged. Hand off local batch/retry/analyzer/SQL; choose workspace and verify official live APIs before claiming a connector/dashboard |
 
-The transaction/order/bay/inventory orchestration is in `domain.py`; kitchen observations/dish rules are in `kitchen.py`, and task claims/helpers are in `tasks.py`. Pure rule functions require the caller’s transaction lock: invoke through `Restaurant.execute`, never expose them as a second authority. Coordinate shared contract and cross-domain changes. Likewise, the static role UI may initially occupy shared files, so partition work by component/module or sequence edits. Do not call a proposed folder an implemented service.
+`backend/app/analytics/events.py` is the **single event schema**, with Core responsible for accepted emission/identity/time semantics and the Databricks lane maintaining export consumption. Shape/vocabulary changes require Menu/Core + Databricks review and Voice/CV review when they supply metadata. `menu.py` is the single menu schema; new lanes do not hardcode fixture dish names. `contracts.py` owns state/commands and requires dependent consumer review.
 
-Shared files (`contracts.py`, fixtures, root setup, STATUS) require coordinated review. Use per-task handoff files and small commits, never a single shared status document as a pseudo-lock. Read [DEVELOPMENT](DEVELOPMENT.md) for Git/code sync versus runtime backend state.
+## Suggested screen split and shared files
+
+Voice→Server; CV→Kitchen zone panel; Menu/Core→kitchen queue/timers, shell and shared client integration is a practical proposed split. The team must explicitly accept it and claim component files before parallel edits. `frontend/app.js` initially holds both screens, so two agents must not edit it simultaneously; first agree an extraction/task boundary or sequence through Menu/Core. Backend `domain.py`, shared fixtures, schemas, `server.py`, root setup and STATUS also require coordinated claims. Existing lane modules and fixture directories give independent work against stable examples; a proposed future folder is not an implemented service.
+
+## Handoff protocol
+
+Use one unique task handoff with base commit/branch, owner role, claimed paths, consumed/emitted schemas, fixtures, checks, gaps and next action. Agree ownership outside the file before editing; a handoff/STATUS file is not a lock. Small scoped commits/PRs flow through Menu/Core integration; no force-push/main overwrite, no overwriting others’ uncommitted work. See [DEVELOPMENT](DEVELOPMENT.md) for precise Git transfer and shared runtime setup.
+
+Immediate human decisions: name the four people (Menu’s person also carries Core/integration), accept/refine the proposed screen split, choose physical camera/board and analytics workspace. Cloud/hardware choices do not block credential-free mock lanes.

@@ -1,33 +1,36 @@
 # Architecture
 
-Existing stack retained: Python 3.11+, FastAPI, uv/lockfile, buildless static frontend. The original kitchen-copilot parser/mismatch/audio evaluation code is preserved alongside the coordination module. There is no monorepo/framework migration.
+The retained stack is FastAPI/Python 3.11+, uv/lockfile and buildless static HTML/CSS/JS. No database/framework/platform migration is required. `/api/v2` is the current MVP authority; v1 coordination and the older voice lab remain isolated preservation surfaces.
 
 ```mermaid
 flowchart LR
-  S[Server phone / kitchen / shift web views] -->|commands with session and stable ID| A[FastAPI coordination API]
-  S <-->|shared snapshot / errors| A
-  V[Voice adapter: mock / future live read-back] -->|proposal or clarification| A
-  C[Two conceptual kitchen camera views] -->|versioned observations| A
-  P[Position adapter: mock / disabled] -->|suggest only on Start order| A
-  A --> D[Validated domain core + atomic lock]
-  D --> M[Single-process in-memory state]
-  D --> E[Observation and command provenance]
-  L[Retained legacy mic/scenario UI] --> W[Legacy WebSocket parser / mismatch]
-  W --> Q[Legacy seeded ticket queue + SQLite call log]
+  M[Menu JSON + canonical matcher] --> V[Voice adapter / transcript simulator]
+  M --> C[Core v2 validated state]
+  M --> K[Kitchen display]
+  V -->|editable draft / constrained intent| C
+  S[Server screen] <-->|session + commands / shared snapshots| C
+  K <-->|ack / start / zones / tap recovery| C
+  CV[Kitchen CV adapter / mock occupancy] -->|stable versioned evidence + status| C
+  C --> O[Local event log + retry outbox]
+  O -->|background batch / no request I/O| D[Fake or JSONL sink / future Databricks]
 ```
 
-`backend/app/coordination/contracts.py` is the source of truth for validated inputs; fixtures supply deterministic menu/tables/actors/zones/bays. The domain owns invariants, transitions, idempotency, claims, and derived ticket/task state. `domain.py` orchestrates one locked transaction; `kitchen.py` holds dish/observation rules, `tasks.py` holds claim/helper rules, and `rules.py` holds common rejections. These rule functions accept explicit state and must run within the orchestrator’s lock. API handlers translate domain errors to actionable HTTP errors. Adapters describe availability and produce observations/proposals; they cannot bypass domain validation. See [API](API.md) for exact endpoints/schema links.
+## Ownership and source boundaries
 
-Clients must not maintain independent authoritative restaurant state. They send stable command IDs and expected revisions/assignment versions where required, show current server state, and surface errors. A failed request is not successful merely because a button was tapped. Retry the same ID for the same logical request; use a new ID for a new operation.
+Menu/Core owns the operational authority, event endpoint and integration; individual names remain unassigned. `app/mvp/menu.py` owns the menu schema/store/matcher; reviewed JSON is under `backend/fixtures/menus/`. `voice.py` consumes that schema and returns structured IDs/flags without retaining capture text. `contracts.py` owns v2 operational models/commands; `domain.py` owns transitions, revision/identity checks, atomic allocation, notification and event emission. `fixtures.py` provides actors, tables, cameras and six one-unit zones. `api.py` exposes sessions/state/menu/commands/events/health.
 
-## Runtime and limits
+`app/analytics/events.py` owns CanonicalEvent. Its stable identity/source time/outcome are retained through `outbox.py` and local adapters. Domain transaction rollback and local enqueue are coordinated; external drain happens separately. The outbox releases its queue lock during sink I/O so a slow/failing sink does not hold restaurant operations. Databricks SQL/templates live in `analytics/`; no live connector is required.
 
-The coordination authority is one process with a lock, not durable storage or production event sourcing. Duplicate detection and sessions reset with restart. Run one worker; separate instances diverge. For durable/multi-worker use, persist state, idempotency keys and transitions in one transaction-capable store, add real auth/authorization and operational controls, and preserve the protocol. Domain tests are not proof of crash recovery.
+Primary frontend files are `index.html`, `app.js`, `mvp.css`; suggested screen ownership is Voice→Server and CV→Kitchen zones, subject to explicit team agreement. Shared shell/queue and contracts require Menu/Core integration. No frontend state is an independent restaurant authority; polling reads one backend, exact retry IDs preserve uncertain requests.
 
-The demo actor selector simulates staff sessions. Diarization is not identity. Never expose the mock session system as production access control. Camera/voice/positioning status remains visibly mock, disabled, or unavailable. No raw camera recording is introduced. No real POS/payment or analytics service is on the live critical path.
+## State and safety boundaries
 
-The legacy WebSocket experiment has its own in-memory seeded queue per capped session and SQLite call log. It parses fire calls and checks mismatches; it does not submit structured Dig In orders or authenticate staff. Existing Deepgram transport/pipeline/eval modules remain useful work in their lane. Historical Pipecat/Daily/Next.js/TTS/Coval claims exceeded actual wiring in places; consult source and [STATUS](STATUS.md), not the archived architecture.
+One process/lock owns demo orders, sessions, idempotency receipts and pending export. Restart loses them; separate processes/workers diverge. No production authentication, crash recovery, multi-instance database or durable outbox is claimed. A future persistent implementation must commit state/idempotency/events/outbox atomically and preserve contracts.
 
-## Contract evolution and lane boundaries
+Draft flags/revisions gate Confirm. On acknowledgment, K free empty zones reserve atomically for K dish units; insufficient capacity waits FIFO. Stable camera signals carry zone/version/time, occupancy, stable duration and hand status. Core does not analyze pixels or establish the truth of the producer’s reported stability. Ready-only convention is explicit, not food recognition. Unknown/blocked status preserves uncertainty; tap actions/reconciliation remain available. Timers preserve missing start/typical data.
 
-Change schemas centrally, update deterministic fixtures and consumers together, and obtain review from dependent lanes. Compatible optional additions may retain schema v1; breaking shapes or semantics require a version/migration plan. No hidden field redefinition in frontend, hardware, or speech modules. [WORKSTREAMS](WORKSTREAMS.md) assigns role slots and [DEVELOPMENT](DEVELOPMENT.md) describes handoff and Git integration.
+Canonical facts distinguish `outcome:accepted` from `observed` evidence/clarification. A rejected stale event cannot silently become `dish.ready` analytics. Derived system facts receive deterministic related IDs; retries do not add state/rows. Source timestamps remain distinct from receipt timestamps. No raw transcript/audio/video enters v2 log/export. The current legacy voice lab’s SQLite call log is separate and does not receive MVP capture.
+
+## Versioned preservation
+
+`app/coordination/` and `/api/v1` retain the broad task/helper/old-ready scaffold against `coordination-v1.html`/`.js`. `legacy.html`, original WebSocket/session endpoints and parser/eval retain the original voice experiment. They share a server process but **not operational state or schemas** with v2. New lanes must target v2; do not dual-write or claim orders synchronize. [API](API.md) records the explicit breaking semantics and compatibility mapping; [v1 archive](archive/2026-11-14-v1-scaffold.md) preserves prior intent/evidence.

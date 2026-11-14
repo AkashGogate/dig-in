@@ -1,25 +1,25 @@
 # Dig In agent bootstrap
 
-1. Inspect `git status`, current branch/worktree, and instructions in your claimed paths. Preserve others' uncommitted work. Never reset, force-push, or overwrite main to integrate work.
-2. Read [docs/INDEX.md](docs/INDEX.md), [PROJECT_SPEC.md](PROJECT_SPEC.md), then [docs/STATUS.md](docs/STATUS.md). Read architecture/contracts and your work lane before editing. These Git-tracked files provide portable context; they are not automatic memory sync.
-3. Claim a scoped task/paths with the integration-owner slot per [DEVELOPMENT](docs/DEVELOPMENT.md). Use a task branch and one clone/worktree per collaborator. Shared-contract changes need explicit dependent-lane review. Handoff in one file per task; STATUS is never a concurrency lock.
+1. Inspect `git status`, branch/worktree, scoped instructions and claimed paths. Preserve others’ uncommitted edits; never reset/force-push/overwrite main to integrate.
+2. Read [docs/INDEX](docs/INDEX.md) → [PROJECT_SPEC](PROJECT_SPEC.md) → [docs/STATUS](docs/STATUS.md), then your [workstream](docs/WORKSTREAMS.md) and contracts. These Git-tracked files provide portable context, not automatic memory sync.
+3. The **Menu workstream also owns Core/backend and integration** (confirmed role decision); individual owner names remain unassigned. Agree task/path claims with that role. Separate clone/branch/worktree per task; shared contracts require dependent-lane review. Use a unique [handoff](docs/handoffs/TEMPLATE.md); STATUS is not a lock.
 
-## Invariants
+## Current MVP invariants
 
-- Manual UI always works. Voice proposes a visible diff; only human **Confirm and send** submits the reviewed draft revision. No speech/model submission or payment authority.
-- Signed-in session supplies actor identity. Demo sessions are simulated auth. Optional table suggestion only on Start order; selected table freezes until explicit correction.
-- No dining-room video/guest tracking. Exactly two conceptual kitchen views: ingredient zones and plating bays. Observations are evidence, not accepted commands.
-- Acknowledged ≠ preparing; staged/partially plated ≠ ready; pickup ≠ served. Aggregate all dish units. Human cook readiness by default; constrained auto-ready is experimental and disabled.
-- Recipe expectations and accepted visual movements cannot both deduct stock. Preserve unresolved attribution and provenance. Never infer prep percentage from withdrawals.
-- No overlapping bay assignments/reuse with food or unresolved pickup. Reject stale revisions/assignment versions. Claims and helper slots must be atomic and idempotent.
-- Backend is shared authority. Surface outages/degraded adapters; never fabricate integration success. No production auth/durability, CV, POS, payment, or hardware claim without evidence.
+- Default app has **Server and Kitchen** screens against `/api/v2`. Manual entry/taps remain usable. Voice creates an editable menu-constrained draft; unknowns/ambiguity and spoken-table mismatch block send until explicit review. Only human **Confirm and send** on the current revision submits.
+- Identity is the demo session/device, never a recognized speaker. Deliberate capture only; discard audio after transcription. Do not persist raw audio/transcripts/video in v2 state or analytics.
+- On kitchen acknowledgment, reserve **K empty zones atomically for K physical dish units**. Quantity two needs two zones. No partial allocation/overbooking. Waiting orders retry FIFO as zones free; reject stale assignment versions.
+- Ready-only plating convention: only finished plates enter assigned zones. Stable occupancy (default 1500ms, no hand) → dish ready; stable removal after occupancy → pickup/free. This recognizes occupancy, never food identity/modifiers/doneness. Blocked/offline/unknown is not empty; tap recovery remains available. Unexpected/returned plates need review.
+- Submitted ≠ acknowledged ≠ started. Timers show elapsed/known typical minutes, never percent cooked. Partial ready count precedes one all-ready notification. Delivered is optional staff close-out.
+- Ingredient detection is second priority: countable observations, review and accepted stock remain separate from recipe expectations; never double-deduct or infer progress from a hand.
+- Canonical accepted/observed events keep stable ID, source time, identity and outcome. Duplicate retries do not repeat state changes or exports. Analytics drains outside requests; failures remain pending. No raw capture content or fabricated missing-stage durations.
+- Deferred from MVP: positioning, task/helper/priority queue, courses, POS/payments and spoken responses. No dining-room camera, facial recognition or guest tracking. Legacy code is not the new authority.
 
 ## Map and checks
 
-- `backend/app/coordination/`: executable contracts, deterministic fixtures, domain, adapters, API. `/api/v1/contracts` and FastAPI `/openapi.json` expose interfaces; do not independently redefine shapes in voice/vision/UI.
-- `backend/app/`: retained kitchen-call parser, mismatch detector, capped audio sessions, SQLite log, legacy WebSocket server.
-- `frontend/`: static role UI; `legacy.html` retains the original mic/scenario experiment. No Node framework/build migration.
-- `backend/tests/`, `backend/eval/`, `audio-samples/`: invariants, transcript tests, synthetic-audio harness. Mock eval scores do not measure STT quality.
-- `docs/`: product/architecture, collaboration lanes, status, decisions, runbooks, per-task handoffs.
+- `backend/app/mvp/`: v2 contracts/domain/fixtures/API, canonical menu and deterministic voice. `menu.py` owns menu shape; `contracts.py` owns operational shapes.
+- `backend/app/analytics/events.py`: canonical event source. Outbox/adapters/analyzer plus `analytics/` SQL and simulated fixtures support Databricks work without cloud credentials.
+- `frontend/index.html`, `app.js`, `mvp.css`: two-screen MVP; read `frontend/AGENTS.md`. `coordination-v1.html` and `/api/v1` preserve the broader scaffold; `legacy.html` preserves the older voice lab. These have separate state.
+- `backend/tests/`, `backend/fixtures/`, `docs/`: meaningful regressions, portable examples, current decisions/workflow/status/handoffs. `/api/v2/contracts` and `/openapi.json` expose executable contracts.
 
-Use README commands for setup/run; run `cd backend && uv run pytest -q` for the existing locked environment. Consult STATUS for commands actually verified in this scaffold. No paid key is required for coordination mocks. Do not publish, push, or enable billable integrations without explicit authorization. Update your task handoff and affected status/contract docs with evidence and limitations.
+Use [README](README.md) for setup/run, [TESTING](docs/TESTING.md) for checks, and STATUS for actual evidence. Default is a one-worker in-memory mock demo, not durable auth/cloud/CV/hardware. Update affected status/contracts and your handoff after changes. Do not push, publish or enable billable/live integrations without authorization.

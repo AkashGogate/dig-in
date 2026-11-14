@@ -1,51 +1,39 @@
-# Status — 2026-11-14 scaffold
+# Status — MVP v2 checkpoint, 2026-11-14
 
-Read [PROJECT_SPEC](../PROJECT_SPEC.md) for intended behavior. This file describes implementation, not an ownership lock or machine synchronization mechanism. Update capabilities only with source/check evidence; keep one task handoff per change.
+[PROJECT_SPEC](../PROJECT_SPEC.md) owns intended behavior; this file owns execution evidence. [Normalized brief](MVP_TEAM_BRIEF.md) is portable team context. The Menu workstream **also owns Core/backend and integration**; personal names remain unassigned. STATUS is not a concurrency lock.
 
-## Capability boundaries
+| Capability | Status / practical limit |
+| --- | --- |
+| FastAPI/Python/uv/static stack | Implemented, retained; no new platform/framework |
+| Two primary Server/Kitchen screens, `/api/v2` | Implemented local demo; shared backend state, exact retry IDs; not native/offline transactions |
+| Menu JSON/schema/store/matcher | Implemented deterministic aliases/modifier IDs, two menus; order name/kitchen-field snapshots; unknown imported fields remain null |
+| Voice draft and kitchen grammar | Simulated transcript input with real parser/flags; no live microphone/STT/noisy-hall validation |
+| Current-revision human send | Implemented; unknown/table mismatch explicitly resolved, voice cannot submit; correction counts defined in product/API |
+| One-zone-per-physical-unit on ack | Implemented atomic all-K/FIFO retry/capacity/version rules; six simulated zones A–F |
+| Ready-only occupancy/removal | Implemented event rules using simulated producer evidence (1500ms/no hand); no image detector or verified UNO Q feed |
+| Camera blocked/offline/unexpected/tap recovery | Implemented demo status, unknown occupancy, review, tap-ready/pickup; no feed-health hardware proof |
+| Per-dish start/timer, partial/all-ready/pickup/delivered | Implemented timestamps/progress and once-only all-ready notification; missing starts remain unknown; delivered optional |
+| Ingredient tracking | Second-priority countable observation/review/movement scaffold, not real ingredient CV; expected recipe does not deduct |
+| Canonical events/outbox/export | Implemented local contract, identity/time/outcome validation, background fake/JSONL retry/health; memory pending rows lost on restart |
+| Databricks evaluation assets | 106 labeled SIMULATED events / ten orders /20 units, local analyzer and SQL/dashboard templates; no live dashboard/workspace tested |
+| Live menu OCR/importer, STT/CV/Databricks adapters | Adapter-only or future; no paid credentials needed |
+| Legacy preservation | Frozen `/api/v1` broad coordination in coordination-v1.html and original legacy.html voice lab; isolated state/contracts, not MVP defaults |
+| Deferred | Positioning, task/helper/priority queue, courses, spoken responses, POS/payments |
+| Production/deployment | No auth/durable state/multi-worker/outbox guarantee; no push/publication or cloud/hardware claim |
 
-| Capability | State | Evidence / limitation |
-| --- | --- | --- |
-| Existing FastAPI/static HTML/uv repository | Implemented, retained | No framework migration; kitchen parser/mismatch/audio experiment preserved |
-| Shared coordination contracts and fixtures | Implemented scaffold | `backend/app/coordination/contracts.py`, `fixtures.py`; schema v1, deterministic actors/tables/menu/zones/bays |
-| Shared authoritative coordination state | Demo implementation | Single process/in-memory lock; reset on restart; no durable/multi-instance guarantee |
-| Sessions/staff identity | Mock | Fixture actor session selection; not production authentication or diarization identity |
-| Structured order and confirmation gate | Scaffold implementation | Current-revision human send; validate actual checks below |
-| Read-back reconciliation | Mock, deliberately limited | Text input / one dish quantity grammar; targeted clarification, manual missing-item additions; no general NLU/live STT in role flow |
-| Kitchen/bay/inventory/task transitions | Scaffold implementation | Versioned domain commands and observations; not production CV or stock sensing |
-| Role screens | Local baseline | Server/kitchen/shift views against shared backend; no native mobile build |
-| Positioning | Mock/disabled | Deterministic suggestion, manual path; no geometry/hardware validation |
-| Ingredient/plating cameras | Mock observations | Exactly two conceptual kitchen views; no video inference/recording or contents/doneness verification |
-| Automatic ready | Experimental, disabled by default | Only an explicitly configured complete-batch convention/single-plate experiment may enable it |
-| Legacy call parser, mismatch, eval scorer | Implemented, retained | Separate seeded session queue and SQLite log; cannot submit structured Dig In orders |
-| Deepgram / ElevenLabs | Legacy Deepgram code / candidate adapter | Live provider quality and integration unverified in scaffold; ElevenLabs not wired |
-| Qualcomm UNO Q | Unverified work lane | No connected hardware or two-stream throughput claim |
-| Databricks / POS / payments | Planned/optional / absent | Analytics off live critical path; no real cards or payment handling |
-| Deployment | Outside scope | Existing deployment files/reports preserved; no push/publication performed |
+## Verified checkpoint evidence
 
-## Current scaffold gaps
+Reported by the implementing lanes/root on macOS arm64/Python3.11.18, locked default environment:
 
-Read-back only proposes one quantity change; new-item detection/freeform transcription are not implemented. `select_prep` records active cook context, while ingredient attribution remains an explicit optional order ID rather than inferred camera ownership. Post-send amendments currently cover queued-line quantity changes, not arbitrary prepared-food edits. Raw observations do not prove stable CV detection. `reconcile_bay` supports manual cook/lead resolution of plate-return/pickup ambiguity using occupancy/version/reason; clearing food still requires a validated claimed pickup first. Task split currently records the staff decision/removes helper requirements rather than planning multi-plate routing. Fixture movements/tasks/observations are produced by scenarios/commands rather than preloaded operational truth.
+- **83 tests passed** across retained regressions, menu/voice, analytics and new MVP core checks. Core tests cover manual/voice approval, table/unknown flags, atomic zone capacity/release, stable/blocked/tap fallback, idempotency, notification and voice ambiguity for same-table orders/quantity>1 units. One dependency deprecation warning remains from Starlette’s httpx TestClient transport.
+- Scoped Ruff lint/format passed for the scoped Python paths. Frontend scripts parsed in Node VM; no frontend build exists. Exact final commands are in [TESTING](TESTING.md); root re-runs after integration as needed.
+- Real HTTP `python -m scripts.mvp_smoke --base-url http://127.0.0.1:8001` **passed** against a fresh full server. Old `scripts.smoke_demo` remains explicitly v1.
+- Chrome v2 flow **passed**: selected table1, captured spoken table2 with two dishes/modifier, saw flags/blocked Confirm, explicitly chose spoken table, sent, acknowledged and reserved two distinct zones. Stable first plate showed1of2; blocked camera plus second tap-ready emitted one all-ready notification; tap-pickup both followed by optional Delivered. Missing start time stayed unknown.
+- No new full responsive/accessibility, screen-reader, cross-browser, physical phone, real noisy-room STT/CV, hardware throughput, container build or live Databricks workspace/dashboard checks were performed. Earlier v1 browser/eval results are [historical](archive/2026-11-14-v1-scaffold.md), not v2 coverage.
+- Analytics fixtures/tests label data SIMULATED and exercise pending failure/retry/deduplication and missing-stage/denominator behavior. See [analytics README](../analytics/README.md) for sample counts and untested SQL/live limits.
 
-## Verification record
+The original saved checkout remains separate from the execution worktree. A read-only remote heads check found origin/main051296de and no remote scaffold branch; no fetch/push or automatic multi-computer synchronization is claimed. The local checkpoint is ready for review/authorized Git transfer, not already pushed.
 
-Verified 2026-11-14 on macOS arm64, Python 3.11.18, locked default environment (Pipecat extra not installed):
+## Remaining human decisions and next work
 
-- `uv sync --locked --python 3.11`: passed after making Pipecat optional and declaring SQLAlchemy asyncio support. The initial host had only Python 3.10/no uv; an isolated uv/Python environment was used. Pytest is pinned below 9 because the newly resolved pytest 9.2 runner crashed before test collection; the locked pytest 8.4.2 runner works.
-- `uv run --locked --offline pytest -q`: **41 passed**, one dependency deprecation warning for Starlette’s httpx TestClient transport. Includes retained parser/evaluation tests and coordination API invariants, concurrent claims, bay uncertainty, conditional auto-ready count guards and ranking/aging.
-- `ruff check app/coordination scripts tests/test_coordination.py`, `ruff format --check` on the same paths, and `python -m compileall -q app scripts`: passed. The formatter/linter is scoped to the new lane; legacy formatting was not rewritten. No separate static typechecker is configured; Pydantic input/output schema validation and integration tests check runtime contracts.
-- `python -m scripts.smoke_demo --base-url http://127.0.0.1:8001` against a fresh full FastAPI server: passed. Two tables/tickets, read-back proposal/apply/human send, retry-safe send and stock, count removal/return, partial versus ready, claimed run/additional helper, pickup, explicit served, return/reconciliation/release. Assertions observed zero duplicate effects, wrong-ticket transitions, premature-ready at partial, and net stock error after return. Ready-to-pickup was ~0.006s **synthetic API timing**, not a human/hardware benchmark.
-- Seven legacy mock eval clips executed via `asyncio.run(eval.run_eval.run('mock'))`: no missed/false calls in ground-truth transcript mode; checked-in scorecard preserved. This does not measure STT.
-- Frontend `app.js` and `config.js`: syntax passed in Node VM through the available tool runtime; HTML IDs and label targets checked. CI also runs Node syntax checks; there is no frontend build step.
-- Chrome browser: entered demo staff sessions; manual order with modifier/dietary request; quantity diff remained proposed until applied; human send; cook acknowledgment/select prep; mock arrival stayed partially plated; explicit ready; claim/pickup/served. The other unit remained queued. Inspected server at 390px and measured no document overflow at 320px; keyboard Tab reached a native control with a visible outline. Initial backend outage visibly showed UNSYNCED, then connected after startup. Shift view displayed stock expectations and mock/disconnected adapters. Inspected console slice showed extension warnings, no app errors. No screen-reader, physical-phone, full 200% zoom, cross-browser, live STT/CV, hardware, container build or deployment validation was performed.
-- Documentation local links and `git diff --check`: passed. Original saved checkout contained only untracked `.DS_Store`; no omitted user scaffold was found. Historical deployment claims are archived and were not reverified.
-
-Post-send amendment creation and detailed stage corrections are API-only; role UI asks for one additional helper while the API supports 0–6. Automatic ready has no public UI toggle and is off in fixtures; tests explicitly enable it. Multi-plate camera attribution asks for clarification when it cannot identify the staged/removed unit. Full group batching/routing and live voice interpretation remain future work. Backend sessions/state/receipts are deliberately transient and unauthenticated fixture identities, unsuitable for production or multiple workers.
-
-## Next tasks by dependency
-
-1. Review/merge the scaffold through the designated integration owner; assign owners to [WORKSTREAMS](WORKSTREAMS.md). Transfer tracked commits through Git; uncommitted worktree files are not on teammates' machines.
-2. Persist state/idempotency with transactional claims and add real authentication before durable/public/multi-instance use.
-3. Improve structured read-back proposal coverage and deliberate live capture without weakening human approval; validate noisy-room audio separately.
-4. Validate UNO Q camera ingestion, stable portion changes, bay observation assignment versions, obstruction/degraded status, and optional constrained-ready operating convention.
-5. Measure the reproducible demo metrics and refine wait/split/group-helper UI; treat unimplemented product details as open tasks, never implied capabilities.
+Name the four workstream people (Menu’s person also carries Core/integration), accept/refine proposed screen ownership, choose actual speech/camera/UNO Q rig and Databricks workspace. Kitchen microphone details/60second escalation/Free Edition availability remain provisional. Next adapters must preserve v2 contracts, privacy, failure recovery and manual paths; validate official live APIs/hardware before claiming completion. A durable transactional state/outbox and real auth are separate production work.

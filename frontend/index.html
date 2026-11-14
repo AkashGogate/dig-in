@@ -3,63 +3,69 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Dig In local restaurant coordination demo: reviewed orders, kitchen stages, and shared running tasks.">
-  <title>Dig In · service desk</title>
+  <meta name="description" content="Dig In restaurant MVP: reviewed orders, one-dish plating zones and shared kitchen state.">
+  <title>Dig In · order & pass</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="mvp.css">
   <script src="config.js"></script>
   <script src="app.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#workspace">Skip to workspace</a>
   <header class="masthead">
-    <div><a class="wordmark" href="./">Dig In<span class="dot">.</span></a><p class="eyebrow">THE SERVICE DESK</p></div>
-    <div class="connection"><span id="connection">Connecting to shared backend…</span><small>Local mock demo · state resets on backend restart</small></div>
+    <div><a class="wordmark" href="./">Dig In<span class="dot">.</span></a><p class="eyebrow">ORDER & PASS · MVP</p></div>
+    <div class="connection"><span id="connection">Connecting to shared backend…</span><small>Simulated demo · one backend · state resets on restart</small></div>
   </header>
   <section class="session-bar" aria-label="Demo session">
-    <label for="actor">Simulated staff session<select id="actor"><option value="server-1">Server One · window</option><option value="server-2">Server Two · patio</option><option value="cook-1">Cook · kitchen</option><option value="lead-1">Shift Lead · all</option></select></label>
+    <label for="actor">Simulated staff session<select id="actor"><option value="">Loading staff…</option></select></label>
     <button id="connect">Enter demo session</button>
-    <p id="identity">Select a staff session. This is simulated authentication.</p>
+    <p id="identity">Choose a staff session. Voice recognition is never authentication.</p>
   </section>
-  <nav aria-label="Workspaces" class="view-nav"><button data-view="server" aria-pressed="true">Server</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button data-view="overview" aria-pressed="false">Shift overview</button><a href="legacy.html">Legacy voice lab ↗</a></nav>
-  <div id="feedback" role="status" aria-live="polite">Manual ordering works without speech or cameras.</div>
-  <div id="retry-bar" hidden><p>The last command has an uncertain result. Review shared state, then retry the exact command safely.</p><button id="retry">Retry last command</button></div>
+  <nav class="view-nav" aria-label="Primary screens"><button data-view="server" aria-pressed="true">Server</button><button data-view="kitchen" aria-pressed="false">Kitchen</button></nav>
+  <div id="feedback" role="status" aria-live="polite">Tap controls work without voice or cameras.</div>
+  <div id="retry-bar" hidden><p>The last change has an uncertain result. Reconnect and retry the exact event; it will not create a duplicate.</p><button id="retry">Retry last event</button></div>
   <main id="workspace" tabindex="-1">
     <section id="server-view" class="view">
-      <div class="section-heading"><div><p class="eyebrow">01 / SERVER</p><h1>Get the order right.</h1></div><p>Structured entries first. Read-back proposes changes.<br>Only your final tap sends the reviewed revision.</p></div>
-      <div class="server-grid">
-        <section class="panel order-panel" aria-labelledby="order-title">
+      <div class="section-heading"><div><p class="eyebrow">01 / SERVER</p><h1>Review. Send. Run.</h1></div><p>The menu drives the draft.<br>Only your final tap sends the order.</p></div>
+      <div id="notifications" aria-label="Ready notifications"></div>
+      <div class="mvp-server-grid">
+        <section class="panel" aria-labelledby="order-title">
           <h2 id="order-title">Order desk</h2>
-          <form id="start-form" class="inline-form"><label for="start-table">Table<select id="start-table"></select></label><label class="check"><input id="positioning" type="checkbox"> Try mock table suggestion</label><button type="submit" class="primary" data-command>Start order</button></form>
-          <p id="position-hint" class="note">Table selection stays fixed during the draft unless you explicitly correct it.</p>
+          <form id="start-form" class="inline-form"><label for="start-table">Table<select id="start-table"></select></label><button type="submit" class="primary" data-command>Start order</button></form>
           <label for="draft-select">Your drafts<select id="draft-select"><option value="">Start an order to begin</option></select></label>
-          <div id="draft-summary" class="empty">No draft selected. Start with a table above.</div>
+          <div id="draft-summary" class="empty">No draft selected.</div>
           <div id="editor" hidden>
-            <form id="table-form" class="inline-form"><label for="draft-table">Correct table<select id="draft-table"></select></label><button type="submit" data-command>Save table correction</button></form>
-            <form id="line-form">
-              <div class="form-grid"><label for="edit-line">Add or edit line<select id="edit-line"><option value="">New dish line</option></select></label><label for="seat">Guest / seat<select id="seat"></select></label><label for="menu">Menu item<select id="menu"></select></label><label for="quantity">Quantity<input id="quantity" type="number" min="1" max="12" value="1" required></label><label for="course">Course<input id="course" value="main" maxlength="80" required></label><label for="modifier">Modifier<select id="modifier" multiple size="3"><option value="">No modifier</option></select></label></div>
-              <label for="requests">Explicit allergy / dietary request<textarea id="requests" rows="2" maxlength="500" placeholder="Record the guest’s request explicitly"></textarea></label>
-              <div class="actions"><button type="submit" data-command>Save dish line</button><button type="button" id="remove-line" data-command>Remove selected line</button></div>
-            </form>
-            <div class="readback"><h3>Read-back check <span class="tag">MOCK</span></h3><p class="note">No microphone is recording. This constrained transcript simulator compares one dish at a time. Use the form for missing items or complex corrections.</p><form id="readback-form"><label for="transcript">Transcript<textarea id="transcript" rows="2" required placeholder="seat 1 salmon quantity 2"></textarea></label><button type="submit" data-command>Compare read-back</button></form><div id="proposal"></div></div>
-            <div class="send-review"><p id="send-note">Review table, seats, food and allergy requests before sending.</p><button id="confirm-send" class="primary" data-command>Confirm and send</button></div>
+            <section class="voice-capture" aria-labelledby="voice-title">
+              <div class="panel-heading"><h3 id="voice-title">Read the order back</h3><span class="tag">SIMULATED TRANSCRIPTION</span></div>
+              <p class="note">No microphone is connected or recording. Enter a table-first read-back below, then hold and release to send this text to the menu matcher. This creates an editable draft, never a submitted order. Existing draft entries are replaced only by this deliberate action.</p>
+              <label for="transcript">Mock transcript<textarea id="transcript" rows="3" maxlength="2000" placeholder="Table 1: one menu item and one other item"></textarea></label>
+              <div class="actions"><button id="hold-talk" type="button" data-command>Hold to transcribe mock text</button><button id="use-transcript" type="button" data-command>Use transcript text</button></div>
+              <p id="capture-status" class="note" aria-live="polite">Hold with pointer, Space or Enter; release to create the draft. Audio adapter is not connected.</p>
+            </section>
+            <div id="draft-flags"></div>
+            <details id="manual-editor" open><summary>Manual entry & corrections</summary>
+              <form id="table-form" class="inline-form"><label for="draft-table">Correct table<select id="draft-table"></select></label><button type="submit" data-command>Save table correction</button></form>
+              <form id="line-form">
+                <div class="form-grid"><label for="edit-line">Add or edit line<select id="edit-line"><option value="">New dish line</option></select></label><label for="menu">Menu item<select id="menu"></select></label><label for="quantity">Quantity<input id="quantity" type="number" min="1" max="12" value="1" required></label><label for="seat">Guest / seat (optional)<input id="seat" type="number" min="1" max="20" placeholder="Unspecified"></label></div>
+                <label for="modifier">Modifiers<select id="modifier" multiple size="3"><option value="">No modifier</option></select></label>
+                <label for="requests">Explicit allergy / dietary request<textarea id="requests" rows="2" maxlength="500" placeholder="Record the guest’s request explicitly"></textarea></label>
+                <div class="actions"><button type="submit" data-command>Save dish line</button><button type="button" id="remove-line" data-command>Remove selected line</button></div>
+              </form>
+            </details>
+            <div class="send-review"><p id="send-note">Review the table, food, quantity and requests before sending.</p><button id="confirm-send" class="primary" data-command>Confirm and send</button><p id="confirmation-blocker" class="note"></p></div>
           </div>
         </section>
-        <aside id="task-panel" class="panel" aria-labelledby="task-title"><div class="panel-heading"><h2 id="task-title">Next up</h2><span class="tag">SHARED QUEUE</span></div><label class="check"><input id="section-only" type="checkbox"> Show my section only before ranking</label><p class="note">Top three available tasks. Hot food and wait time lead; every ranking has a reason.</p><div id="ranked-tasks"></div><details open><summary>Claims & colleagues needing help</summary><div id="other-tasks"></div></details><form id="request-form" class="request-form"><h3>Add a request</h3><div class="form-grid"><label for="request-table">Table<select id="request-table"></select></label><label for="request-type">Type<select id="request-type"><option value="guest_request">Guest request</option><option value="help">Helping hands</option></select></label></div><label for="request-reason">What is needed?<input id="request-reason" required maxlength="500" placeholder="Water for table 3"></label><button type="submit" data-command>Add shared task</button></form></aside>
+        <aside class="panel" aria-labelledby="menu-title"><h2 id="menu-title">Configured menu</h2><div id="menu-summary"></div><p class="note">Unknown menu words and ambiguous matches stay flagged. Kitchen fields may be unknown; this demo does not invent recipes or times.</p><div class="health-note"><h3>Analytics export</h3><div id="analytics-health">Checking outbox…</div><p class="note">Service continues when export is unavailable. No live Databricks workspace or dashboard is claimed here.</p></div></aside>
       </div>
-      <section class="panel"><h2>Sent orders & delivery</h2><div id="server-orders"></div></section>
+      <section class="panel"><div class="panel-heading"><h2>Sent orders</h2><span class="tag">ALL-READY NOTIFY · PARTIAL COUNT</span></div><p class="note">A ready plate counts once. Pickup frees its zone. Delivered is an optional explicit close-out.</p><div id="server-orders"></div></section>
     </section>
     <section id="kitchen-view" class="view" hidden>
-      <div class="section-heading"><div><p class="eyebrow">02 / KITCHEN</p><h1>One ticket. Every dish.</h1></div><p>Acknowledge, prepare, stage, then mark ready.<br>Plate presence alone never verifies food or modifiers.</p></div>
-      <section class="panel"><div class="panel-heading"><h2>Physical plating bays</h2><span class="tag">FIXED A / B / C</span></div><p class="note">Assigned on order arrival in this demo. A full bay waits; food or unresolved pickup prevents reuse. Mock events never imply live camera processing.</p><div id="bays" class="bay-grid"></div></section>
-      <section class="panel"><h2>Kitchen tickets</h2><div id="tickets"></div></section>
-    </section>
-    <section id="overview-view" class="view" hidden>
-      <div class="section-heading"><div><p class="eyebrow">03 / SHIFT OVERVIEW</p><h1>See the gaps in service.</h1></div><p>Coverage, waiting food and inventory uncertainty.<br>No staff performance or emotion scoring.</p></div>
-      <div id="overview-summary" class="summary-strip"></div>
-      <div class="overview-grid"><section class="panel"><h2>Ingredient zones</h2><p class="note">Expected recipes reserve nothing physically here. Only accepted movements change stock. Observations remain evidence until reviewed; removal alone does not identify a ticket or quantity.</p><div id="inventory"></div><form id="stock-form"><h3>Review a stock movement</h3><div class="form-grid"><label for="stock-zone">Zone<select id="stock-zone"></select></label><label for="stock-kind">Movement<select id="stock-kind"><option value="consume">Consume</option><option value="return">Return</option><option value="restock">Restock</option><option value="waste">Waste</option><option value="correction">Correction (signed delta)</option></select></label><label for="stock-quantity">Count / signed correction<input id="stock-quantity" type="number" value="1" required></label><label for="stock-order">Ticket attribution<select id="stock-order"><option value="">Unassigned</option></select></label></div><label for="stock-observation">Observed change<select id="stock-observation"><option value="">Manual movement / no observation</option></select></label><label for="stock-reason">Reason<input id="stock-reason" required maxlength="500" placeholder="Counted one portion removed; reviewed by cook"></label><button type="submit" data-command>Accept inventory movement</button></form></section>
-      <section class="panel"><h2>Adapters & uncertainty</h2><div id="adapters"></div><h3>Recent observations</h3><div id="observations"></div><h3>Recent accepted commands</h3><div id="events"></div></section></div>
+      <div class="section-heading"><div><p class="eyebrow">02 / KITCHEN</p><h1>Every plate has a zone.</h1></div><p>Only finished plates enter these zones.<br>Stable occupancy means ready by that convention.</p></div>
+      <section class="panel"><div class="panel-heading"><h2>Kitchen voice</h2><span class="tag">TEXT SIMULATOR</span></div><form id="kitchen-voice-form" class="inline-form"><label for="kitchen-transcript">Constrained kitchen phrase<input id="kitchen-transcript" maxlength="500" placeholder="Heard, table 1" required></label><button type="submit" data-command>Interpret kitchen phrase</button></form><p class="note">“Heard, table N” or “Start table N [menu item]”. When table or dish is ambiguous, select the exact ticket/unit below. This is not a live kitchen microphone.</p><div id="kitchen-clarification"></div></section>
+      <section class="panel"><div class="panel-heading"><h2>Plating camera & zones</h2><span class="tag">SIMULATED OBSERVATIONS</span></div><p class="note">Acknowledgment reserves one zone per physical dish, all or none. A camera observation needs a current assignment, 1.5 seconds of stability and no hand. Blocked/unknown is never treated as empty.</p><div id="cameras"></div><div id="zones" class="mvp-zone-grid"></div></section>
+      <section class="panel"><div class="panel-heading"><h2>Kitchen tickets</h2><span class="tag">ELAPSED TIME · NO COOKING PERCENTAGE</span></div><div id="tickets"></div></section>
     </section>
   </main>
-  <footer>Dig In · Manual first, shared state, visible evidence. <a href="http://localhost:8000/docs" id="api-link">API contracts</a><span>Demo identities · no payments · no dining-room video</span></footer>
+  <footer>Dig In · Human approval, menu IDs, visible uncertainty. <a href="http://localhost:8000/docs" id="api-link">API contracts</a><details class="legacy-links"><summary>Earlier experiments</summary><a href="coordination-v1.html">Archived coordination v1</a> · <a href="legacy.html">Legacy voice lab</a><p>Separate legacy state and contracts; outside the MVP demo.</p></details></footer>
 </body>
 </html>
