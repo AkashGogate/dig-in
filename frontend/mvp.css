@@ -70,3 +70,5 @@ footer { align-items: flex-start; }
 @media (prefers-reduced-motion: reduce) {
   button:active { transform: none; }
 }
+.dish.suggested { outline: 3px solid var(--danger); outline-offset: 2px; }
+.suggested-tag { display: inline-block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
