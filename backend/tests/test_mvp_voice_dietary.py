@@ -199,3 +199,30 @@ def test_spoken_seat_not_at_table_is_flagged_not_kept(demo):
     capture(demo, key, "Table 1: one salmon seat nine")
     assert draft(demo, key)["lines"][0]["seat"] is None
     assert "seat_unknown" in codes(demo, key)
+
+
+def test_confirm_blocked_only_by_dietary_check_names_the_real_reason(demo, monkeypatch):
+    monkeypatch.setenv("DIG_IN_REQUIRE_DIETARY_CHECK", "1")
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    core.ok(
+        demo,
+        {
+            "action": "edit_draft",
+            "order_id": key,
+            "revision": 1,
+            "table_id": "1",
+            "lines": [{"id": "l1", "menu_id": "salmon", "quantity": 1}],
+        },
+    )
+    blocked = core.send(
+        demo,
+        {
+            "action": "confirm_send",
+            "order_id": key,
+            "revision": 2,
+            "human_confirmed": True,
+        },
+    )
+    assert blocked.status_code == 409 and "allergies" in blocked.json()["detail"]

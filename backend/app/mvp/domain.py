@@ -360,6 +360,10 @@ class Restaurant:
                 "Human Confirm and send tap required",
             )
             order = self._draft(p)
+            require(
+                not any(f.code == "dietary_check_required" for f in order.flags),
+                "Ask the table about allergies or dietary needs and record the answer first",
+            )
             require(not order.flags, "Resolve table mismatch/unknown menu flags first")
             require(bool(order.lines), "Add at least one configured dish")
             count = sum(x.quantity for x in order.lines)
