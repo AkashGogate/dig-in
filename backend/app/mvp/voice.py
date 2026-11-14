@@ -6,7 +6,9 @@ implemented here. A provider adapter can return text to these same functions.
 
 from __future__ import annotations
 
+import math
 import re
+from collections import Counter
 from typing import Protocol
 
 from app.mvp.menu import MenuDocument, match_menu, names, normalize
@@ -37,6 +39,57 @@ NUMBER = r"(?:\d+|" + "|".join(NUMBER_WORDS) + r")"
 def _number(token: str) -> str:
     """Live STT often spells small numbers ('table four'); normalize to digits."""
     return str(NUMBER_WORDS.get(token.lower(), token))
+
+
+SIMILARITY_MIN = 0.5  # calibration knob: retune on real misheard kitchen transcripts
+
+
+def _vector(text: str) -> Counter:
+    joined = f" {normalize(text).replace(' ', '')} "  # robust to 'bull dozer' splits
+    return Counter(joined[i : i + 3] for i in range(len(joined) - 2))
+
+
+def _cosine(a: Counter, b: Counter) -> float:
+    dot = sum(a[k] * b[k] for k in a.keys() & b.keys())
+    norm = math.sqrt(sum(v * v for v in a.values()) * sum(v * v for v in b.values()))
+    return dot / norm if norm else 0.0
+
+
+def suggest_items(menu: MenuDocument, text: str, limit: int = 3) -> list[str]:
+    """Secondary, deterministic layer: rank likely misheard dish names.
+
+    Character-trigram vectors + cosine similarity over 1-3 word spans of the
+    phrase. Returns review candidates only; exact alias matching stays the
+    authority and nothing here ever selects an item.
+    """
+    words = normalize(text).split()
+    spans = [
+        _vector(" ".join(words[i : i + n]))
+        for n in (1, 2, 3)
+        for i in range(len(words) - n + 1)
+    ]
+    scores = {
+        item.id: max(
+            (_cosine(span, _vector(alias)) for span in spans for alias in names(item)),
+            default=0.0,
+        )
+        for item in menu.items
+    }
+    ranked = sorted(
+        (-score, item_id)
+        for item_id, score in scores.items()
+        if score >= SIMILARITY_MIN
+    )
+    return [item_id for _, item_id in ranked[:limit]]
+
+
+def _with_suggestions(menu: MenuDocument, phrase: str, flags: list[dict]) -> list[dict]:
+    return [
+        {**flag, "candidates": suggest_items(menu, phrase)}
+        if flag["code"] == "unknown_item" and not flag.get("candidates")
+        else flag
+        for flag in flags
+    ]
 
 
 def _clauses(menu: MenuDocument, text: str) -> list[str]:
@@ -113,8 +166,12 @@ def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
                 }
             )
             continue
-        matched = match_menu(menu, clause[number.end() :] if number else clause)
-        flags.extend({**flag, "line_index": index} for flag in matched["flags"])
+        phrase = clause[number.end() :] if number else clause
+        matched = match_menu(menu, phrase)
+        flags.extend(
+            {**flag, "line_index": index}
+            for flag in _with_suggestions(menu, phrase, matched["flags"])
+        )
         if matched["menu_id"]:
             lines.append(
                 {
@@ -158,7 +215,7 @@ def parse_kitchen(menu: MenuDocument, text: str) -> dict:
             else None,
             "table_id": _number(started[1]),
             "menu_id": matched["menu_id"],
-            "flags": matched["flags"]
+            "flags": _with_suggestions(menu, started[2], matched["flags"])
             or (
                 [
                     {

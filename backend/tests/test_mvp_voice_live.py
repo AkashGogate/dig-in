@@ -12,7 +12,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from app.mvp import voice_live
 from app.mvp.menu import load_menu
-from app.mvp.voice import parse_kitchen, parse_order
+from app.mvp.voice import parse_kitchen, parse_order, suggest_items
 from app.server import app
 
 demo = core.demo  # reuse the core MVP fixture
@@ -241,3 +241,25 @@ def test_kitchen_voice_with_spoken_numbers_acknowledges_and_starts(demo):
         source="voice",
     )
     assert core.units(demo, key)[0]["started_at"] is not None
+
+
+@pytest.mark.parametrize(
+    ("heard", "expected"),
+    [
+        ("bull dozer", "bulldozer"),
+        ("back hoe", "backhoe"),
+        ("wreking ball", "wrecking_ball_brownie"),
+        ("dirt sight", "dirt_site"),
+    ],
+)
+def test_similarity_suggests_misheard_dishes_but_never_selects(heard, expected):
+    menu = load_menu(DIG_IN)
+    assert suggest_items(menu, heard)[0] == expected
+    parsed = parse_order(menu, f"Table 1: one {heard}", "1")
+    assert parsed["lines"] == []  # exact matching stays the authority
+    flag = next(f for f in parsed["flags"] if f["code"] == "unknown_item")
+    assert flag["candidates"][0] == expected
+
+
+def test_similarity_stays_silent_for_off_menu_words():
+    assert suggest_items(load_menu(DIG_IN), "lobster") == []
