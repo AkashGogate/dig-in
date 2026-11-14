@@ -39,6 +39,12 @@ def draw_trip_zone(img, polygon, state: str, zone_id: str, ingredient: str, trip
     _label(img, f"{zone_id} {ingredient}  trips: {trips}  [{state}]", (x, max(18, y - 8)), color)
 
 
+def draw_hand(img, points, tip) -> None:
+    for x, y in points.astype(int):
+        cv2.circle(img, (int(x), int(y)), 3, (255, 0, 255), -1)
+    cv2.circle(img, (int(tip[0]), int(tip[1])), 8, (255, 0, 255), 2)
+
+
 def draw_bay(img, polygon, state: str, bay_id: str, count: int, assignment, contours) -> None:
     color = STATE_COLOR.get(state, GREY)
     cv2.polylines(img, [np.array(polygon, np.int32)], True, color, 2)

@@ -177,11 +177,12 @@ def create_app(rt: Runtime) -> FastAPI:
         return {"ok": True, "path": path}
 
     @app.get("/debug/{camera_id}.mjpg")
-    async def debug_stream(camera_id: str):
+    async def debug_stream(camera_id: str, raw: bool = False):
+        """Overlay stream; ?raw=1 streams the unannotated frames (for recording/replay)."""
         if rt.mjpeg is None:
             raise HTTPException(503, "no live camera in this mode")
         try:
-            gen = rt.mjpeg(camera_id)
+            gen = rt.mjpeg(camera_id, raw)
         except KeyError:
             raise HTTPException(404, f"unknown camera {camera_id}")
         return StreamingResponse(gen, media_type="multipart/x-mixed-replace; boundary=frame")

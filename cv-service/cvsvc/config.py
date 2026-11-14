@@ -46,6 +46,12 @@ class IngredientConfig(BaseModel):
     trip_settle_s: float = 0.6      # no motion this long ends a trip
     body_motion_fraction: float = 0.25  # share of the frame occupied by something new => a person in front, not a reach
     body_hold_s: float = 1.0        # keep treating motion as "body" this long after the person leaves
+    # trip_detector: hands  = a detected hand dwelling in the zone (MediaPipe); robust to bodies/passers-by
+    #                motion = motion in the zone polygon (no extra dependency; fixed overhead cameras)
+    trip_detector: Literal["hands", "motion"] = "motion"
+    hand_model_path: str = "models/hand_landmarker.task"
+    hand_dwell_s: float = 0.35      # hand must stay in the zone this long to count as a trip
+    hand_max_size_px: float = 200   # ignore hands this large (right in front of the lens, not at the shelf)
     settle_s: float = 1.0
     occlusion_timeout_s: float = 6.0
     snapshot_interval_s: float = 10

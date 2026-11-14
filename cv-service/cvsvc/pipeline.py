@@ -19,6 +19,7 @@ from cvsvc.emitter import Emitter
 from cvsvc.events import EventBus
 from cvsvc.health import HealthMonitor
 from cvsvc.ingredient.tracker import ZoneTracker
+from cvsvc.ingredient.hands import HandTripTracker, zone_of
 from cvsvc.ingredient.trips import TripTracker
 from cvsvc.ingredient.zones import ZoneCounter
 from cvsvc.plating.bays import BayCounter
@@ -41,6 +42,8 @@ class _Zone:
         self.motion = MotionDetector(self.counter.mask, icfg.motion_min_area_px)
         self.trip = TripTracker(min_trip_s=icfg.min_trip_s, settle_s=icfg.trip_settle_s,
                                 max_trip_s=icfg.occlusion_timeout_s)
+        self.hand_trip = HandTripTracker(dwell_s=icfg.hand_dwell_s)
+        self.hands_mode = icfg.trip_detector == "hands"
         # baseline is taken from the first live frame (see CameraWorker._process_zone)
         self.initialized = False
         self.tracker = ZoneTracker(baseline=0, settle_s=icfg.settle_s,
@@ -51,7 +54,13 @@ class _Zone:
 
     @property
     def state(self) -> str:
-        return self.trip.state if self.trips_mode else self.tracker.state
+        if self.trips_mode:
+            return self.hand_trip.state if self.hands_mode else self.trip.state
+        return self.tracker.state
+
+    @property
+    def trip_count(self) -> int:
+        return self.hand_trip.trips if self.hands_mode else self.trip.trips
 
 
 class _Bay:
@@ -79,6 +88,7 @@ class CameraWorker:
         self.reference: np.ndarray | None = None
         self.lock = threading.Lock()
         self.overlay: np.ndarray = debug.placeholder(camera_id, "starting")
+        self.raw: np.ndarray = self.overlay
         self.overlay_seq = 0
         self.fps = 0.0
         self.capture_request: threading.Event | None = None
@@ -88,6 +98,11 @@ class CameraWorker:
         self.occluded_bays: set[str] = set()
         self.scene_motion: PresenceDetector | None = None
         self.body_until = 0.0
+        self.hand_detector = None
+        self.hands: list = []
+        if self.has_ingredient and self.cfg.ingredient.mode == "trips" and self.cfg.ingredient.trip_detector == "hands":
+            from cvsvc.ingredient.hands import HandDetector
+            self.hand_detector = HandDetector(self.cfg.ingredient.hand_model_path)
         self.stop = threading.Event()
 
     # ---- emit helpers ----
@@ -229,7 +244,9 @@ class CameraWorker:
                 self._reconcile(ts, frame)
                 self.recovering_since = None
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            if self.cfg.ingredient.mode == "trips":
+            if self.cfg.ingredient.mode == "trips" and self.hand_detector is not None:
+                self._process_hand_trips(ts, frame)
+            elif self.cfg.ingredient.mode == "trips":
                 self._process_trips(ts, gray)
             else:
                 for zid, z in self.zones.items():
@@ -286,6 +303,20 @@ class CameraWorker:
             self.emit(self.o.emitter.trip(zid, z.cfg.ingredient, res.duration_s, res.confidence, attr,
                                           res.reason, ts))
 
+    def _process_hand_trips(self, ts, frame) -> None:
+        assert self.hand_detector is not None
+        icfg = self.cfg.ingredient
+        self.hands = [h for h in self.hand_detector.detect(frame, ts) if h.size <= icfg.hand_max_size_px]
+        polys = {zid: np.array(z.cfg.polygon, np.int32) for zid, z in self.zones.items()}
+        occupied = {zone_of(h, polys) for h in self.hands} - {None}
+        version = self.o.context.active_version()
+        for zid, z in self.zones.items():
+            res = z.hand_trip.update(ts, zid in occupied, version)
+            if res is None:
+                continue
+            attr = self.o.context.attribution(res.version_at_start)
+            self.emit(self.o.emitter.trip(zid, z.cfg.ingredient, res.duration_s, res.confidence, attr, None, ts))
+
     def _process_bay(self, ts, frame, gray, bid, b: _Bay) -> None:
         motion = b.motion.update(gray)
         pc = b.counter.count(frame)
@@ -332,10 +363,11 @@ class CameraWorker:
             self.emit(em.camera_status(self.id, self.health.state, "recovered_recount", self.health.since or ts))
 
     def _render(self, frame: np.ndarray) -> None:
+        self.raw = frame
         img = frame.copy()
         for zid, z in self.zones.items():
             if z.trips_mode:
-                debug.draw_trip_zone(img, z.cfg.polygon, z.trip.state, zid, z.cfg.ingredient, z.trip.trips)
+                debug.draw_trip_zone(img, z.cfg.polygon, z.state, zid, z.cfg.ingredient, z.trip_count)
             elif z.last is not None:
                 debug.draw_zone(img, z.cfg.polygon, z.tracker.state, zid, z.cfg.ingredient, z.tracker.baseline,
                                 z.counter.slot_polygons(), z.last.occupied)
@@ -343,6 +375,8 @@ class CameraWorker:
             state = b.tracker.state
             debug.draw_bay(img, b.cfg.polygon, state, bid, b.tracker.stable_count, self.o.context.bay(bid),
                            b.last.contours if b.last else [])
+        for h in self.hands:
+            debug.draw_hand(img, h.points, h.tip)
         debug.draw_banner(img, self.id, self.health.state, self.health.reason, self.fps)
         self.overlay = img
         self.overlay_seq += 1
@@ -396,7 +430,7 @@ class CameraPipelines:
             raise TimeoutError("no frame within 5 s")
         return w.captured_path or ""
 
-    def mjpeg(self, camera_id: str) -> Iterator[bytes]:
+    def mjpeg(self, camera_id: str, raw: bool = False) -> Iterator[bytes]:
         w = self.workers[camera_id]
 
         def gen():
@@ -404,7 +438,7 @@ class CameraPipelines:
             while True:
                 if w.overlay_seq != seen:
                     seen = w.overlay_seq
-                    jpg = debug.encode_jpeg(w.overlay)
+                    jpg = debug.encode_jpeg(w.raw if raw else w.overlay, 90 if raw else 70)
                     yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n"
                 time.sleep(0.05)
         return gen()

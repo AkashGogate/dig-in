@@ -8,3 +8,4 @@ node_modules/
 /specs
 cv-service/logs/
 kitchen-backend/data/
+cv-service/models/

@@ -32,6 +32,26 @@ curl -XPOST localhost:8001/mock/bays/A/plates -H 'content-type: application/json
 curl -XPOST localhost:8001/mock/cameras/plating_cam -H 'content-type: application/json' -d '{"state":"obstructed","reason":"lens_covered"}'
 ```
 
+## Ingredient trips (default)
+
+The backend owns stock. With `ingredient.mode: trips` the camera reports one
+`INGREDIENT_TRIP` per reach into a zone and the backend subtracts the recipe quantity.
+`trip_detector: hands` (recommended for a straight-on camera) counts a trip only when a
+detected hand stays inside a zone for `hand_dwell_s`; people walking past or standing in
+front never count. It needs the MediaPipe hand model (not committed):
+
+```bash
+mkdir -p models && curl -L -o models/hand_landmarker.task \
+  https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+```
+
+`trip_detector: motion` uses plain motion in the zone (no model; only reliable when nobody
+stands between the camera and the shelf). Bays: `detector: white` finds white plates on a
+coloured counter and ignores the counter's texture and the camera's auto white balance.
+
+Debug streams: `/debug/<camera>.mjpg` (overlay) and `/debug/<camera>.mjpg?raw=1` (raw frames,
+for recording and replay).
+
 ## Calibrate (under 2 minutes per camera)
 
 1. Mount the camera fixed, overhead or at a high angle; turn on the venue lighting.
