@@ -21,4 +21,4 @@ Current decision date: 2026-11-14. Product intent is [PROJECT_SPEC](../PROJECT_S
 | Deferred | Positioning, tasks/helpers/priority, POS/payments, courses, spoken responses; retained code does not put them back into MVP |
 | Kitchen-only views | No dining-room camera, faces/guest tracking or raw video retention |
 
-Still provisional: individual owner names, proposed screen split, real kitchen mic/hold-to-talk details, 60-second escalation, workspace edition/warehouse/quota/Zerobus and actual hardware/noise performance. No live speech/CV/cloud integration or remote push/publication is implied. The original brief’s Free Edition claims are unverified inputs, not implemented guarantees.
+Still provisional: individual owner names, proposed screen split, kitchen mic details (hold-to-talk is implemented on both screens but awaits team acceptance), 60-second escalation, workspace edition/warehouse/quota/Zerobus and actual hardware/noise performance. No live speech/CV/cloud integration or remote push/publication is implied. The original brief’s Free Edition claims are unverified inputs, not implemented guarantees.

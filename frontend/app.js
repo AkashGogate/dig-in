@@ -265,6 +265,11 @@ async function startLive(target) {
     ui.status.textContent = "Enter the demo login at the top of the page to unlock the live mic.";
     return false;
   }
+  const opus = "audio/webm;codecs=opus";
+  if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia || !MediaRecorder.isTypeSupported(opus)) {
+    ui.status.textContent = "This browser can't stream live audio (use Chrome or Edge). Type the order or use manual entry.";
+    return false;
+  }
   const cap = capture = {target, ui, text: "", stopped: false, cancelled: false};
   try {
     const ticket = await request("/api/v2/voice/ticket", {method: "POST", headers: voice.auth ? {Authorization: `Basic ${voice.auth}`} : {}});
@@ -283,8 +288,7 @@ async function startLive(target) {
       ws.addEventListener("open", resolve, {once: true});
       ws.addEventListener("close", () => reject(new Error("Live stream refused")), {once: true});
     });
-    const opus = "audio/webm;codecs=opus";
-    const recorder = cap.recorder = new MediaRecorder(cap.media, MediaRecorder.isTypeSupported(opus) ? {mimeType: opus} : {});
+    const recorder = cap.recorder = new MediaRecorder(cap.media, {mimeType: opus});
     recorder.addEventListener("dataavailable", event => { if (event.data.size && ws.readyState === 1) ws.send(event.data); });
     recorder.addEventListener("stop", () => { if (ws.readyState === 1) ws.send(JSON.stringify({type: "stop"})); });
     recorder.start(250);

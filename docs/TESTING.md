@@ -31,7 +31,7 @@ No paid keys are required. CI runs the locked tests/scoped Python checks plus No
 
 Exercise the default two-screen v2 against one shared backend with multiple actor sessions, long/empty/error/unknown states, explicit flag resolution, capacity, status and tap recovery. Verify phone reflow, keyboard/focus, labels,200%zoom and screen reader as available; record precise coverage rather than claiming broad accessibility. STATUS records the current Chrome path and explicitly untested checks.
 
-Real STT requires deliberate capture/privacy review and noisy-room tests; real CV requires calibrated overhead zones, stable interval/no-hand evidence, blocked/offline/returned plate scenarios and actual hardware timing. Cloud connector/SQL/dashboard work requires official capability verification and live workspace credentials. Synthetic fixture timings are not restaurant or staff benchmarks.
+Real STT requires deliberate capture/privacy review and noisy-room tests. The live Deepgram path (`backend/app/mvp/voice_live.py`) is unit-tested with a fake Deepgram (`tests/test_mvp_voice_live.py`, no key/cost); live runs are billable and need explicit approval per run, and so far cover synthetic `say` clips only; real CV requires calibrated overhead zones, stable interval/no-hand evidence, blocked/offline/returned plate scenarios and actual hardware timing. Cloud connector/SQL/dashboard work requires official capability verification and live workspace credentials. Synthetic fixture timings are not restaurant or staff benchmarks.
 
 ## Preserved regressions
 

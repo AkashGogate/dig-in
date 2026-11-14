@@ -16,7 +16,7 @@
 | Ingredient tracking | Second-priority countable observation/review/movement scaffold, not real ingredient CV; expected recipe does not deduct |
 | Canonical events/outbox/export | Implemented local contract, identity/time/outcome validation, background fake/JSONL retry/health; memory pending rows lost on restart |
 | Databricks evaluation assets | 106 labeled SIMULATED events / ten orders /20 units, local analyzer and SQL/dashboard templates; no live dashboard/workspace tested |
-| Live menu OCR/importer, STT/CV/Databricks adapters | Adapter-only or future; no paid credentials needed |
+| Live menu OCR/importer, CV/Databricks adapters | Adapter-only or future; no paid credentials needed. Live STT adapter exists (voice row) but is off by default |
 | Legacy preservation | Frozen `/api/v1` broad coordination in coordination-v1.html and original legacy.html voice lab; isolated state/contracts, not MVP defaults |
 | Deferred | Positioning, task/helper/priority queue, courses, spoken responses, POS/payments |
 | Production/deployment | No auth/durable state/multi-worker/outbox guarantee; no push/publication or cloud/hardware claim |

@@ -180,7 +180,11 @@ _tickets: dict[str, tuple[str, float]] = {}
 
 
 def _client_ip(conn: Request | WebSocket) -> str:
-    return conn.client.host if conn.client else "unknown"
+    # Behind Fly every connection comes from its proxy; Fly's edge sets
+    # Fly-Client-IP. Off Fly the header is spoofable, but global caps still hold.
+    return conn.headers.get("fly-client-ip") or (
+        conn.client.host if conn.client else "unknown"
+    )
 
 
 def issue_ticket(ip: str) -> str:

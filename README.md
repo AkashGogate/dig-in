@@ -29,7 +29,7 @@ cd backend
 DIG_IN_MENU_PATH=fixtures/menus/second.json uv run uvicorn app.server:app --port 8000
 ```
 
-Unknown kitchen fields in that second menu remain null. PDF/photo/model import is an interface/status stub, not a live importer. Hold/release on the server screen is an explicitly labeled **text-transcription simulator**, not verified microphone/STT. Camera controls simulate stable occupancy/removal, not image inference.
+Unknown kitchen fields in that second menu remain null. PDF/photo/model import is an interface/status stub, not a live importer. Hold/release on the Server and Kitchen screens uses the labeled text simulator by default. Optional live Deepgram voice (off unless `DIG_IN_VOICE_LIVE=1` + `DEEPGRAM_API_KEY` on the backend) streams the mic to Deepgram nova-3 with menu keyterms; it is password-gated, spend-capped and has been checked only on synthetic clips, not a noisy kitchen. Camera controls simulate stable occupancy/removal, not image inference.
 
 ## Check and demo
 

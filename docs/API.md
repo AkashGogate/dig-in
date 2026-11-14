@@ -9,7 +9,10 @@ New work uses `/api/v2`. Sources: [`mvp/contracts.py`](../backend/app/mvp/contra
 | `POST /api/v2/commands` | Validated command, `X-Demo-Session` header; returns result/state/replayed |
 | `GET /api/v2/contracts` | Command/state/canonical event JSON Schemas |
 | `GET /api/v2/menu`, `POST /menu/match` | Canonical configured menu and deterministic candidate/flag matcher |
-| `GET /api/v2/menu/import-status`, `/voice/status` | Explicit adapter-only importer and mock transcript availability |
+| `GET /api/v2/menu/import-status`, `/voice/status` | Explicit adapter-only importer; voice mode (`mock_transcript` or `deepgram_stream`) and whether the demo password is required |
+| `POST /api/v2/voice/ticket` | Demo password (when configured); 503 if live voice is off, 429 if a spend cap is hit; returns a single-use ticket valid 30s and the max stream seconds |
+| `WS /api/v2/voice/stream?ticket=` | Browser sends WebM/Opus chunks then `{"type":"stop"}`; server relays `interim`/`final`/`done` text (plus `limit`/`error`). Audio is forwarded and dropped; text is never stored. The browser then sends the text through `capture_voice` (`capture_mode: live_voice`) or `kitchen_voice` like typed text |
+| `GET /api/v2/voice/usage` | Demo password; audio seconds used/remaining, streams started/rejected, estimated USD (in memory, resets on restart) |
 | `GET /api/v2/events?format=jsonl` | Canonical accepted/observed log, original IDs/source times preserved |
 | `POST /api/v2/events` | Supported canonical adapter **intent**, translated/validated by Core, never arbitrary fact insertion |
 | `GET /api/v2/analytics/health`, `/analytics/pending` | Retry health/exact pending rows; not live cloud dashboard |

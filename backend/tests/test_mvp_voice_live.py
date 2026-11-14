@@ -290,3 +290,14 @@ def test_table_key_narrows_misheard_callout_to_that_tickets_dishes(demo):
         e for e in demo[2].snapshot()["events"] if e["type"] == "voice.clarification"
     ]
     assert events[-2]["payload"]["candidate_menu_ids"] == ["risotto"]
+
+
+def test_per_device_limits_use_real_client_ip_behind_fly_proxy(live):
+    client = TestClient(app)
+    voice_live.budget.active["203.0.113.1"] = 1  # that device already has a mic open
+    busy = client.post("/api/v2/voice/ticket", headers={"Fly-Client-IP": "203.0.113.1"})
+    assert busy.status_code == 429
+    other = client.post(
+        "/api/v2/voice/ticket", headers={"Fly-Client-IP": "203.0.113.2"}
+    )
+    assert other.status_code == 200
