@@ -55,12 +55,15 @@ def _cosine(a: Counter, b: Counter) -> float:
     return dot / norm if norm else 0.0
 
 
-def suggest_items(menu: MenuDocument, text: str, limit: int = 3) -> list[str]:
+def suggest_items(
+    menu: MenuDocument, text: str, limit: int = 3, only: set[str] | None = None
+) -> list[str]:
     """Secondary, deterministic layer: rank likely misheard dish names.
 
     Character-trigram vectors + cosine similarity over 1-3 word spans of the
     phrase. Returns review candidates only; exact alias matching stays the
-    authority and nothing here ever selects an item.
+    authority and nothing here ever selects an item. `only` restricts scoring
+    to dishes already keyed by an exact table (see Restaurant kitchen_voice).
     """
     words = normalize(text).split()
     spans = [
@@ -74,6 +77,7 @@ def suggest_items(menu: MenuDocument, text: str, limit: int = 3) -> list[str]:
             default=0.0,
         )
         for item in menu.items
+        if only is None or item.id in only
     }
     ranked = sorted(
         (-score, item_id)
@@ -214,6 +218,7 @@ def parse_kitchen(menu: MenuDocument, text: str) -> dict:
             if matched["status"] == "matched" and not matched["modifiers"]
             else None,
             "table_id": _number(started[1]),
+            "dish_phrase": started[2],
             "menu_id": matched["menu_id"],
             "flags": _with_suggestions(menu, started[2], matched["flags"])
             or (

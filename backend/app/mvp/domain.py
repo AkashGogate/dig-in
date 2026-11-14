@@ -16,7 +16,7 @@ from app.analytics.outbox import Outbox
 from app.coordination.rules import Conflict, require
 from app.mvp import contracts as c
 from app.mvp.fixtures import seed
-from app.mvp.voice import parse_kitchen, parse_order
+from app.mvp.voice import parse_kitchen, parse_order, suggest_items
 from app.mvp.voice_live import live_enabled
 
 
@@ -406,19 +406,42 @@ class Restaurant:
                 )
             ]
             if flags or len(candidates) != 1:
+                # Exact table key narrows a misheard dish to that ticket's queued
+                # dishes; similarity only suggests, a tap still starts the dish.
+                suggested = (
+                    suggest_items(
+                        s.menu,
+                        parsed["dish_phrase"],
+                        only={
+                            d.menu_id
+                            for d in self._dishes(candidates[0])
+                            if d.stage == "queued"
+                        },
+                    )
+                    if flags and parsed.get("dish_phrase") and len(candidates) == 1
+                    else []
+                )
                 self._emit(
                     "voice.clarification",
+                    candidates[0].id if suggested else None,
                     payload={
-                        "reason": "ambiguous_or_unknown_order",
+                        "reason": "unknown_dish_on_table"
+                        if suggested
+                        else "ambiguous_or_unknown_order",
                         "candidate_order_ids": [o.id for o in candidates],
+                        "candidate_menu_ids": suggested,
                     },
                     outcome="observed",
                 )
+                dish_names = ", ".join(s.menu.item(m).name for m in suggested)
                 return {
                     "flags": [
                         {
                             "code": "clarification",
-                            "message": "Select one eligible order by tap; table/phrase is ambiguous.",
+                            "message": f"Did you mean {dish_names}? Tap that dish on the ticket to start it."
+                            if suggested
+                            else "Select one eligible order by tap; table/phrase is ambiguous.",
+                            "candidates": suggested,
                         }
                     ]
                 }

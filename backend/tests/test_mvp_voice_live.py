@@ -263,3 +263,30 @@ def test_similarity_suggests_misheard_dishes_but_never_selects(heard, expected):
 
 def test_similarity_stays_silent_for_off_menu_words():
     assert suggest_items(load_menu(DIG_IN), "lobster") == []
+
+
+def test_table_key_narrows_misheard_callout_to_that_tickets_dishes(demo):
+    key = core.order(demo, table="3", menu_id="risotto")
+    core.ack(demo, key)
+    other = core.order(demo, table="2", menu_id="salmon", actor="server-2")
+    core.ack(demo, other)
+
+    def callout(text):
+        return core.ok(
+            demo,
+            {"action": "kitchen_voice", "text": text},
+            actor="cook-1",
+            source="voice",
+        )["result"]["flags"][0]
+
+    on_ticket = callout("Start table three rizotto")
+    assert on_ticket["candidates"] == ["risotto"]
+    assert "Garden risotto" in on_ticket["message"]
+    # Salmon exists on the menu (and on table 2) but not on table 3's ticket.
+    assert suggest_items(load_menu(), "sammon") == ["salmon"]
+    assert callout("Start table three sammon")["candidates"] == []
+    assert all(d["started_at"] is None for d in core.units(demo, key))
+    events = [
+        e for e in demo[2].snapshot()["events"] if e["type"] == "voice.clarification"
+    ]
+    assert events[-2]["payload"]["candidate_menu_ids"] == ["risotto"]
