@@ -15,9 +15,11 @@ from app.mvp import contracts as c
 from app.mvp.domain import Restaurant
 from app.mvp.menu import import_status, match_menu
 from app.mvp.voice import adapter_status
+from app.mvp.voice_live import make_router as make_voice_router
 
 router = APIRouter(prefix="/api/v2", tags=["MVP v2"])
 restaurant = Restaurant()
+router.include_router(make_voice_router(lambda: restaurant.state.menu))
 
 
 def checked(fn):

@@ -34,6 +34,11 @@ NUMBER_WORDS = {
 NUMBER = r"(?:\d+|" + "|".join(NUMBER_WORDS) + r")"
 
 
+def _number(token: str) -> str:
+    """Live STT often spells small numbers ('table four'); normalize to digits."""
+    return str(NUMBER_WORDS.get(token.lower(), token))
+
+
 def _clauses(menu: MenuDocument, text: str) -> list[str]:
     # Do not split a configured name/modifier containing 'and'.
     protected = normalize(text)
@@ -58,8 +63,8 @@ def _clauses(menu: MenuDocument, text: str) -> list[str]:
 
 
 def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
-    table = re.match(r"^\s*table\s+(\d+)\b\s*[:,]?", text, re.IGNORECASE)
-    spoken_table = table[1] if table else None
+    table = re.match(r"^\s*table\s+(" + NUMBER + r")\b[\s:,.]*", text, re.IGNORECASE)
+    spoken_table = _number(table[1]) if table else None
     remainder = text[table.end() :] if table else text
     flags = []
     if not table:
@@ -136,22 +141,22 @@ def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
 
 def parse_kitchen(menu: MenuDocument, text: str) -> dict:
     clean = normalize(text)
-    heard = re.fullmatch(r"heard table (\d+)", clean)
+    heard = re.fullmatch(r"heard table (" + NUMBER + r")", clean)
     if heard:
         return {
             "action": "acknowledge",
-            "table_id": heard[1],
+            "table_id": _number(heard[1]),
             "menu_id": None,
             "flags": [],
         }
-    started = re.fullmatch(r"start table (\d+) (.+)", clean)
+    started = re.fullmatch(r"start table (" + NUMBER + r") (.+)", clean)
     if started:
         matched = match_menu(menu, started[2])
         return {
             "action": "start_dish"
             if matched["status"] == "matched" and not matched["modifiers"]
             else None,
-            "table_id": started[1],
+            "table_id": _number(started[1]),
             "menu_id": matched["menu_id"],
             "flags": matched["flags"]
             or (
@@ -206,9 +211,13 @@ def transcribe_discarding(
 
 
 def adapter_status() -> dict:
+    from app.mvp.voice_live import status
+
+    live = status()
     return {
-        "mode": "mock_transcript",
-        "live_capture_available": False,
+        "mode": "deepgram_stream" if live["live_enabled"] else "mock_transcript",
+        "live_capture_available": live["live_enabled"],
+        "auth_required": live["auth_required"],
         "discard_audio_after_transcription": True,
         "speaker_identity_is_authentication": False,
     }

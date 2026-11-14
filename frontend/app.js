@@ -234,18 +234,114 @@ async function captureText() {
   const data = await dispatch({action: "capture_voice", order_id: order.id, revision: order.revision, text}, "voice");
   if (data) $("transcript").value = "";
 }
-function beginHold(event) {
+let voice = {live: false, authRequired: false, auth: null}, capture = null;
+async function loadVoiceStatus() {
+  try {
+    const status = await request("/api/v2/voice/status");
+    voice.live = Boolean(status.live_capture_available);
+    voice.authRequired = Boolean(status.auth_required);
+  } catch { voice.live = false; }
+  $("voice-mode-tag").textContent = voice.live ? "LIVE MIC · DEEPGRAM" : "SIMULATED TRANSCRIPTION";
+  $("kitchen-hold").hidden = !voice.live;
+  if (voice.live) {
+    $("voice-note").textContent = "Hold to talk: say the table first, then each dish. Audio streams to Deepgram and is discarded after transcription. Release to build an editable draft; nothing is sent until you review and tap Confirm and send.";
+    $("hold-talk").textContent = "Hold to talk";
+    $("capture-status").textContent = "Live mic ready. Hold with pointer, Space or Enter; release to stop.";
+    $("transcript").labels[0].firstChild.textContent = "Transcript (live words appear here; you can also type)";
+  }
+}
+const captureUi = target => target === "kitchen"
+  ? {field: $("kitchen-transcript"), status: $("kitchen-capture-status"), button: $("kitchen-hold")}
+  : {field: $("transcript"), status: $("capture-status"), button: $("hold-talk")};
+function stopMedia(cap) {
+  cap.media?.getTracks().forEach(track => track.stop());
+  if (cap.ws && cap.ws.readyState <= 1) cap.ws.close();
+}
+async function startLive(target) {
+  const ui = captureUi(target);
+  if (voice.authRequired && !voice.auth) {
+    $("voice-login").hidden = false;
+    showView("server");
+    ui.status.textContent = "Enter the demo login to unlock the live mic.";
+    return false;
+  }
+  const cap = capture = {target, ui, text: "", stopped: false, cancelled: false};
+  try {
+    const ticket = await request("/api/v2/voice/ticket", {method: "POST", headers: voice.auth ? {Authorization: `Basic ${voice.auth}`} : {}});
+    cap.media = await navigator.mediaDevices.getUserMedia({audio: true});
+    const ws = cap.ws = new WebSocket(`${API.replace(/^http/, "ws")}/api/v2/voice/stream?ticket=${encodeURIComponent(ticket.ticket)}`);
+    cap.done = new Promise(resolve => {
+      ws.addEventListener("message", event => {
+        const message = JSON.parse(event.data);
+        if (message.type === "interim" || message.type === "final") ui.field.value = message.text;
+        if (message.type === "limit" || message.type === "error") ui.status.textContent = message.message;
+        if (message.type === "done") { cap.text = message.text; resolve(); }
+      });
+      ws.addEventListener("close", () => resolve());
+    });
+    await new Promise((resolve, reject) => {
+      ws.addEventListener("open", resolve, {once: true});
+      ws.addEventListener("close", () => reject(new Error("Live stream refused")), {once: true});
+    });
+    const opus = "audio/webm;codecs=opus";
+    const recorder = cap.recorder = new MediaRecorder(cap.media, MediaRecorder.isTypeSupported(opus) ? {mimeType: opus} : {});
+    recorder.addEventListener("dataavailable", event => { if (event.data.size && ws.readyState === 1) ws.send(event.data); });
+    recorder.addEventListener("stop", () => { if (ws.readyState === 1) ws.send(JSON.stringify({type: "stop"})); });
+    recorder.start(250);
+    ui.status.textContent = `Listening (max ${Math.round(ticket.max_stream_seconds)}s). Release to stop.`;
+    if (cap.stopped) finishLive(cap);
+    return true;
+  } catch (error) {
+    stopMedia(cap);
+    capture = null;
+    if (String(error.message).startsWith("401")) { voice.auth = null; $("voice-login").hidden = false; }
+    ui.status.textContent = `Live mic unavailable: ${error.message}. Type the order or use manual entry.`;
+    return false;
+  }
+}
+async function finishLive(cap) {
+  if (!cap.recorder || cap.finishing) return;
+  cap.finishing = true;
+  if (cap.recorder.state !== "inactive") cap.recorder.stop();
+  cap.ui.status.textContent = cap.cancelled ? "Capture cancelled. Nothing was sent." : "Finishing transcription…";
+  await Promise.race([cap.done, new Promise(resolve => setTimeout(resolve, 10000))]);
+  stopMedia(cap);
+  if (capture === cap) capture = null;
+  const text = cap.text.trim();
+  if (cap.cancelled) { cap.ui.field.value = ""; return; }
+  if (!text) { cap.ui.status.textContent = "Nothing was heard. Try again, type it, or use manual entry."; return; }
+  cap.ui.field.value = text;
+  if (cap.target === "kitchen") {
+    const data = await dispatch({action: "kitchen_voice", text}, "voice");
+    if (data) cap.ui.field.value = "";
+    cap.ui.status.textContent = "";
+  } else {
+    cap.ui.status.textContent = "Released. The draft still needs human review and Confirm and send.";
+    captureText();
+  }
+}
+function beginHold(event, target = "order") {
   if (busy || uncertain || !session || holding) return;
+  if (target === "order" && !state?.orders[draftId]) { feedback("Start an order before capturing a read-back.", true); return; }
   event?.preventDefault();
   holding = true;
-  $("hold-talk").classList.add("holding");
-  $("capture-status").textContent = "Holding simulated capture. Release to build an editable menu-constrained draft; no audio is recording.";
+  const ui = captureUi(target);
+  ui.button.classList.add("holding");
+  if (voice.live) { ui.status.textContent = "Starting live mic…"; startLive(target).then(ok => { if (!ok) { holding = false; ui.button.classList.remove("holding"); } }); }
+  else ui.status.textContent = "Holding simulated capture. Release to build an editable menu-constrained draft; no audio is recording.";
 }
-function endHold(event, cancelled = false) {
+function endHold(event, cancelled = false, target = "order") {
   if (!holding) return;
   event?.preventDefault();
   holding = false;
-  $("hold-talk").classList.remove("holding");
+  captureUi(target).button.classList.remove("holding");
+  if (capture) {
+    capture.stopped = true;
+    capture.cancelled = cancelled;
+    finishLive(capture);
+    return;
+  }
+  if (voice.live) return;
   $("capture-status").textContent = cancelled ? "Capture cancelled. Nothing was sent." : "Released. The draft still needs human review and Confirm and send.";
   if (!cancelled) captureText();
 }
@@ -286,12 +382,22 @@ $("remove-line").addEventListener("click", () => {
 });
 $("confirm-send").addEventListener("click", () => { const order = state.orders[draftId]; dispatch({action: "confirm_send", order_id: order.id, revision: order.revision, human_confirmed: true}); });
 $("use-transcript").addEventListener("click", captureText);
-$("hold-talk").addEventListener("pointerdown", event => { beginHold(event); if (holding) $("hold-talk").setPointerCapture(event.pointerId); });
-$("hold-talk").addEventListener("pointerup", event => endHold(event));
-$("hold-talk").addEventListener("pointercancel", event => endHold(event, true));
-$("hold-talk").addEventListener("keydown", event => { if ([" ", "Enter"].includes(event.key) && !event.repeat) beginHold(event); if (event.key === "Escape") endHold(event, true); });
-$("hold-talk").addEventListener("keyup", event => { if ([" ", "Enter"].includes(event.key)) endHold(event); });
-$("hold-talk").addEventListener("blur", event => endHold(event, true));
+for (const [id, target] of [["hold-talk", "order"], ["kitchen-hold", "kitchen"]]) {
+  const button = $(id);
+  button.addEventListener("pointerdown", event => { beginHold(event, target); if (holding) button.setPointerCapture(event.pointerId); });
+  button.addEventListener("pointerup", event => endHold(event, false, target));
+  button.addEventListener("pointercancel", event => endHold(event, true, target));
+  button.addEventListener("keydown", event => { if ([" ", "Enter"].includes(event.key) && !event.repeat) beginHold(event, target); if (event.key === "Escape") endHold(event, true, target); });
+  button.addEventListener("keyup", event => { if ([" ", "Enter"].includes(event.key)) endHold(event, false, target); });
+  button.addEventListener("blur", event => endHold(event, true, target));
+}
+$("voice-login").addEventListener("submit", event => {
+  event.preventDefault();
+  voice.auth = btoa(`${$("voice-user").value}:${$("voice-pass").value}`);
+  $("voice-pass").value = "";
+  $("voice-login").hidden = true;
+  $("capture-status").textContent = "Live mic unlocked for this tab. Hold to talk.";
+});
 $("kitchen-voice-form").addEventListener("submit", async event => { event.preventDefault(); const data = await dispatch({action: "kitchen_voice", text: $("kitchen-transcript").value.trim()}, "voice"); if (data) $("kitchen-transcript").value = ""; });
 document.addEventListener("click", event => {
   const button = event.target.closest("[data-action]");
@@ -310,4 +416,5 @@ document.addEventListener("click", event => {
 });
 $("api-link").href = `${API}/docs`;
 refresh();
+loadVoiceStatus();
 setInterval(refresh, 2000);

@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "id": "dig-in",
+  "name": "DIG IN construction kitchen (demo menu)",
+  "items": [
+    {"id": "gravel_pit_tots", "name": "Gravel Pit Tots", "aliases": ["gravel pit tot", "gravel tots", "tots"],
+     "modifiers": [{"id": "no_bacon", "name": "No bacon", "aliases": ["without bacon", "hold the bacon"]}]},
+    {"id": "steel_beams", "name": "Steel Beams", "aliases": ["steel beam", "mozzarella sticks", "mozz sticks"],
+     "modifiers": [{"id": "no_marinara", "name": "No marinara", "aliases": ["without marinara", "hold the marinara"]}]},
+    {"id": "dynamite_poppers", "name": "Dynamite Poppers", "aliases": ["dynamite popper", "poppers", "jalapeno poppers"]},
+    {"id": "bulldozer", "name": "The Bulldozer", "aliases": ["bulldozer", "bulldozers", "smash burger", "smash burgers"],
+     "modifiers": [
+       {"id": "no_pickles", "name": "No pickles", "aliases": ["without pickles", "hold the pickles"]},
+       {"id": "no_onions", "name": "No onions", "aliases": ["without onions", "hold the onions"]},
+       {"id": "sauce_side", "name": "Sauce on side", "aliases": ["sauce on the side"]}
+     ]},
+    {"id": "backhoe", "name": "The Backhoe", "aliases": ["backhoe", "backhoes", "pulled pork", "pulled pork sandwich"],
+     "modifiers": [
+       {"id": "no_slaw", "name": "No slaw", "aliases": ["without slaw", "hold the slaw"]},
+       {"id": "no_pickles", "name": "No pickles", "aliases": ["without pickles", "hold the pickles"]}
+     ]},
+    {"id": "cement_mixer_mac", "name": "Cement Mixer Mac", "aliases": ["cement mixer", "cement mixers", "mac and cheese"]},
+    {"id": "dirt_site", "name": "Dirt Site", "aliases": ["dirt sites", "dirt pudding"]},
+    {"id": "wrecking_ball_brownie", "name": "Wrecking Ball Brownie", "aliases": ["wrecking ball", "wrecking balls", "wrecking ball brownies", "brownie", "brownies"]}
+  ]
+}

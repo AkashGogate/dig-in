@@ -7,7 +7,7 @@
 | FastAPI/Python/uv/static stack | Implemented, retained; no new platform/framework |
 | Two primary Server/Kitchen screens, `/api/v2` | Implemented local demo; shared backend state, exact retry IDs; not native/offline transactions |
 | Menu JSON/schema/store/matcher | Implemented deterministic aliases/modifier IDs, two menus; order name/kitchen-field snapshots; unknown imported fields remain null |
-| Voice draft and kitchen grammar | Simulated transcript input with real parser/flags; no live microphone/STT/noisy-hall validation |
+| Voice draft and kitchen grammar | Real parser/flags; optional live Deepgram nova-3 streaming (off unless `DIG_IN_VOICE_LIVE=1`), menu-alias keyterms, demo-password ticket, per-stream/daily/IP spend caps + `/api/v2/voice/usage`. Two approved live runs on a synthetic `say` clip only; no real mic/noisy-hall validation |
 | Current-revision human send | Implemented; unknown/table mismatch explicitly resolved, voice cannot submit; correction counts defined in product/API |
 | One-zone-per-physical-unit on ack | Implemented atomic all-K/FIFO retry/capacity/version rules; six simulated zones A–F |
 | Ready-only occupancy/removal | Implemented event rules using simulated producer evidence (1500ms/no hand); no image detector or verified UNO Q feed |
