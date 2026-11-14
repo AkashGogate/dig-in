@@ -1,7 +1,7 @@
 # Fly.io config (ARCHITECTURE.md #1: needs a persistent-connection host, not serverless).
 # Deploy with: fly launch --no-deploy (first time, picks up this file) then `fly deploy`.
 # Set the real secret before deploying: fly secrets set DEEPGRAM_API_KEY=...
-app = "kitchen-copilot"          # fly launch will prompt to rename if taken
+app = "frictionless-kitchen"
 primary_region = "iad"
 
 [build]
