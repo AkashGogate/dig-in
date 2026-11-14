@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import os
 import threading
 from uuid import uuid4
 
@@ -165,6 +166,23 @@ class Restaurant:
             "fallback_reason": reason,
         }
 
+    def _dietary_flag(self, order):
+        """Reminder to ask the table; blocks Confirm until an answer is recorded."""
+        if (
+            os.environ.get("DIG_IN_REQUIRE_DIETARY_CHECK") == "1"
+            and order.dietary_check == "not_asked"
+            and not any(f.code == "dietary_check_required" for f in order.flags)
+        ):
+            order.flags.append(
+                c.DraftFlag(
+                    id=f"{order.id}:dietary:{order.revision}",
+                    code="dietary_check_required",
+                    message="Ask the table about allergies or dietary needs, then record the answer.",
+                )
+            )
+        if order.dietary_check != "not_asked":
+            order.flags = [f for f in order.flags if f.code != "dietary_check_required"]
+
     def _apply(self, p):
         s, e = self.state, self._current
         if isinstance(p, c.StartOrder):
@@ -180,6 +198,7 @@ class Restaurant:
                 created_at=e.time,
             )
             s.orders[order.id] = order
+            self._dietary_flag(order)
             self._emit("draft.created", order.id, payload={"table_id": order.table_id})
             return {"order_id": order.id}
         if isinstance(p, c.EditDraft):
@@ -197,6 +216,12 @@ class Restaurant:
                 "Seat is not at this table",
             )
             order.table_id, order.lines = p.table_id, [self._line(x) for x in p.lines]
+            has_requests = any(x.requests.strip() for x in order.lines)
+            if has_requests:
+                order.dietary_check = "requests_recorded"
+            elif order.dietary_check == "requests_recorded":
+                order.dietary_check = "not_asked"  # notes removed: ask again
+            self._dietary_flag(order)
             order.revision += 1
             self._emit(
                 "draft.updated",
@@ -210,6 +235,17 @@ class Restaurant:
             )
             order = self._draft(p)
             parsed = parse_order(s.menu, p.text, order.table_id)
+            seats = s.tables[order.table_id].seats
+            for n, value in enumerate(parsed["lines"]):
+                if value.get("seat") is not None and value["seat"] not in seats:
+                    parsed["flags"].append(
+                        {
+                            "code": "seat_unknown",
+                            "message": f"Seat {value['seat']} is not at table {order.table_id}; set the seat manually.",
+                            "line_index": n,
+                        }
+                    )
+                    value["seat"] = None
             order.lines = [
                 self._line(c.LineInput(id=f"{e.event_id}:line:{n}", **value))
                 for n, value in enumerate(parsed["lines"])
@@ -221,6 +257,10 @@ class Restaurant:
                 "live_voice capture requires live voice enabled on this server",
             )
             order.capture_mode = p.capture_mode
+            if parsed.get("dietary_check"):
+                order.dietary_check = parsed["dietary_check"]
+            elif order.dietary_check == "requests_recorded":
+                order.dietary_check = "not_asked"  # re-capture replaced the noted lines
             order.flags = [
                 c.DraftFlag(
                     id=f"{e.event_id}:flag:{n}",
@@ -244,6 +284,7 @@ class Restaurant:
                         spoken_table_id=parsed.get("table_id"),
                     )
                 )
+            self._dietary_flag(order)
             order.revision += 1
             self._emit(
                 "draft.updated",
@@ -277,6 +318,17 @@ class Restaurant:
                 if p.resolution == "use_spoken_table":
                     self._validate_table(flag.spoken_table_id)
                     order.table_id = flag.spoken_table_id
+            elif flag.code == "dietary_check_required":
+                require(
+                    p.resolution == "asked_none_reported",
+                    "Record the table's answer: tap 'Asked: none' or add the dietary needs to a dish",
+                )
+                order.dietary_check = "none_reported"
+            elif flag.code in ("dietary_review", "dietary_unattached"):
+                require(
+                    p.resolution == "reviewed_keep_note",
+                    "Check the dietary note, edit the dish if needed, then confirm the note",
+                )
             else:
                 require(
                     p.resolution == "reviewed_remove_unknown",
@@ -343,6 +395,7 @@ class Restaurant:
                     "table_id": order.table_id,
                     "dishes": [d.model_dump(mode="json") for d in self._dishes(order)],
                     "corrected_draft_lines": order.corrected_draft_lines,
+                    "dietary_check": order.dietary_check,
                     "initial_voice_draft_line_count": order.initial_voice_draft_line_count,
                     "capture_mode": order.capture_mode,
                     "final_line_count": len(order.lines),
