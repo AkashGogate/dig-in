@@ -1,0 +1,44 @@
+# dig-in CV service config. Polygons are placeholders until you run the
+# calibrator (python -m cvsvc.calibrate --camera <id>), which rewrites them.
+cameras:
+  ingredient_cam: {source: 0, fps_target: 15, resolution: [1280, 720]}
+  plating_cam:    {source: 1, fps_target: 15, resolution: [1280, 720]}
+
+ingredient:
+  camera: ingredient_cam
+  settle_s: 1.0
+  occlusion_timeout_s: 6.0
+  snapshot_interval_s: 10
+  active_ticket_ttl_s: 120
+  large_delta_limit: 4
+  zones:
+    - id: Z1
+      ingredient: tomato_slice
+      polygon: [[100, 200], [400, 200], [400, 400], [100, 400]]
+      slots: {rows: 2, cols: 4}
+      diff_threshold: 28
+      occupied_min_fraction: 0.35
+    - id: Z2
+      ingredient: cheese_slice
+      polygon: [[500, 200], [800, 200], [800, 400], [500, 400]]
+      slots: {rows: 2, cols: 3}
+      diff_threshold: 28
+      occupied_min_fraction: 0.35
+
+plating:
+  camera: plating_cam
+  debounce_s: 0.8
+  snapshot_interval_s: 10
+  max_plates_per_bay: 4
+  bays:
+    - {id: A, polygon: [[50, 150], [410, 150], [410, 600], [50, 600]], min_plate_area_px: 6000, max_plate_area_px: 60000}
+    - {id: B, polygon: [[460, 150], [820, 150], [820, 600], [460, 600]], min_plate_area_px: 6000, max_plate_area_px: 60000}
+    - {id: C, polygon: [[870, 150], [1230, 150], [1230, 600], [870, 600]], min_plate_area_px: 6000, max_plate_area_px: 60000}
+
+sinks:
+  stdout: false
+  backend_url: null          # e.g. http://localhost:8002/cv/events (or set BACKEND_URL)
+  outbox_path: logs/outbox.jsonl
+
+events_log_path: logs/events.jsonl
+calibration_dir: config/calibration

@@ -1,0 +1,20 @@
+# dig-in kitchen backend config (BACKEND_SPEC.md section 2)
+cv_base_url: "http://localhost:8001"
+event_source: http            # http: CV POSTs to /cv/events | ws: backend subscribes to CV's /events
+readiness_mode: auto          # auto | confirm
+auto_serve_on_removal: true
+cv_stale_after_s: 10
+allocate_on: submit           # submit | cooking_complete
+bays: [A, B, C]
+db_path: data/kitchen.db
+schema_path: ../schema/events.schema.json
+zone_count_tolerance: 0
+
+zones:
+  Z1: {ingredient: tomato_slice, on_hand: 8}
+  Z2: {ingredient: cheese_slice, on_hand: 6}
+
+recipes:
+  burger: [{zone: Z1, qty: 2}, {zone: Z2, qty: 1}]
+  salad: [{zone: Z1, qty: 2}]
+  grilled_cheese: [{zone: Z2, qty: 2}]
