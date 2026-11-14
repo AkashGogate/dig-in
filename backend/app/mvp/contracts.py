@@ -190,6 +190,7 @@ class CaptureVoice(Model):
     order_id: str
     revision: int
     text: str = Field(min_length=1, max_length=2000)
+    capture_mode: Literal["mock_voice", "live_voice"] = "mock_voice"
 
 
 class ResolveFlag(Model):

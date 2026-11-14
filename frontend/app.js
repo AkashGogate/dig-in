@@ -226,12 +226,12 @@ function showView(name) {
   document.querySelectorAll("[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === name)));
   document.title = `Dig In · ${name}`;
 }
-async function captureText() {
+async function captureText(captureMode = "mock_voice") {
   const order = state?.orders[draftId];
   if (!order) { feedback("Start an order before capturing a read-back.", true); return; }
   const text = $("transcript").value.trim();
   if (!text) { feedback("Enter a mock transcript first. No microphone is connected.", true); return; }
-  const data = await dispatch({action: "capture_voice", order_id: order.id, revision: order.revision, text}, "voice");
+  const data = await dispatch({action: "capture_voice", order_id: order.id, revision: order.revision, text, capture_mode: captureMode}, "voice");
   if (data) $("transcript").value = "";
 }
 let voice = {live: false, authRequired: false, auth: null}, capture = null;
@@ -261,8 +261,8 @@ async function startLive(target) {
   const ui = captureUi(target);
   if (voice.authRequired && !voice.auth) {
     $("voice-login").hidden = false;
-    showView("server");
-    ui.status.textContent = "Enter the demo login to unlock the live mic.";
+    $("voice-user").focus();
+    ui.status.textContent = "Enter the demo login at the top of the page to unlock the live mic.";
     return false;
   }
   const cap = capture = {target, ui, text: "", stopped: false, cancelled: false};
@@ -317,7 +317,7 @@ async function finishLive(cap) {
     cap.ui.status.textContent = "";
   } else {
     cap.ui.status.textContent = "Released. The draft still needs human review and Confirm and send.";
-    captureText();
+    captureText("live_voice");
   }
 }
 function beginHold(event, target = "order") {
@@ -381,7 +381,7 @@ $("remove-line").addEventListener("click", () => {
   dispatch({action: "edit_draft", order_id: order.id, revision: order.revision, table_id: order.table_id, lines: order.lines.filter(line => line.id !== selected).map(editableLine)});
 });
 $("confirm-send").addEventListener("click", () => { const order = state.orders[draftId]; dispatch({action: "confirm_send", order_id: order.id, revision: order.revision, human_confirmed: true}); });
-$("use-transcript").addEventListener("click", captureText);
+$("use-transcript").addEventListener("click", () => captureText());
 for (const [id, target] of [["hold-talk", "order"], ["kitchen-hold", "kitchen"]]) {
   const button = $(id);
   button.addEventListener("pointerdown", event => { beginHold(event, target); if (holding) button.setPointerCapture(event.pointerId); });
@@ -396,7 +396,7 @@ $("voice-login").addEventListener("submit", event => {
   voice.auth = btoa(`${$("voice-user").value}:${$("voice-pass").value}`);
   $("voice-pass").value = "";
   $("voice-login").hidden = true;
-  $("capture-status").textContent = "Live mic unlocked for this tab. Hold to talk.";
+  feedback("Live mic unlocked for this tab. Hold to talk.");
 });
 $("kitchen-voice-form").addEventListener("submit", async event => { event.preventDefault(); const data = await dispatch({action: "kitchen_voice", text: $("kitchen-transcript").value.trim()}, "voice"); if (data) $("kitchen-transcript").value = ""; });
 document.addEventListener("click", event => {

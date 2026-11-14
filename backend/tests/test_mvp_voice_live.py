@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+import test_mvp_core as core
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
@@ -14,6 +15,7 @@ from app.mvp.menu import load_menu
 from app.mvp.voice import parse_kitchen, parse_order
 from app.server import app
 
+demo = core.demo  # reuse the core MVP fixture
 DIG_IN = Path(__file__).resolve().parents[1] / "fixtures" / "menus" / "dig-in.json"
 
 
@@ -176,7 +178,9 @@ def test_voice_status_reports_live_mode(live):
 def test_real_deepgram_transcript_with_spelled_numbers_parses_cleanly():
     """Regression from the first live run: nova-3 returned 'Table four. Two bulldozers.'"""
     menu = load_menu(DIG_IN)
-    parsed = parse_order(menu, "Table four. Two bulldozers. Hold the pickles. And one dirt site.", "4")
+    parsed = parse_order(
+        menu, "Table four. Two bulldozers. Hold the pickles. And one dirt site.", "4"
+    )
     assert parsed["table_id"] == "4" and not parsed["flags"]
     assert parsed["lines"] == [
         {"menu_id": "bulldozer", "quantity": 2, "modifiers": ["no_pickles"]},
@@ -184,3 +188,56 @@ def test_real_deepgram_transcript_with_spelled_numbers_parses_cleanly():
     ]
     assert parse_kitchen(menu, "Heard, table four.")["table_id"] == "4"
     assert parse_kitchen(menu, "Start table four bulldozer.")["action"] == "start_dish"
+
+
+def _voice_capture(demo, mode=None):
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    payload = {
+        "action": "capture_voice",
+        "order_id": key,
+        "revision": 1,
+        "text": "Table 1: one salmon",
+    }
+    if mode:
+        payload["capture_mode"] = mode
+    return key, core.send(demo, payload, source="voice")
+
+
+def test_capture_mode_defaults_to_mock_and_live_label_needs_live_server(
+    demo, monkeypatch
+):
+    monkeypatch.delenv("DIG_IN_VOICE_LIVE", raising=False)
+    key, response = _voice_capture(demo)
+    assert response.status_code == 200
+    assert core.snapshot(demo)["orders"][key]["capture_mode"] == "mock_voice"
+    _, refused = _voice_capture(demo, "live_voice")
+    assert refused.status_code == 409  # browser can't mislabel typed text as live
+
+
+def test_live_capture_is_labeled_live_in_state_and_analytics(demo, live):
+    key, response = _voice_capture(demo, "live_voice")
+    assert response.status_code == 200
+    assert core.snapshot(demo)["orders"][key]["capture_mode"] == "live_voice"
+    events = [e for e in demo[2].snapshot()["events"] if e["type"] == "draft.updated"]
+    assert events[-1]["payload"]["capture_mode"] == "live_voice"
+
+
+def test_kitchen_voice_with_spoken_numbers_acknowledges_and_starts(demo):
+    key = core.order(demo, table="3")
+    heard = core.ok(
+        demo,
+        {"action": "kitchen_voice", "text": "Heard, table three."},
+        actor="cook-1",
+        source="voice",
+    )
+    assert not heard["result"].get("flags")
+    assert core.snapshot(demo)["orders"][key]["acknowledged_at"] is not None
+    core.ok(
+        demo,
+        {"action": "kitchen_voice", "text": "Start table three salmon."},
+        actor="cook-1",
+        source="voice",
+    )
+    assert core.units(demo, key)[0]["started_at"] is not None

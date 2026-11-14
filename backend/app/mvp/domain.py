@@ -17,6 +17,7 @@ from app.coordination.rules import Conflict, require
 from app.mvp import contracts as c
 from app.mvp.fixtures import seed
 from app.mvp.voice import parse_kitchen, parse_order
+from app.mvp.voice_live import live_enabled
 
 
 class Restaurant:
@@ -215,7 +216,11 @@ class Restaurant:
             ]
             order.voice_baseline = copy.deepcopy(order.lines)
             order.initial_voice_draft_line_count = len(order.lines)
-            order.capture_mode = "mock_voice"  # no live STT wired in this scaffold
+            require(
+                p.capture_mode != "live_voice" or live_enabled(),
+                "live_voice capture requires live voice enabled on this server",
+            )
+            order.capture_mode = p.capture_mode
             order.flags = [
                 c.DraftFlag(
                     id=f"{e.event_id}:flag:{n}",
