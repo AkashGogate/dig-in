@@ -45,14 +45,28 @@ uv run python -m eval.run_eval --mode mock
 
 Mock eval feeds ground-truth transcripts and proves scoring/plumbing, not microphone quality. The harness writes the checked-in scorecard; preserve provenance and do not claim regenerated mock scores as speech improvement. Legacy voice lab logging remains separate from v2 capture privacy. The optional Pipecat extra is outside the default checks.
 
-## DIG IN voice eval
+## DIG IN voice eval (Coval-style harness)
 
-Server orders and Kitchen callouts, each clean / kitchen noise bed / overlapping second speaker (18 synthetic `say` clips, 52s, `audio-samples/dig-in/`). From `backend/`:
+`backend/eval/dig_in/` mirrors how [Coval](https://docs.coval.dev/concepts/simulations/overview) structures voice-agent tests, so the suite can move onto real Coval later without changing what it measures:
+
+| Coval concept | Here | Notes |
+| --- | --- | --- |
+| Persona (how the caller sounds) | `personas.json` | `standard_server`, `rushed_server`, `line_cook_noise` (5 dB SNR), `interrupted` (overlapping second speaker), `accented`, `phone_quality` (8 kHz). Voice, rate, background, SNR, overlap, sample rate. |
+| Test set (what they say + expected result) | `test_sets/*.json` | `server_orders` (8 cases: quantities, modifiers, mac-and-cheese "and", table mismatch, misheard name, seat + allergy, "no allergies", homophone table), `kitchen_callouts` (9 cases run end to end against seeded tickets), `safety_regressions` (7 real nova-3 transcripts from the first live run, fixed text, never billed). |
+| Metrics (pass/fail) | `metrics.py` | `safety_outcome` exact / flagged / **wrong** (hard gate: 0 wrong), exact parse, table accuracy, item precision/recall, quantity, modifier, seat/dietary capture, flag correctness; live only: WER, STT latency, menu-term hit rate. |
+| Run / simulation | `run.py`, `simulate.py` | A run = test sets x personas x mode with a fixed agent config (recorded in the run). Every persona gets the same cases, so differences come only from audio. Writes `runs/<run_id>.json` + `.md`; `--baseline` lists cases that got worse. |
+
+Outcome meanings: **exact** = intended result; **flagged** = Confirm blocked or the cook asked to tap (safe, a human steps in); **wrong** = accepted silently with the wrong content, or the kitchen acknowledged/started the wrong ticket or dish. Kitchen cases seed real tickets in `Restaurant` and diff state, so `wrong` is a real wrong state change, not just a parse mismatch. The eval seeds tables 1-9; the demo fixture only configures tables 1-3.
+
+From `backend/`:
 
 ```bash
-uv run python -m audio_gen.generate_dig_in            # macOS only; regenerates clips + manifest
-uv run python -m eval.run_dig_in_eval --mode mock     # free: ground-truth text through the v2 parser; plumbing proof, not speech accuracy
-uv run python -m eval.run_dig_in_eval --mode deepgram # BILLABLE: prints seconds/cost and refuses without --confirm-billable
+uv run python -m eval.dig_in.run                                        # mock, free: scripted text through the real parser/domain + safety regressions
+uv run python -m eval.dig_in.run --baseline eval/dig_in/runs/baseline-mock.json   # same, fail on any case that got worse
+uv run python -m eval.dig_in.run --mode deepgram                         # renders audio (macOS say, free, cached), prints seconds/cost, REFUSES
+uv run --env-file .env python -m eval.dig_in.run --mode deepgram --test-set server_orders --test-set kitchen_callouts --persona standard_server --confirm-billable
 ```
 
-Live scoring uses the same nova-3/keyterm/`mip_opt_out` params as the live adapter. Run it only with explicit approval for that run, then add `--confirm-billable` (needs `DEEPGRAM_API_KEY`). The scorecard (`audio-samples/dig-in/scorecard.md`) states its mode; synthetic TTS is not a real kitchen.
+Mock mode is persona-independent (one `scripted_text` pseudo-persona) and proves plumbing and scoring, not speech accuracy. Deepgram mode uses the same params as the live mic adapter (nova-3, en, smart_format off, punctuate, `mip_opt_out`, menu keyterms) and refuses unless `--confirm-billable` is passed and the total audio is under `--max-audio-seconds` (default 120). **Run it only with explicit approval for that specific run.** Full matrix: 102 simulations, about 225 s of audio (about USD 0.029 at the 0.0077/min estimate; needs `--max-audio-seconds 240`). Generated audio lives in `audio-samples/dig-in/generated/` (gitignored, regenerable); routine run output in `eval/dig_in/runs/` is gitignored except the committed mock baseline and `20261114-first-live-deepgram.json` (first live run: 8 exact / 10 flagged / 0 wrong; rescored with the current parser: 10 / 8 / 0). The old `python -m eval.run_dig_in_eval` command still works. Synthetic TTS is not a real kitchen: only a recorded noisy-room run establishes real accuracy.
+
+Moving to hosted Coval later: personas map to Coval personas (voice, background, interruption), each test-set case becomes a Coval test case (utterance + expected result), and `metrics.py` functions become custom metrics; keep the 0-wrong gate and the safety regressions as a deterministic transcript test set.

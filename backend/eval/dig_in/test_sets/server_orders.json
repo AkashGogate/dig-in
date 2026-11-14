@@ -1,0 +1,43 @@
+{
+  "id": "server_orders",
+  "kind": "scripted",
+  "description": "Server read-backs that build a draft. Audio is rendered per persona; mock mode feeds the scripted text.",
+  "cases": [
+    {"id": "two_dishes_modifier", "flow": "server", "tags": ["quantity", "modifier"],
+     "utterance": "Table four, two bulldozers, hold the pickles, and one dirt site", "selected_table_id": "4",
+     "expected_any": [{"table_id": "4", "lines": [
+       {"menu_id": "bulldozer", "quantity": 2, "modifiers": ["no_pickles"]},
+       {"menu_id": "dirt_site", "quantity": 1, "modifiers": []}], "flag_codes": []}]},
+    {"id": "internal_and", "flow": "server", "tags": ["and_in_name"],
+     "utterance": "Table two, one mac and cheese and three tots", "selected_table_id": "2",
+     "expected_any": [{"table_id": "2", "lines": [
+       {"menu_id": "cement_mixer_mac", "quantity": 1, "modifiers": []},
+       {"menu_id": "gravel_pit_tots", "quantity": 3, "modifiers": []}], "flag_codes": []}]},
+    {"id": "table_mismatch", "flow": "server", "tags": ["table_mismatch", "modifier"],
+     "utterance": "Table three, one backhoe without slaw", "selected_table_id": "1",
+     "expected_any": [{"table_id": "3", "lines": [
+       {"menu_id": "backhoe", "quantity": 1, "modifiers": ["no_slaw"]}], "flag_codes": ["table_mismatch"]}]},
+    {"id": "misheard_name", "flow": "server", "tags": ["similarity_candidate"],
+     "utterance": "Table one, one bull dozer", "selected_table_id": "1",
+     "expected_any": [
+       {"table_id": "1", "lines": [], "flag_codes": ["no_items", "unknown_item"], "candidates": ["bulldozer"]},
+       {"table_id": "1", "lines": [{"menu_id": "bulldozer", "quantity": 1, "modifiers": []}], "flag_codes": []}]},
+    {"id": "seat_and_allergy", "flow": "server", "tags": ["seat", "dietary"],
+     "utterance": "Table two, one bulldozer, seat two, allergy to gluten", "selected_table_id": "2",
+     "expected_any": [{"table_id": "2", "lines": [
+       {"menu_id": "bulldozer", "quantity": 1, "modifiers": [], "seat": 2, "requests": "allergy to gluten"}],
+       "flag_codes": ["dietary_review"], "dietary_check": "requests_recorded"}]},
+    {"id": "no_allergies", "flow": "server", "tags": ["dietary"],
+     "utterance": "Table two, one bulldozer and no allergies", "selected_table_id": "2",
+     "expected_any": [{"table_id": "2", "lines": [
+       {"menu_id": "bulldozer", "quantity": 1, "modifiers": []}], "flag_codes": [], "dietary_check": "none_reported"}]},
+    {"id": "two_modifiers", "flow": "server", "tags": ["modifier"],
+     "utterance": "Table one, one bulldozer, no onions, sauce on the side", "selected_table_id": "1",
+     "expected_any": [{"table_id": "1", "lines": [
+       {"menu_id": "bulldozer", "quantity": 1, "modifiers": ["no_onions", "sauce_side"]}], "flag_codes": []}]},
+    {"id": "homophone_table", "flow": "server", "tags": ["homophone"],
+     "utterance": "Table for, one steel beams", "selected_table_id": "4",
+     "expected_any": [{"table_id": "4", "lines": [
+       {"menu_id": "steel_beams", "quantity": 1, "modifiers": []}], "flag_codes": []}]}
+  ]
+}

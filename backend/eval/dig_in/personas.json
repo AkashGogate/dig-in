@@ -1,0 +1,16 @@
+[
+  {"id": "standard_server", "description": "Clear speech at a normal pace, quiet room.",
+   "say_voice": "Samantha", "rate_wpm": 180, "background": "none", "snr_db": null, "overlap": null, "sample_rate": 16000},
+  {"id": "rushed_server", "description": "Same voice, rushing during a busy service.",
+   "say_voice": "Samantha", "rate_wpm": 260, "background": "none", "snr_db": null, "overlap": null, "sample_rate": 16000},
+  {"id": "line_cook_noise", "description": "Fan rumble and pan clatter behind the speaker at 5 dB SNR.",
+   "say_voice": "Samantha", "rate_wpm": 180, "background": "kitchen_noise", "snr_db": 5, "overlap": null, "sample_rate": 16000},
+  {"id": "interrupted", "description": "A second person talks over the second half of the call.",
+   "say_voice": "Samantha", "rate_wpm": 180, "background": "none", "snr_db": null,
+   "overlap": {"phrase": "can somebody grab a refill for table nine", "say_voice": "Daniel", "offset_fraction": 0.4, "gain": 0.6},
+   "sample_rate": 16000},
+  {"id": "accented", "description": "Indian English voice (falls back to Samantha if the voice is not installed).",
+   "say_voice": "Rishi", "rate_wpm": 180, "background": "none", "snr_db": null, "overlap": null, "sample_rate": 16000},
+  {"id": "phone_quality", "description": "Band-limited 8 kHz line, like a cheap headset or phone.",
+   "say_voice": "Samantha", "rate_wpm": 180, "background": "none", "snr_db": null, "overlap": null, "sample_rate": 8000}
+]

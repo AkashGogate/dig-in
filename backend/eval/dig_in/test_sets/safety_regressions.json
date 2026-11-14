@@ -1,0 +1,36 @@
+{
+  "id": "safety_regressions",
+  "kind": "transcript",
+  "description": "Deterministic regressions seeded from REAL nova-3 transcripts of the first approved live run (2026-11-14). Fixed text, no audio, never billed. Expected = what the speaker meant; the gate is exact or safely flagged, never silently wrong.",
+  "cases": [
+    {"id": "merged_number_table_31", "flow": "server", "tags": ["smart_format_merge"], "allowed_outcomes": ["exact", "flagged"],
+     "heard": "Table 31 backhoe without slaw", "utterance": "Table three, one backhoe without slaw", "selected_table_id": "3",
+     "expected_any": [{"table_id": "3", "lines": [{"menu_id": "backhoe", "quantity": 1, "modifiers": ["no_slaw"]}], "flag_codes": []}]},
+    {"id": "merged_number_table_11", "flow": "server", "tags": ["smart_format_merge"], "allowed_outcomes": ["exact", "flagged"],
+     "heard": "Table 11 bulldozer", "utterance": "Table one, one bulldozer", "selected_table_id": "1",
+     "expected_any": [{"table_id": "1", "lines": [{"menu_id": "bulldozer", "quantity": 1, "modifiers": []}], "flag_codes": []}]},
+    {"id": "overlap_appended_to_order", "flow": "server", "tags": ["overlap"], "allowed_outcomes": ["exact", "flagged"],
+     "heard": "Table two one mac and cheese and three tots table nine", "utterance": "Table two, one mac and cheese and three tots", "selected_table_id": "2",
+     "expected_any": [{"table_id": "2", "lines": [
+       {"menu_id": "cement_mixer_mac", "quantity": 1, "modifiers": []},
+       {"menu_id": "gravel_pit_tots", "quantity": 3, "modifiers": []}], "flag_codes": []}]},
+    {"id": "heard_misheard_as_pert", "flow": "kitchen", "tags": ["noise"], "allowed_outcomes": ["exact", "flagged"],
+     "heard": "PERT, table four.", "utterance": "Heard, table four",
+     "context": [{"label": "T4", "table_id": "4", "lines": [{"menu_id": "bulldozer", "quantity": 1}], "state": "submitted"}],
+     "expected_any": [{"acknowledged": ["T4"], "started": []}]},
+    {"id": "table_for_homophone", "flow": "kitchen", "tags": ["homophone"], "allowed_outcomes": ["exact", "flagged"],
+     "heard": "Start table for bulldozer", "utterance": "Start table four bulldozer",
+     "context": [{"label": "T4", "table_id": "4", "lines": [{"menu_id": "bulldozer", "quantity": 1}], "state": "acknowledged"}],
+     "expected_any": [{"acknowledged": [], "started": ["T4:bulldozer"]}]},
+    {"id": "overlap_after_heard", "flow": "kitchen", "tags": ["overlap"], "allowed_outcomes": ["exact", "flagged"],
+     "heard": "Heard table four. Grab a refill for table nine.", "utterance": "Heard, table four",
+     "context": [
+       {"label": "T4", "table_id": "4", "lines": [{"menu_id": "bulldozer", "quantity": 1}], "state": "submitted"},
+       {"label": "T9", "table_id": "9", "lines": [{"menu_id": "dirt_site", "quantity": 1}], "state": "submitted"}],
+     "expected_any": [{"acknowledged": ["T4"], "started": []}]},
+    {"id": "overlap_after_start", "flow": "kitchen", "tags": ["overlap"], "allowed_outcomes": ["exact", "flagged"],
+     "heard": "Start table four bulldozer grab a refill for table nine", "utterance": "Start table four bulldozer",
+     "context": [{"label": "T4", "table_id": "4", "lines": [{"menu_id": "bulldozer", "quantity": 1}], "state": "acknowledged"}],
+     "expected_any": [{"acknowledged": [], "started": ["T4:bulldozer"]}]}
+  ]
+}
