@@ -17,7 +17,8 @@ Current decision date: 2026-11-14. Product intent is [PROJECT_SPEC](../PROJECT_S
 | Databricks a fourth lane | Analyze service waits and voice/camera failures through canonical events, batch outbox and simulated data. Never live operational authority |
 | No raw capture analytics | Preserve structured facts/counts, source identity/time and simulation/outcome labels; no audio/transcripts/video |
 | Explicit breaking version v2 | New lanes use `/api/v2`; frozen `/api/v1`/legacy UI isolated, no automatic migration/dual-write |
-| Deferred | Positioning, tasks/helpers/priority, POS/payments, courses, spoken responses; retained code does not put them back into MVP |
+| Service coordination follow-up | Distinct Server/Kitchen journeys, canonical dish lineup, targeted kitchen updates and requested role-scoped summaries with explicit display/Print/Speak/Stop. Supersedes blanket task/spoken-response deferral only for this bounded feature |
+| Deferred | Positioning, independent task/helper/priority engine, POS/payments, courses and general conversational spoken responses; retained v1 code does not put them back into MVP |
 | Kitchen-only views | No dining-room camera, faces/guest tracking or raw video retention |
 
 Still provisional: individual owner names, proposed screen split, real kitchen mic/hold-to-talk details, 60-second escalation, workspace edition/warehouse/quota/Zerobus and actual hardware/noise performance. No live speech/CV/cloud integration or remote push/publication is implied. The original brief’s Free Edition claims are unverified inputs, not implemented guarantees.

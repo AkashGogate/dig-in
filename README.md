@@ -29,7 +29,7 @@ cd backend
 DIG_IN_MENU_PATH=fixtures/menus/second.json uv run uvicorn app.server:app --port 8000
 ```
 
-Unknown kitchen fields in that second menu remain null. PDF/photo/model import is an interface/status stub, not a live importer. Hold/release on the server screen is an explicitly labeled **text-transcription simulator**, not verified microphone/STT. Camera controls simulate stable occupancy/removal, not image inference.
+Unknown kitchen fields in that second menu remain null. [Mutable menu pipeline](docs/MENU_PIPELINE.md) supports JSON/CSV/item-per-line input, automatic vectors, reviewed runtime activation, and pinned ticket revisions. **Menu setup** lets a demo lead upload/paste, automatically encode, review and activate a menu in the app. `scripts.menu_tool` also prepares canonical JSON plus vectors offline; `fixtures/menus/dig-in.json` matches the existing eight-dish artwork. Default vectors are lexical hashing; an opt-in semantic API adapter is implemented with mocked tests, not live validation. PDF/PNG/JPEG extraction and editable correction are implemented through [local OCR](docs/MENU_EXTRACTION.md). See the [agent task map](docs/AGENT_TASK_MAP.md) and [teammate integration guide](docs/INTEGRATION_GUIDE.md). Hold/release on the server screen is an explicitly labeled **text-transcription simulator**, not verified microphone/STT. Camera controls simulate stable occupancy/removal, not image inference.
 
 ## Check and demo
 
@@ -60,3 +60,10 @@ Follow the [six-beat demo and failure probes](docs/DEMO_PLAN.md). [Analytics lan
 `/api/v2` is authoritative for new work. `/api/v1` and [coordination-v1.html](http://localhost:5173/coordination-v1.html) remain a separate legacy demo; [legacy.html](http://localhost:5173/legacy.html) retains the original voice lab. Orders do not synchronize between versions. See [API](docs/API.md) for explicit migration semantics.
 
 Local commits/docs are not automatically on other computers. Use separate clones/task branches and [the documented Git handoff](docs/DEVELOPMENT.md). No remote push/publication or live payment is part of this checkpoint.
+
+
+Server and Kitchen now have a documented [service coordination extension](docs/SERVICE_COORDINATION.md):
+canonical dish lineup, targeted kitchen-to-server updates and requested role-specific
+summaries, with explicit device Print and optional Speak/Stop. Menu setup continues
+to supply shared menu revisions. [Agent task map](docs/AGENT_TASK_MAP.md) and
+[integration guide](docs/INTEGRATION_GUIDE.md) identify extension seams and reviews.

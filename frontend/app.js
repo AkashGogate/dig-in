@@ -8,25 +8,31 @@ const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp
 const uid = () => globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const human = value => String(value || "").replaceAll("_", " ");
 let state = null, actor = null, session = null, busy = false, uncertain = null;
-let draftId = "", draftSignature = "", menuSignature = "", view = "server", holding = false;
+let menuSetup = null, serviceCoordination = null, backendOnline = false;
+let draftId = "", draftSignature = "", menuSignature = "", editorMenuSignature = "", view = "server", holding = false;
 
 function feedback(message, error = false) {
   $("feedback").textContent = message;
   $("feedback").classList.toggle("error", error);
 }
 function connected(ok) {
+  backendOnline = ok;
+  menuSetup?.sync();
+  serviceCoordination?.sync();
   $("connection").textContent = ok ? "Shared backend connected" : "Backend unavailable · UNSYNCED";
   $("connection").style.color = ok ? "var(--green)" : "var(--danger)";
 }
-async function request(path, options = {}) {
+async function request(path, {timeoutMs = 10000, ...options} = {}) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${API}${path}`, {...options, signal: controller.signal});
     const data = await response.json();
     if (!response.ok) {
       const error = new Error(`${response.status}: ${typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data)}`);
       error.rejected = true;
+      error.status = response.status;
+      error.detail = typeof data.detail === "string" ? data.detail : "Check the input fields and try again";
       throw error;
     }
     connected(true);
@@ -40,6 +46,8 @@ function setBusy(value) {
   busy = value;
   document.querySelectorAll("[data-command]").forEach(button => button.disabled = value || !session || Boolean(uncertain));
   $("retry").disabled = value;
+  menuSetup?.sync();
+  serviceCoordination?.sync();
   const order = state?.orders[draftId];
   $("confirm-send").disabled = value || !session || Boolean(uncertain) || !order?.lines.length || Boolean(order?.flags?.length);
 }
@@ -56,17 +64,19 @@ async function dispatch(payload, source = "tap", existing = null) {
     state = data.state;
     if (payload.action === "start_order") draftId = data.result.order_id;
     render();
+    menuSetup?.accepted(data, payload);
     const flags = data.result?.flags;
     if (Array.isArray(flags) && flags.length) {
       const message = flags.map(flag => typeof flag === "string" ? flag : flag.message || flag.code).join(" ");
       feedback(`Clarification needed: ${message}`, true);
       if (payload.action === "kitchen_voice") $("kitchen-clarification").textContent = message;
     } else {
-      feedback(payload.action === "confirm_send" ? "Order submitted. Kitchen acknowledgment is a separate next step." : "Change accepted by the shared backend.");
+      feedback(payload.action === "confirm_send" ? "Order submitted. Kitchen acknowledgment is a separate next step." : payload.action === "activate_menu" ? "Menu activated for new orders. Open drafts and tickets keep their original menu." : "Change accepted by the shared backend.");
       if (payload.action === "kitchen_voice") $("kitchen-clarification").textContent = "Kitchen phrase accepted. Check the exact ticket and dish below.";
     }
     return data;
   } catch (error) {
+    if (error.rejected) menuSetup?.rejected(payload, error);
     if (!error.rejected) { uncertain = envelope; $("retry-bar").hidden = false; }
     feedback(error.rejected ? `${error.message}. Refresh and review the shared state before trying again.` : "Connection interrupted. The event may have arrived. Reconnect, then Retry reuses its exact ID and timestamp.", true);
     return null;
@@ -86,10 +96,13 @@ function fillSelect(id, options, placeholder) {
   element.innerHTML = (placeholder === undefined ? "" : `<option value="">${esc(placeholder)}</option>`) + options.map(([value, text]) => `<option value="${esc(value)}">${esc(text)}</option>`).join("");
   if ([...element.options].some(option => option.value === before)) element.value = before;
 }
-function items() { return state?.menu?.items || []; }
+function menuForOrder(orderId = draftId) {
+  return state?.menus?.[state?.orders?.[orderId]?.menu_revision] || state?.menu;
+}
+function items() { return menuForOrder()?.items || []; }
 function menuItem(id) { return items().find(item => item.id === id); }
-function modifierNames(menuId, ids = []) {
-  const modifiers = menuItem(menuId)?.modifiers || [];
+function modifierNames(menuId, ids = [], orderId = draftId) {
+  const modifiers = menuForOrder(orderId)?.items.find(item => item.id === menuId)?.modifiers || [];
   return ids.map(id => modifiers.find(modifier => modifier.id === id)?.name || id);
 }
 function dishesFor(orderId) { return Object.values(state.dishes).filter(dish => dish.order_id === orderId); }
@@ -115,11 +128,7 @@ function render() {
     fillSelect("start-table", tables);
     fillSelect("draft-table", tables);
     fillSelect("actor", Object.values(state.actors).map(person => [person.id, `${person.name} · ${person.role}`]));
-    fillSelect("menu", items().map(item => [item.id, item.name]));
-    refreshModifiers();
-    const examples = items().slice(0, 2).map(item => `one ${item.aliases?.[0] || item.name}`).join(" and ");
-    $("transcript").placeholder = `Table ${tables[0]?.[0] || "N"}: ${examples || "one configured menu item"}`;
-    $("menu-summary").innerHTML = items().map(item => `<div class="menu-item"><strong>${esc(item.name)}</strong><p>${item.price_cents == null ? "Price unknown" : new Intl.NumberFormat("en-US", {style: "currency", currency: "USD"}).format(item.price_cents / 100)}</p><p class="note">${item.station ? esc(item.station) : "Station unknown"} · ${item.typical_minutes == null ? "Typical time unknown" : `Typical ${esc(item.typical_minutes)} min`}</p></div>`).join("");
+    $("menu-summary").innerHTML = state.menu.items.map(item => `<div class="menu-item"><strong>${esc(item.name)}</strong>${item.description ? `<p>${esc(item.description)}</p>` : ""}<p>${item.price_cents == null ? "Price unknown" : new Intl.NumberFormat("en-US", {style: "currency", currency: "USD"}).format(item.price_cents / 100)}</p><p class="note">${item.station ? esc(item.station) : "Station unknown"} · ${item.typical_minutes == null ? "Typical time unknown" : `Typical ${esc(item.typical_minutes)} min`}</p></div>`).join("");
   }
   renderDraft();
   updateUnlessEditing("server-orders", renderServerOrders);
@@ -139,10 +148,18 @@ function renderDraft() {
   const order = state.orders[draftId];
   $("editor").hidden = !order;
   if (!order) { $("draft-summary").innerHTML = '<p class="empty">Start with a table, then enter dishes manually or use the read-back simulator.</p>'; draftSignature = ""; return; }
-  const signature = JSON.stringify(order);
+  const editorSignature = order.menu_revision || state.menu_revision;
+  if (editorMenuSignature !== editorSignature) {
+    editorMenuSignature = editorSignature;
+    fillSelect("menu", items().map(item => [item.id, item.name]));
+    refreshModifiers();
+    const examples = items().slice(0, 2).map(item => `one ${item.aliases?.[0] || item.name}`).join(" and ");
+    $("transcript").placeholder = `Table ${order.table_id}: ${examples || "one configured menu item"}`;
+  }
+  const signature = JSON.stringify([order, state.menu_revision]);
   if (signature === draftSignature) return;
   draftSignature = signature;
-  $("draft-summary").innerHTML = `<div class="draft-title"><strong>Table ${esc(order.table_id)}</strong><span class="status">Draft · revision ${order.revision}</span></div>${lineList(order)}<p class="note">Ticket ${esc(order.id)} · corrections measured at submission</p>`;
+  $("draft-summary").innerHTML = `<div class="draft-title"><strong>Table ${esc(order.table_id)}</strong><span class="status">Draft · revision ${order.revision}</span></div>${lineList(order)}<p class="note">Ticket ${esc(order.id)} · corrections measured at submission${order.menu_revision !== state.menu_revision ? " · This draft keeps its original menu; new orders use the current menu." : ""}</p>`;
   $("draft-table").value = order.table_id || "";
   fillSelect("edit-line", order.lines.map(line => [line.id, `${line.quantity} × ${line.item_name || menuItem(line.menu_id)?.name || line.menu_id}`]), "New dish line");
   $("draft-flags").innerHTML = (order.flags || []).map(flagMarkup).join("");
@@ -151,7 +168,7 @@ function renderDraft() {
   $("confirmation-blocker").textContent = order.flags?.length ? "Submission blocked: resolve each table/menu flag above, then review the draft." : !count ? "Add at least one dish before sending." : "Ready for human review. Voice never submits.";
 }
 function lineList(order) {
-  return order.lines.length ? order.lines.map(line => `<div class="order-line"><div><strong>${line.quantity} × ${esc(line.item_name || menuItem(line.menu_id)?.name || line.menu_id)}</strong><small>${line.seat ? `Seat ${line.seat} · ` : ""}${esc(modifierNames(line.menu_id, line.modifiers).join(", ") || "No modifiers")}</small>${line.requests ? `<small><strong>Guest request:</strong> ${esc(line.requests)}</small>` : ""}</div></div>`).join("") : '<p class="empty">No dishes entered. Nothing has been sent.</p>';
+  return order.lines.length ? order.lines.map(line => `<div class="order-line"><div><strong>${line.quantity} × ${esc(line.item_name || menuItem(line.menu_id)?.name || line.menu_id)}</strong><small>${line.seat ? `Seat ${line.seat} · ` : ""}${esc((line.modifier_names || modifierNames(line.menu_id, line.modifiers, order.id)).join(", ") || "No modifiers")}</small>${line.requests ? `<small><strong>Guest request:</strong> ${esc(line.requests)}</small>` : ""}</div></div>`).join("") : '<p class="empty">No dishes entered. Nothing has been sent.</p>';
 }
 function flagMarkup(flag) {
   const mismatch = flag.code === "table_mismatch";
@@ -196,7 +213,7 @@ function dishMarkup(dish, kitchen) {
     if (["queued", "started"].includes(dish.stage) && dish.zone_id) controls += `<button class="small" data-action="ready-dish" data-id="${esc(dish.id)}" data-command>Tap ready</button>`;
   }
   if (!kitchen && dish.stage === "ready") controls += `<button class="small primary" data-action="pickup-dish" data-id="${esc(dish.id)}" data-command>Confirm plate pickup</button>`;
-  return `<div class="dish"><div><p><strong>${esc(dish.item_name || menuItem(dish.menu_id)?.name || dish.menu_id)}</strong>${dish.seat ? ` · seat ${dish.seat}` : ""}</p><small>Unit ${esc(dish.id)} · ${dish.zone_id ? `Zone ${esc(dish.zone_id)}` : "No zone assigned"}${dish.station ? ` · ${esc(dish.station)}` : " · station unknown"}</small><p class="dish-timer">${esc(elapsed(dish.started_at))} · ${dish.typical_minutes == null ? "typical time unknown" : `typical ${esc(dish.typical_minutes)} min`}</p>${dish.modifiers?.length ? `<small>${esc(modifierNames(dish.menu_id, dish.modifiers).join(", "))}</small>` : ""}${dish.requests ? `<small><strong>Guest request:</strong> ${esc(dish.requests)}</small>` : ""}<span class="dish-stage">${esc(human(dish.stage))}</span></div><div class="actions">${controls}</div></div>`;
+  return `<div class="dish"><div><p><strong>${esc(dish.item_name || menuItem(dish.menu_id)?.name || dish.menu_id)}</strong>${dish.seat ? ` · seat ${dish.seat}` : ""}</p><small>Unit ${esc(dish.id)} · ${dish.zone_id ? `Zone ${esc(dish.zone_id)}` : "No zone assigned"}${dish.station ? ` · ${esc(dish.station)}` : " · station unknown"}</small><p class="dish-timer">${esc(elapsed(dish.started_at))} · ${dish.typical_minutes == null ? "typical time unknown" : `typical ${esc(dish.typical_minutes)} min`}</p>${dish.modifiers?.length ? `<small>${esc((dish.modifier_names || modifierNames(dish.menu_id, dish.modifiers, dish.order_id)).join(", "))}</small>` : ""}${dish.requests ? `<small><strong>Guest request:</strong> ${esc(dish.requests)}</small>` : ""}<span class="dish-stage">${esc(human(dish.stage))}</span></div><div class="actions">${controls}</div></div>`;
 }
 function renderTickets() {
   const orders = Object.values(state.orders).filter(order => order.status !== "draft" && order.status !== "delivered");
@@ -221,10 +238,13 @@ function fallbackReason(dish) {
   return status && status !== "ok" ? `Camera ${status}; staff used the tap alternative` : null;
 }
 function showView(name) {
+  if (holding) endHold(null, true);
   view = name;
   document.querySelectorAll(".view").forEach(element => element.hidden = element.id !== `${name}-view`);
-  document.querySelectorAll("[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === name)));
-  document.title = `Dig In · ${name}`;
+  document.querySelectorAll(".view-nav [data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === name)));
+  document.title = `Dig In · ${name === "menu-setup" ? "Menu setup" : name}`;
+  if (name === "menu-setup") $("menu-setup-title").focus();
+  serviceCoordination?.sync();
 }
 async function captureText() {
   const order = state?.orders[draftId];
@@ -308,6 +328,8 @@ document.addEventListener("click", event => {
   if (action === "zone-observation" || action === "hand-pass") { const zone = state.zones[id]; dispatch({action: "zone_observation", zone_id: id, assignment_version: zone.assignment_version, occupied: action === "hand-pass" || button.dataset.occupied === "true", stable_ms: action === "hand-pass" ? 200 : Math.max(1600, state.stable_ms_required || 1500), hand_present: action === "hand-pass"}, "camera"); }
   if (action === "reconcile-zone") { const zone = state.zones[id]; dispatch({action: "reconcile_zone", zone_id: id, assignment_version: zone.assignment_version, occupied: button.dataset.occupied === "true", reason: `Staff reviewed physical zone: ${button.dataset.occupied === "true" ? "plate present" : "empty"}`}); }
 });
+menuSetup = window.createMenuSetup({request, dispatch, esc, getContext: () => ({state, actor, session, busy, uncertain, online: backendOnline})});
+serviceCoordination = window.createServiceCoordination({request, dispatch, esc, getContext: () => ({state, actor, session, busy, uncertain, online: backendOnline, view})});
 $("api-link").href = `${API}/docs`;
 refresh();
 setInterval(refresh, 2000);

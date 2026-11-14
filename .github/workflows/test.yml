@@ -20,8 +20,10 @@ jobs:
       - run: uv sync --locked --python 3.11
       - run: uv run ruff check app/coordination app/mvp app/analytics scripts tests/test_coordination.py tests/test_mvp*.py
       - run: uv run ruff format --check app/coordination app/mvp app/analytics scripts tests/test_coordination.py tests/test_mvp*.py
+      - run: uv run python -m scripts.check_repository_hygiene
       - run: uv run pytest -q
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node --check ../frontend/app.js && node --check ../frontend/coordination-v1.js && node --check ../frontend/config.js
+      - run: node --check ../frontend/app.js && node --check ../frontend/service-coordination.js && node --check ../frontend/menu-document.js && node --check ../frontend/menu-setup.js && node --check ../frontend/coordination-v1.js && node --check ../frontend/config.js
+      - run: node --test ../frontend/tests/menu-setup.test.cjs ../frontend/tests/service-coordination.test.cjs

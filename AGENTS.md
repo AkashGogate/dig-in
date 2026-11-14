@@ -1,7 +1,7 @@
 # Dig In agent bootstrap
 
 1. Inspect `git status`, branch/worktree, scoped instructions and claimed paths. Preserve others’ uncommitted edits; never reset/force-push/overwrite main to integrate.
-2. Read [docs/INDEX](docs/INDEX.md) → [PROJECT_SPEC](PROJECT_SPEC.md) → [docs/STATUS](docs/STATUS.md), then your [workstream](docs/WORKSTREAMS.md) and contracts. These Git-tracked files provide portable context, not automatic memory sync.
+2. Use [agent task map](docs/AGENT_TASK_MAP.md) and [integration guide](docs/INTEGRATION_GUIDE.md) to locate change seams and dependent reviewers. Read [docs/INDEX](docs/INDEX.md) → [PROJECT_SPEC](PROJECT_SPEC.md) → [docs/STATUS](docs/STATUS.md), then your [workstream](docs/WORKSTREAMS.md) and contracts. These Git-tracked files provide portable context, not automatic memory sync.
 3. The **Menu workstream also owns Core/backend and integration** (confirmed role decision); individual owner names remain unassigned. Agree task/path claims with that role. Separate clone/branch/worktree per task; shared contracts require dependent-lane review. Use a unique [handoff](docs/handoffs/TEMPLATE.md); STATUS is not a lock.
 
 ## Current MVP invariants
@@ -13,7 +13,7 @@
 - Submitted ≠ acknowledged ≠ started. Timers show elapsed/known typical minutes, never percent cooked. Partial ready count precedes one all-ready notification. Delivered is optional staff close-out.
 - Ingredient detection is second priority: countable observations, review and accepted stock remain separate from recipe expectations; never double-deduct or infer progress from a hand.
 - Canonical accepted/observed events keep stable ID, source time, identity and outcome. Duplicate retries do not repeat state changes or exports. Analytics drains outside requests; failures remain pending. No raw capture content or fabricated missing-stage durations.
-- Deferred from MVP: positioning, task/helper/priority queue, courses, POS/payments and spoken responses. No dining-room camera, facial recognition or guest tracking. Legacy code is not the new authority.
+- Bounded Server/Kitchen coordination and requested display/print/optional spoken summaries are authorized; see docs/SERVICE_COORDINATION.md. Dish lineups project canonical units, and handling an update never changes cooking/pickup facts. General positioning, independent task/helper/priority engine, courses, POS/payments and conversational spoken responses remain deferred. No dining-room camera, facial recognition or guest tracking. Legacy code is not the new authority.
 
 ## Map and checks
 

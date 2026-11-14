@@ -16,17 +16,87 @@ from app.analytics.outbox import Outbox
 from app.coordination.rules import Conflict, require
 from app.mvp import contracts as c
 from app.mvp.fixtures import seed
+from app.mvp.menu import import_status, match_menu
+from app.mvp.menu_embeddings import MenuIndex, provider_from_env
+from app.mvp.menu_import import parse_menu, review_warnings
+from app.mvp.service_flow import apply_service_command, build_summary
 from app.mvp.voice import parse_kitchen, parse_order
 
 
 class Restaurant:
-    def __init__(self, menu=None, outbox=None):
+    def __init__(self, menu=None, outbox=None, embedding_provider=None):
         self.state = seed(menu)
+        self.embedding_provider = embedding_provider or provider_from_env()
+        initial_index = MenuIndex.build(self.state.menu, self.embedding_provider)
+        self.state.menu_revision = initial_index.revision
+        self.state.menus = {
+            initial_index.revision: self.state.menu.model_copy(deep=True)
+        }
+        self.menu_indexes = {initial_index.revision: initial_index}
+        self.menu_candidates = {}
         self.lock = threading.RLock()
         self.outbox = outbox or Outbox()
         self.sessions = {}
         self.receipts = {}
         self.waiting = []
+
+    def _menu_lead(self, session_id):
+        require(session_id in self.sessions, "Select a demo staff/device session")
+        require(
+            self.state.actors[self.sessions[session_id]].role == "lead",
+            "Menu changes require a lead session",
+        )
+
+    def prepare_menu(self, request, session_id):
+        # Authorize before work/provider usage. Never hold the operational lock
+        # during parsing/encoding; failed preparation cannot replace active state.
+        with self.lock:
+            self._menu_lead(session_id)
+            base_revision = self.state.menu_revision
+        menu = parse_menu(request)
+        index = MenuIndex.build(menu, self.embedding_provider)
+        candidate_id = str(uuid4())
+        with self.lock:
+            self.menu_candidates[candidate_id] = (menu, index, base_revision)
+            while len(self.menu_candidates) > 16:
+                del self.menu_candidates[next(iter(self.menu_candidates))]
+        return {
+            "candidate_id": candidate_id,
+            "expected_menu_revision": base_revision,
+            "menu_revision": index.revision,
+            "menu": menu.model_dump(mode="json"),
+            "index": index.status(),
+            "warnings": review_warnings(menu),
+            "import_status": import_status(menu),
+            "requires_human_review": True,
+        }
+
+    def search_menu(self, text, revision=None, limit=5):
+        with self.lock:
+            revision = revision or self.state.menu_revision
+            require(revision in self.state.menus, "Unknown menu revision")
+            index = self.menu_indexes[revision]
+        # Explicit API search may call the configured provider; no capture text
+        # is automatically sent to it and no query is retained/exported.
+        return {
+            **index.status(),
+            "candidates": index.search(text, limit),
+            "requires_human_review": True,
+        }
+
+    def match_menu(self, text):
+        with self.lock:
+            index = self.menu_indexes[self.state.menu_revision]
+            return match_menu(self.state.menu, text, suggest=index.suggest_local)
+
+    def service_summary(self, session_id, audience):
+        # Capture identity, state and generation time together. Rendering and
+        # device delivery happen after the operational lock has been released.
+        with self.lock:
+            require(session_id in self.sessions, "Select a demo staff/device session")
+            actor = self.state.actors[self.sessions[session_id]].model_copy(deep=True)
+            state, generated_at = self.state.model_copy(deep=True), c.now()
+        return build_summary(state, actor, audience, generated_at)
 
     def session(self, actor_id):
         with self.lock:
@@ -132,8 +202,8 @@ class Restaurant:
         )
         return order
 
-    def _line(self, value):
-        item = self.state.menu.item(value.menu_id)
+    def _line(self, value, menu):
+        item = menu.item(value.menu_id)
         require(item is not None, "Unknown menu ID; choose a configured item")
         require(
             set(value.modifiers) <= {m.id for m in item.modifiers},
@@ -142,6 +212,7 @@ class Restaurant:
         return c.Line(
             **value.model_dump(),
             item_name=item.name,
+            modifier_names=[m.name for m in item.modifiers if m.id in value.modifiers],
             station=item.station,
             typical_minutes=item.typical_minutes,
             recipe=None
@@ -166,6 +237,55 @@ class Restaurant:
 
     def _apply(self, p):
         s, e = self.state, self._current
+        service_result = apply_service_command(self, p)
+        if service_result is not None:
+            return service_result
+        if isinstance(p, c.ActivateMenu):
+            require(
+                self._actor.role == "lead" and e.source == "tap" and p.human_confirmed,
+                "Menu activation requires a lead human review tap",
+            )
+            require(
+                p.candidate_id in self.menu_candidates,
+                "Unknown/expired menu candidate; prepare again",
+            )
+            menu, index, base_revision = self.menu_candidates[p.candidate_id]
+            require(
+                p.expected_menu_revision == s.menu_revision == base_revision,
+                "Active menu changed; prepare and review again",
+            )
+            # Preserve physical ingredient-zone IDs/balances. A menu cannot
+            # silently redefine an existing zone or invent initial stock.
+            for ingredient, zone_id in menu.ingredient_zones.items():
+                if zone_id is not None:
+                    require(
+                        zone_id in s.ingredient_zones
+                        and s.ingredient_zones[zone_id].ingredient == ingredient,
+                        "Ingredient zones require explicit physical setup before activation",
+                    )
+            for item in menu.items:
+                for ingredient in item.recipe or []:
+                    if ingredient.zone_id is not None:
+                        require(
+                            ingredient.zone_id in s.ingredient_zones
+                            and s.ingredient_zones[ingredient.zone_id].ingredient
+                            == ingredient.ingredient,
+                            "Recipe zone does not match configured physical ingredient",
+                        )
+            s.menu, s.menu_revision = menu.model_copy(deep=True), index.revision
+            s.menus[index.revision] = s.menu.model_copy(deep=True)
+            self.menu_indexes[index.revision] = index
+            self._emit(
+                "menu.activated",
+                payload={
+                    "menu_id": menu.id,
+                    "menu_revision": index.revision,
+                    "previous_menu_revision": base_revision,
+                    "item_count": len(menu.items),
+                    "embedding_provider": index.provider.name,
+                },
+            )
+            return {"menu_revision": index.revision}
         if isinstance(p, c.StartOrder):
             require(
                 self._actor.role in ("server", "lead") and e.source == "tap",
@@ -177,6 +297,7 @@ class Restaurant:
                 owner=self._actor.id,
                 table_id=p.table_id,
                 created_at=e.time,
+                menu_revision=s.menu_revision,
             )
             s.orders[order.id] = order
             self._emit("draft.created", order.id, payload={"table_id": order.table_id})
@@ -195,7 +316,10 @@ class Restaurant:
                 ),
                 "Seat is not at this table",
             )
-            order.table_id, order.lines = p.table_id, [self._line(x) for x in p.lines]
+            order.table_id, order.lines = (
+                p.table_id,
+                [self._line(x, s.menus[order.menu_revision]) for x in p.lines],
+            )
             order.revision += 1
             self._emit(
                 "draft.updated",
@@ -208,9 +332,17 @@ class Restaurant:
                 e.source == "voice", "Capture must be an explicit voice-adapter action"
             )
             order = self._draft(p)
-            parsed = parse_order(s.menu, p.text, order.table_id)
+            parsed = parse_order(
+                s.menus[order.menu_revision],
+                p.text,
+                order.table_id,
+                suggest=self.menu_indexes[order.menu_revision].suggest_local,
+            )
             order.lines = [
-                self._line(c.LineInput(id=f"{e.event_id}:line:{n}", **value))
+                self._line(
+                    c.LineInput(id=f"{e.event_id}:line:{n}", **value),
+                    s.menus[order.menu_revision],
+                )
                 for n, value in enumerate(parsed["lines"])
             ]
             order.voice_baseline = copy.deepcopy(order.lines)
@@ -325,6 +457,7 @@ class Restaurant:
                         line_id=line.id,
                         menu_id=line.menu_id,
                         item_name=line.item_name,
+                        modifier_names=line.modifier_names,
                         modifiers=line.modifiers,
                         seat=line.seat,
                         requests=line.requests,
@@ -336,6 +469,7 @@ class Restaurant:
                 order.id,
                 payload={
                     "table_id": order.table_id,
+                    "menu_revision": order.menu_revision,
                     "dishes": [d.model_dump(mode="json") for d in self._dishes(order)],
                     "corrected_draft_lines": order.corrected_draft_lines,
                     "initial_voice_draft_line_count": order.initial_voice_draft_line_count,
@@ -387,25 +521,27 @@ class Restaurant:
         if isinstance(p, c.KitchenVoice):
             self._kitchen()
             require(e.source == "voice", "Kitchen voice requires voice source")
-            parsed = parse_kitchen(s.menu, p.text)
-            flags = parsed.get("flags", [])
-            candidates = [
-                o
-                for o in s.orders.values()
-                if o.table_id == parsed.get("table_id")
-                and (
-                    o.status == "submitted"
+            candidates = []
+            for candidate in s.orders.values():
+                parsed = parse_kitchen(s.menus[candidate.menu_revision], p.text)
+                eligible = (
+                    candidate.status == "submitted"
                     if parsed.get("action") == "acknowledge"
-                    else o.acknowledged_at is not None
-                    and o.status not in ("picked_up", "delivered")
+                    else candidate.acknowledged_at is not None
+                    and candidate.status not in ("picked_up", "delivered")
                 )
-            ]
-            if flags or len(candidates) != 1:
+                if candidate.table_id == parsed.get("table_id") and eligible:
+                    candidates.append((candidate, parsed))
+            if (
+                len(candidates) != 1
+                or candidates[0][1].get("flags")
+                or not candidates[0][1].get("action")
+            ):
                 self._emit(
                     "voice.clarification",
                     payload={
                         "reason": "ambiguous_or_unknown_order",
-                        "candidate_order_ids": [o.id for o in candidates],
+                        "candidate_order_ids": [o.id for o, _ in candidates],
                     },
                     outcome="observed",
                 )
@@ -417,7 +553,7 @@ class Restaurant:
                         }
                     ]
                 }
-            order = candidates[0]
+            order, parsed = candidates[0]
             if parsed["action"] == "acknowledge":
                 return self._acknowledge(order)
             matches = [
@@ -843,11 +979,9 @@ class Restaurant:
                 if order.submitted_at is not None:
                     for line in order.lines:
                         for ingredient in line.recipe or []:
-                            key = ingredient.get(
-                                "zone_id"
-                            ) or self.state.menu.ingredient_zones.get(
-                                ingredient["ingredient"]
-                            )
+                            key = ingredient.get("zone_id") or self.state.menus[
+                                order.menu_revision
+                            ].ingredient_zones.get(ingredient["ingredient"])
                             if key in expected:
                                 expected[key] += ingredient["qty"] * line.quantity
             result["computed"] = {

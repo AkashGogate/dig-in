@@ -4,13 +4,13 @@ Decision date: 2026-11-14. This is the current agreed scope, normalized from the
 
 ## Product and responsibility
 
-The MVP has **two primary screens: Server and Kitchen**, using one authoritative shared backend. Four workstreams are Voice, Computer vision, **Menu/Core**, and Databricks. The user confirmed that the **Menu workstream owner also owns Core/backend and integration**; no individual names have been supplied. Proposed UI split: Voice develops the Server screen; CV develops the Kitchen zone panel; Menu/Core coordinates shared shell, kitchen queue and contract integration. That screen split is a proposal, not assigned people. See [WORKSTREAMS](docs/WORKSTREAMS.md).
+The MVP has **two primary service screens: Server and Kitchen**, using one authoritative shared backend, plus a secondary **Menu setup** screen for lead upload/review/activation. Four workstreams are Voice, Computer vision, **Menu/Core**, and Databricks. The user confirmed that the **Menu workstream owner also owns Core/backend and integration**; no individual names have been supplied. Proposed UI split: Voice develops the Server screen; CV develops the Kitchen zone panel; Menu/Core coordinates shared shell, kitchen queue and contract integration. That screen split is a proposal, not assigned people. See [WORKSTREAMS](docs/WORKSTREAMS.md).
 
 ## Reviewed orders and voice
 
 A server selects a configured table and either enters menu items manually or deliberately holds/releases capture and reads back the order. A menu-constrained parser produces an editable draft using configured item/modifier IDs, quantities and optional seat/dietary requests. Unknown terms/ambiguous matches return flags and candidates, never invented items. The server says the table first; a spoken/selected table mismatch **blocks submission** until an explicit choice. Manual edits do not silently clear unresolved flags. Voice alone cannot submit: a human **Confirm and send** tap must approve the current revision. Sending never authorizes payment.
 
-The menu owns item names, aliases, modifiers and optional kitchen fields. Orders snapshot item ID/name, station, typical time and recipe where known, so later menu edits cannot rename an open ticket. Missing imported kitchen details remain unknown/null. The MVP ships reviewed JSON and a deterministic matcher; an arbitrary PDF/photo/model importer is an interface requiring later human review. Loading a second menu must require no parser/domain code change.
+The menu owns item names, aliases, modifiers and optional kitchen fields. Orders snapshot item ID/name, station, typical time and recipe where known, so later menu edits cannot rename an open ticket. Missing imported kitchen details remain unknown/null. The MVP accepts structured JSON/CSV/item-per-line text through a prepare/review/activate pipeline, with automatic vector indexing and a deterministic matcher. PDF/PNG/JPEG input uses local OCR and heuristic grouping to create editable provisional dishes before encoding/review; accuracy on arbitrary layouts remains unverified. Local vectors are a lexical baseline; an opt-in semantic provider adapter is implemented but not live-validated. Runtime menu changes pin existing drafts/tickets to their original menu revision. Loading another menu must require no parser/domain code change. See [MENU_PIPELINE](docs/MENU_PIPELINE.md).
 
 Demo sessions honestly simulate staff/device identity. Diarization/speaker labels are not authentication. Capture is deliberate; audio is discarded after transcription. V2 retains structured draft facts/counts rather than raw transcripts/audio, and exports no raw capture content. The old voice lab is isolated and retains its historical logging behavior; do not route MVP capture through it.
 
@@ -40,8 +40,18 @@ Databricks analyzes **where service loses time and where voice/camera fail**. Ba
 
 Metrics use source timestamps for stage durations, per-dish ready-to-pickup, corrected draft lines, eligible manual fallback actions, zone waiting, camera blocked/offline and unexpected zones. Mandatory Confirm/optional Delivered taps do not count as automation fallback. Missing stages have null/censored counts, not fabricated zeros. Inventory-versus-recipe analysis is conditional on implemented ingredient evidence. Every simulated tile/result must say SIMULATED and include counts. See [analytics definitions](analytics/README.md).
 
+## Server–Kitchen coordination and requested summaries
+
+The 2026-11-14 follow-up authorizes a bounded service coordination scaffold:
+separate Server ordering/coordination and Kitchen cooking/lineup journeys, structured
+kitchen updates to the owning server, recipient handling, and on-demand deterministic
+role-scoped summaries. Summaries display on device, with explicit Print and optional
+Speak/Stop presentation. The kitchen lineup projects canonical dish units and never
+creates a second cooking state machine. Update handling never changes food milestones.
+See [SERVICE_COORDINATION](docs/SERVICE_COORDINATION.md) for both complete flows.
+
 ## Deferred and provisional
 
-Deferred from default MVP: positioning, shared task/priority queue, helpers, priority scoring, courses, POS/Square/payment and spoken responses. Existing v1 code remains isolated to preserve previous work. Production auth/durability, live speech/CV/hardware and cloud deployment are not implied by the scaffold.
+Deferred from default MVP: positioning, independent task/priority engine, helpers, priority scoring, courses and POS/Square/payment. The bounded canonical lineup/update/summary and explicit spoken-summary follow-up above supersedes the earlier blanket deferral of tasks and spoken responses; general conversational spoken responses remain deferred. Existing v1 code remains isolated to preserve previous work. Production auth/durability, live speech/CV/hardware and cloud deployment are not implied by the scaffold.
 
 The supplied brief proposed kitchen push-to-talk, all-ready notify, 60-second escalation and Free Edition. Current task explicitly adopts one all-ready notification and elapsed/typical timers. Kitchen microphone behavior and 60-second escalation remain provisional; escalation is not required/implemented. Free Edition/SQL warehouse/quotas/Zerobus availability require workspace verification, not assumption. The team still needs individual names for the four role owners and confirmation of the proposed screen split; Menu/Core responsibility itself is settled.

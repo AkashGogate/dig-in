@@ -5,10 +5,14 @@ New work uses `/api/v2`. Sources: [`mvp/contracts.py`](../backend/app/mvp/contra
 | Endpoint | Meaning |
 | --- | --- |
 | `POST /api/v2/sessions` | `{actor_id}`→session_id/actor; simulated device/staff identity |
+| `GET /api/v2/service/summary?audience=server\|kitchen` | Demo-session/role-scoped read-only summary of current lineup, orders and update actionability; not retained/exported |
 | `GET /api/v2/state` | Shared snapshot, physical zones/cameras/progress/stock/export health |
 | `POST /api/v2/commands` | Validated command, `X-Demo-Session` header; returns result/state/replayed |
 | `GET /api/v2/contracts` | Command/state/canonical event JSON Schemas |
 | `GET /api/v2/menu`, `POST /menu/match` | Canonical configured menu and deterministic candidate/flag matcher |
+| `POST /api/v2/menu/extract`, `GET /api/v2/menu/extraction-status` | Lead-only bounded PDF/PNG/JPEG → provisional editable dishes; readiness/limits. No encoding/activation side effect |
+| `POST /api/v2/menu/prepare` | Lead session: normalize/validate/index structured menu candidate; no activation |
+| `GET /api/v2/menu/index`, `POST /api/v2/menu/search` | Current index metadata / explicit candidate retrieval; search requires demo session |
 | `GET /api/v2/menu/import-status`, `/voice/status` | Explicit adapter-only importer and mock transcript availability |
 | `GET /api/v2/events?format=jsonl` | Canonical accepted/observed log, original IDs/source times preserved |
 | `POST /api/v2/events` | Supported canonical adapter **intent**, translated/validated by Core, never arbitrary fact insertion |
@@ -37,6 +41,8 @@ Core takes actor/role from the demo session. Device identifiers are honest simul
 
 | Domain | Actions / safeguards |
 | --- | --- |
+| Menu | activate_menu; lead/tap/human review + expected active revision, exact-envelope retries |
+| Staff coordination | publish_service_update (kitchen/lead tap, order-derived recipient); acknowledge_service_update/resolve_service_update (recipient/lead tap, current update revision). No food transition |
 | Draft | start_order, edit_draft, capture_voice, resolve_flag, confirm_send; stable line IDs/revision, unknown/mismatch review, mandatory human tap |
 | Kitchen/order | acknowledge, retry_zones, deliver_order; acknowledgment separate from start; all-K zone capacity/FIFO; delivered optional after pickups |
 | Physical dish | start_dish, ready_dish, pickup_dish; timestamps, one unit/zone; camera uses evidence rather than bypassing commands |
@@ -46,7 +52,7 @@ Core takes actor/role from the demo session. Device identifiers are honest simul
 
 ## Menu and correction counts
 
-Menu item IDs/names/aliases/modifier IDs drive all new paths. Optional station/call-out/typical_minutes/recipe/ingredient mapping remain null if unknown. Orders snapshot name/kitchen fields. Reviewed JSON loads through DIG_IN_MENU_PATH; arbitrary photo/PDF/model import is a protocol/status stub. Second fixture loads without code changes.
+Menu item IDs/names/aliases/modifier IDs drive all new paths. Optional station/call-out/typical_minutes/recipe/ingredient mapping remain null if unknown. Orders snapshot name/kitchen fields. Reviewed JSON loads through DIG_IN_MENU_PATH. [MENU_PIPELINE](MENU_PIPELINE.md) documents JSON/CSV/item-per-line preparation, automatic local/optional semantic vectors and explicit reviewed activation. PDF/PNG/JPEG extraction produces correctable provisional dishes via local OCR; see MENU_EXTRACTION. Future model extractors can replace that seam. State includes current `menu_revision` and a `menus` map keyed by content revision; orders pin their revision at draft creation. Item descriptions/categories and snapshotted modifier labels are additive fields. Both original fixtures and the eight-dish DIG IN fixture load without code changes.
 
 `corrected_draft_lines` compares the latest voice baseline and final reviewed lines by stable ID and menu_id/quantity/modifiers/seat/requests: distinct changed/added/removed IDs count once; reverting to baseline counts zero. `initial_voice_draft_line_count`, final_line_count and capture_mode define denominators/context. Additions can make count exceed baseline; do not call this recognition accuracy or edit-tap count. Pure manual capture has no voice baseline.
 
@@ -69,6 +75,22 @@ Incoming camera `dish.ready` intent still needs current zone/version/stability/n
 | batch bay/course assigned on send | one dish unit/zone, all K atomically on acknowledgment; courses deferred |
 | staff-ready default/optional camera experiment | ready-only zone convention and stable occupancy default; tap fallback |
 | speech supplement-only draft | deliberate menu-constrained editable capture; human Confirm gate retained |
-| per-dish running task/helper/priority | deferred; partial count + once-only all-ready notification |
+| per-dish running task/helper/priority | Canonical dish lineup plus bounded v2 coordination updates/summaries; independent v1 task/helper/priority state stays deferred/isolated |
 
 The mapping describes semantics, not a working legacy importer. Never silently relabel old/rejected observations as accepted facts. Menu/Core coordinates any future version/migration and dependent review; preserve stable examples/fixtures and tests.
+
+
+## Service handoff contract
+
+`service_contracts.py` owns ServiceUpdate/ServiceSummary and update commands. State
+adds `service_updates`; `/contracts` exposes `service_summary` alongside existing
+shapes. Update kinds are delay, needs_attention, pickup_request and availability;
+explicit typed notes are at most 300 characters. IDs/source time/outcome survive
+canonical events; authored note text and generated summaries are not analytics
+payloads. Pickup requests require an actual currently ready physical unit, and
+summary projections re-evaluate actionability after pickup. Receiving/handling an
+update never changes cooking, zones or pickup state. Summary reads emit no event.
+
+Summary/handling routing is role/session scoped, while existing global demo state
+and command response snapshots are not a confidentiality boundary. See
+[SERVICE_COORDINATION](SERVICE_COORDINATION.md) for both journeys and audio limits.

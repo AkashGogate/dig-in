@@ -70,3 +70,67 @@ footer { align-items: flex-start; }
 @media (prefers-reduced-motion: reduce) {
   button:active { transform: none; }
 }
+/* Lead setup: inputs stay beside the review, with one explicit commit action. */
+.menu-setup-nav { margin-inline-start: auto; }
+.menu-current { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border: 1px solid var(--line); border-inline-start: 4px solid var(--green); background: var(--surface); border-radius: var(--radius); }
+.menu-current h2, .menu-current p { margin-block: 0; }
+.menu-current > .note { max-width: 32ch; }
+.menu-setup-status { margin-block: 1rem; padding: .85rem 1rem; background: var(--soft); border-radius: var(--radius); overflow-wrap: anywhere; }
+.menu-setup-status.error { background: #fff2d9; color: var(--danger); border-inline-start: 4px solid var(--danger); }
+.menu-setup-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr); gap: 1rem; align-items: start; }
+.menu-setup-grid > * { min-width: 0; }
+#menu-input-fields { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
+#menu-input-fields:disabled { opacity: .7; }
+.menu-upload-box { padding: 1rem; background: var(--paper); border: 1px dashed #8b9f90; border-radius: var(--radius); }
+#menu-upload { background: transparent; border: 0; padding: .5rem 0 0; overflow-wrap: anywhere; }
+#menu-upload::file-selector-button { min-height: 44px; padding: .5rem .65rem; margin-inline-end: .6rem; border: 1px solid #8b9f90; border-radius: 5px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+#menu-import-form pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--paper); padding: .7rem; font-size: .85rem; }
+#menu-content { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 1rem; }
+#menu-source-name { overflow-wrap: anywhere; }
+.menu-preview-empty { border-block: 1px solid var(--line); padding-block: 1.25rem; margin-block: 1rem; color: var(--muted); }
+.menu-preview-empty h3 { color: var(--ink); }
+.menu-review-list { padding: 0; margin: 1rem 0; list-style: none; }
+.menu-review-item { border-block-start: 1px solid var(--line); padding-block: 1rem; overflow-wrap: anywhere; }
+.menu-review-item p { margin-block: .35rem; }
+.menu-item-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .4rem 1rem; }
+.menu-item-heading h3 { margin: 0; font-size: 1.15rem; }
+.menu-item-heading > span { font-size: .9rem; color: var(--muted); }
+.menu-item-number { color: var(--muted); font-variant-numeric: tabular-nums; }
+.menu-unknown { color: var(--amber); }
+.menu-review-item summary { padding-block: .45rem; cursor: pointer; }
+.menu-kitchen-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: .4rem .8rem; font-size: .9rem; }
+.menu-kitchen-details dt { font-weight: 650; }
+.menu-kitchen-details dd { margin: 0; }
+.menu-activation-area { border-block-start: 2px solid var(--line); margin-block-start: 1rem; padding-block-start: .8rem; }
+#menu-review-confirmation .check { align-items: flex-start; margin-block: 1rem; }
+#menu-reviewed { margin-block-start: .15rem; }
+#menu-activation-gate.error { color: var(--danger); font-weight: 650; }
+#menu-preview-heading:focus, #menu-setup-title:focus, #menu-setup-status:focus { outline: 3px solid #bd7113; outline-offset: 4px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 920px) { .menu-setup-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) {
+  .menu-setup-nav { margin-inline-start: 0; }
+  .menu-current > .note { max-width: none; }
+  .menu-activation-area .actions > button, #menu-prepare, #menu-activate { width: 100%; }
+}
+/* Service coordination projects canonical state. Summary print is deliberately
+   isolated from the full restaurant page; normal screen layout is unchanged. */
+.service-summary-panel .panel-heading { align-items: center; }
+.service-summary-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; margin-block: .8rem; }
+.service-summary-text:focus { outline: 3px solid #bd7113; outline-offset: 3px; }
+.service-update { border-block-start: 1px solid var(--line); padding-block: .9rem; overflow-wrap: anywhere; }
+.service-update h3, .service-lineup-unit h3 { font-size: 1.1rem; margin: 0; }
+.service-update p, .service-lineup-unit p { margin-block: .4rem; }
+.service-lineup-unit { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; padding-block: .85rem; border-block-start: 1px solid var(--line); overflow-wrap: anywhere; }
+.service-lineup-unit > div { flex: 1 1 260px; min-width: 0; }
+#service-update-fields { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
+#service-update-fields:disabled { opacity: .7; }
+#service-print-sheet { display: none; }
+@media (max-width: 520px) { .service-summary-panel .panel-heading > button { width: 100%; } .service-summary-panel .actions > button { flex: 1 1 150px; } }
+@media print {
+  body > * { display: none !important; }
+  body > #service-print-sheet { display: block !important; padding: 1cm; color: #000; background: #fff; }
+  #service-print-text { white-space: pre-wrap; overflow-wrap: anywhere; font: 12pt/1.5 sans-serif; }
+  #service-print-title { font-size: 18pt; }
+}
+.service-guest-request { border-inline-start: 3px solid var(--amber); padding-inline-start: .7rem; font-weight: 600; }

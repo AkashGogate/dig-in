@@ -21,7 +21,19 @@ Menu/Core owns the operational authority, event endpoint and integration; indivi
 
 `app/analytics/events.py` owns CanonicalEvent. Its stable identity/source time/outcome are retained through `outbox.py` and local adapters. Domain transaction rollback and local enqueue are coordinated; external drain happens separately. The outbox releases its queue lock during sink I/O so a slow/failing sink does not hold restaurant operations. Databricks SQL/templates live in `analytics/`; no live connector is required.
 
-Primary frontend files are `index.html`, `app.js`, `mvp.css`; suggested screen ownership is Voice→Server and CV→Kitchen zones, subject to explicit team agreement. Shared shell/queue and contracts require Menu/Core integration. No frontend state is an independent restaurant authority; polling reads one backend, exact retry IDs preserve uncertain requests.
+`menu_import.py` normalizes structured inputs; `menu_embeddings.py` owns content-revision-bound vectors and replaceable encoding providers. Preparation and explicit provider search run outside the operational lock. Reviewed activation selects menu/index and enqueues `menu.activated` atomically with Core state. Orders pin historical menus, and the shared client uses those revisions for draft selectors and ticket labels. [MENU_PIPELINE](MENU_PIPELINE.md) records supported formats, credential-free baseline versus optional semantic provider, and persistence limits.
+
+Primary frontend files are `index.html`, `app.js`, `mvp.css`; `menu-setup.js` handles the secondary upload/review screen through shared requests and activation dispatch. Suggested screen ownership is Voice→Server and CV→Kitchen zones, subject to explicit team agreement. Shared shell/queue and contracts require Menu/Core integration. No frontend state is an independent restaurant authority; polling reads one backend, exact retry IDs preserve uncertain requests.
+
+## Service coordination boundary
+
+`mvp/service_contracts.py` defines additive staff-update and role-summary shapes;
+`service_flow.py` handles bounded update commands within Restaurant's existing
+transaction and builds ephemeral summaries from a single state copy. Kitchen
+lineups project canonical Dish units, never independent cooking tasks. The
+focused `frontend/service-coordination.js` consumes shared context/request/dispatch
+and presents the two journeys, scoped updates and explicit summary/print/speech
+controls. See [SERVICE_COORDINATION](SERVICE_COORDINATION.md) for scope and limits.
 
 ## State and safety boundaries
 

@@ -57,7 +57,9 @@ def _clauses(menu: MenuDocument, text: str) -> list[str]:
     ]
 
 
-def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
+def parse_order(
+    menu: MenuDocument, text: str, selected_table_id: str, *, suggest=None
+) -> dict:
     table = re.match(r"^\s*table\s+(\d+)\b\s*[:,]?", text, re.IGNORECASE)
     spoken_table = table[1] if table else None
     remainder = text[table.end() :] if table else text
@@ -108,7 +110,9 @@ def parse_order(menu: MenuDocument, text: str, selected_table_id: str) -> dict:
                 }
             )
             continue
-        matched = match_menu(menu, clause[number.end() :] if number else clause)
+        matched = match_menu(
+            menu, clause[number.end() :] if number else clause, suggest=suggest
+        )
         flags.extend({**flag, "line_index": index} for flag in matched["flags"])
         if matched["menu_id"]:
             lines.append(

@@ -13,6 +13,11 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validato
 
 from app.analytics.events import CanonicalEvent
 from app.mvp.menu import MenuDocument
+from app.mvp.service_contracts import (
+    PublishServiceUpdate,
+    RespondServiceUpdate,
+    ServiceUpdate,
+)
 
 
 def now():
@@ -45,6 +50,7 @@ class LineInput(Model):
 
 class Line(LineInput):
     item_name: str
+    modifier_names: list[str] = Field(default_factory=list)
     station: str | None = None
     typical_minutes: float | None = None
     recipe: list[dict] | None = None
@@ -60,6 +66,7 @@ class DraftFlag(Model):
 
 
 class Order(Model):
+    menu_revision: str = ""
     id: str
     owner: str
     table_id: str
@@ -96,6 +103,7 @@ class Dish(Model):
     line_id: str
     menu_id: str
     item_name: str
+    modifier_names: list[str] = Field(default_factory=list)
     modifiers: list[str]
     seat: int | None = None
     requests: str = ""
@@ -160,6 +168,8 @@ class State(Model):
     actors: dict[str, Actor]
     tables: dict[str, Table]
     menu: MenuDocument
+    menu_revision: str = ""
+    menus: dict[str, MenuDocument] = Field(default_factory=dict)
     orders: dict[str, Order] = Field(default_factory=dict)
     dishes: dict[str, Dish] = Field(default_factory=dict)
     zones: dict[str, PlatingZone]
@@ -167,9 +177,17 @@ class State(Model):
     ingredient_zones: dict[str, IngredientZone]
     stock_movements: list[StockMovement] = Field(default_factory=list)
     stock_observations: dict[str, dict] = Field(default_factory=dict)
+    service_updates: dict[str, ServiceUpdate] = Field(default_factory=dict)
     notifications: list[Notification] = Field(default_factory=list)
     events: list[CanonicalEvent] = Field(default_factory=list)
     stable_ms_required: int = Field(default=1500, ge=1000, le=2000)
+
+
+class ActivateMenu(Model):
+    action: Literal["activate_menu"]
+    candidate_id: str
+    expected_menu_revision: str
+    human_confirmed: bool
 
 
 class StartOrder(Model):
@@ -268,7 +286,10 @@ class AcceptStock(Model):
 
 
 Payload = Annotated[
-    StartOrder
+    PublishServiceUpdate
+    | RespondServiceUpdate
+    | ActivateMenu
+    | StartOrder
     | EditDraft
     | CaptureVoice
     | ResolveFlag
