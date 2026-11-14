@@ -17,3 +17,5 @@ playwright-report/
 test-results/
 .venv-*/
 .ruff_cache/
+# DIG IN eval audio is regenerated per persona by backend/eval/dig_in/audio.py
+audio-samples/dig-in/generated/
