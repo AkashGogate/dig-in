@@ -1,0 +1,49 @@
+Use case: ads-marketing.
+Asset type: finished restaurant menu poster, portrait, high resolution.
+Create an exceptionally well-designed, readable, construction-themed food menu for a hackathon demo restaurant called DIG IN. Output the flat, front-facing artwork itself, with no photographic mockup, no table, no frame, no perspective.
+
+Art direction: bold industrial construction signage meets a beautifully typeset independent burger restaurant menu. Safety yellow, near-black ink, and warm ivory. Large oversized tightly set condensed block type for DIG IN at the top, small uppercase monospaced utility labels, clear substantial sans serif dish names and comfortably readable descriptions. Mostly warm ivory background with black text; a broad yellow masthead, yellow section highlights and narrow black/yellow diagonal hazard-stripe bands at top and bottom. Subtle printed paper grain, crisp graphic edges, generous margins. A small tasteful black line illustration of an excavator with a fork-like bucket near the title; a tiny hardhat or shovel motif in the footer. Decorative marks remain minimal and support the typography. No food photography, no 3D rendering, no gradients, no fake signage distressing that harms reading. Professional, witty, inviting, strong typography, not childish or cluttered.
+
+Layout: portrait page, title masthead occupies roughly top fifth. Beneath it, three clearly separated full-width horizontal menu sections in a single-column layout with ample whitespace. Each section has a small numbered yellow-and-black marker and section heading. Dish names bold, descriptions one smaller line or two directly below. Exactly 3 appetizers, exactly 3 mains, exactly 2 desserts, each appearing once. All eight items must be fully visible. No prices. Footer reads BUILT FOR BIG APPETITES. Do not invent any additional dishes, symbols for dietary claims, dates, locations, offers, or prices.
+
+Exact text to render, maintaining these pairings and order:
+
+DIG IN
+THE CONSTRUCTION KITCHEN
+
+01 / GROUNDWORK
+APPETIZERS
+
+GRAVEL PIT TOTS
+Crispy tots buried under queso, bacon, and scallions.
+
+STEEL BEAMS
+Golden mozzarella sticks with marinara for dipping.
+
+DYNAMITE POPPERS
+Bacon-wrapped jalapeños stuffed with cream cheese.
+
+02 / HEAVY LIFTING
+MAINS
+
+THE BULLDOZER
+Double smash burger, cheddar, crispy onions, pickles, and house sauce.
+
+THE BACKHOE
+BBQ pulled pork on a toasted bun with slaw and pickles.
+
+CEMENT MIXER MAC
+Three-cheese macaroni with a crunchy breadcrumb topping.
+
+03 / FINISHING TOUCHES
+DESSERTS
+
+DIRT SITE
+Chocolate pudding, Oreo soil, gummy worms, and a shovel spoon.
+
+WRECKING BALL BROWNIE
+Warm fudge brownie, chocolate ice cream, and caramel.
+
+BUILT FOR BIG APPETITES
+
+Prioritize impeccable lettering, exact correct spelling, balanced typesetting, and clear text hierarchy. Make the final menu feel like a real polished piece of restaurant branding ready to display at the demo.
