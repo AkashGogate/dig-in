@@ -8,8 +8,9 @@
   const client = createClient(), page = document.body.dataset.operatorPage;
   const kitchen = page === 'kitchen', composer = page === 'order';
   const $ = id => document.getElementById(id);
-  let editor = null, selectedDraft = '', localDirty = false, search = '', category = '', station = '', kitchenTab = 'tickets';
+  let editor = null, selectedDraft = '', localDirty = false, search = '', category = '', station = '', kitchenTab = 'tickets', kitchenSummaryOpen = false;
   let summary = null, summaryPending = false, signature = '', renderPending = false;
+  const unitDetails = new Map();
   const updateForms = new Map(); // Unsaved explicit staff notes only; never browser storage.
   const uid = () => crypto.randomUUID();
   const canOperate = ctx => Boolean(ctx.session && ctx.online && !ctx.needsAuth && !ctx.busy && !ctx.uncertain && (kitchen ? ['cook','lead'].includes(ctx.actor?.role) : ['server','lead'].includes(ctx.actor?.role)));
@@ -49,6 +50,14 @@
     document.querySelectorAll('[data-started]').forEach(el => {
       const seconds = Math.max(0,Math.floor((Date.now()-Date.parse(el.dataset.started))/1000));
       el.textContent = `${Math.floor(seconds/60)} min elapsed`;
+    });
+  }
+    // Ticket age is explicitly since submission, never a cooking estimate.
+  function ticketAge() {
+    document.querySelectorAll('[data-submitted]').forEach(el=>{
+      const minutes=Math.max(0,Math.floor((Date.now()-Date.parse(el.dataset.submitted))/60000));
+      el.textContent=`${minutes}m since sent`;
+      el.classList.toggle('warn',minutes>=10&&minutes<15);el.classList.toggle('crit',minutes>=15);
     });
   }
   function openEditor(order) {
@@ -111,6 +120,13 @@
     const readyAllowed=['queued','started'].includes(dish.stage) && Boolean(order.acknowledged_at) && zone?.dish_id===dish.id && !zone.needs_review;
     const pickupAllowed=dish.stage==='ready' && zone?.dish_id===dish.id && !zone.needs_review;
     const operations=kitchen ? (startAllowed?action('Start unit','start_dish',dish.id):'')+' '+(readyAllowed?action('Tap ready · finished plate verified','ready_dish',dish.id):'') : (pickupAllowed?action('Pick up this unit','pickup_dish',dish.id):'');
+    if(kitchen) return `<div class="dish" data-unit="${e(dish.id)}"><div class="dish-main"><div class="dish-name">${e(dish.item_name)}</div>
+      <div class="dish-meta">${dish.seat==null?'Seat unassigned':`Seat ${dish.seat}`} · ${dish.stage==='picked_up'?`Last zone ${e(dish.zone_id || 'unknown')} · released`:dish.zone_id?`Physical zone ${e(dish.zone_id)}`:'Waiting for a physical zone'} · ${e(dish.station || 'Station unknown')} · ${e(dish.modifier_names?.join(', ') || 'No modifiers')}</div>
+      <p class="dish-requests">Guest requests: ${e(dish.requests || 'None recorded')}</p>
+      <div class="dish-meta">${dish.started_at?`<span data-started="${e(dish.started_at)}"></span>`:dish.stage==='queued'?'Not started':'Start time unknown'} · ${dish.typical_minutes==null?'Usual time unknown':`Usually ${dish.typical_minutes} min`}</div>
+      ${zone?.needs_review?'<p class="operator-warning">Zone requires staff review in the full workbench before ready/pickup.</p>':''}
+      <details class="dish-provenance" data-unit-details="${e(dish.id)}" ${unitDetails.get(dish.id)?'open':''}><summary id="unit-details-${e(dish.id)}">Unit details</summary><p class="operator-label">Unit ${e(dish.id)} · ${e(dish.line_id)}</p></details>
+      <div class="dish-actions">${operations}</div></div><div class="dish-right"><span class="d-status ${e(dish.stage)}"><span class="dot" aria-hidden="true"></span>${e(human(dish.stage))}</span></div></div>`;
     return `<div class="operator-unit"><strong>${e(dish.item_name)}</strong> <span class="operator-pill">${e(human(dish.stage))}</span>
       <p>${dish.seat==null?'Seat unassigned':`Seat ${dish.seat}`} · ${e(dish.station || 'Station unknown')} · ${dish.stage==='picked_up'?`Last zone ${e(dish.zone_id || 'unknown')} · released`:dish.zone_id?`Physical zone ${e(dish.zone_id)}`:'Waiting for a physical zone'}</p>
       <p>Modifiers: ${e(dish.modifier_names?.join(', ') || 'None')}</p><p class="operator-notes">Guest requests: ${e(dish.requests || 'None recorded')}</p>
@@ -127,21 +143,36 @@
       ${action(u.status==='unread'?'Acknowledge update':'Resolve update',u.status==='unread'?'acknowledge_service_update':'resolve_service_update',u.id)}</article>`;
     }).join('') || '<p>No open updates addressed to this staff member.</p>'}</section>`;
   }
+  function kitchenUpdateMarkup(ctx,order) {
+    if(['picked_up','delivered'].includes(order.status))return '';
+    return `<details data-update-form="${e(order.id)}" ${updateForms.get(order.id)?.open?'open':''}><summary>Send update to ${e(ctx.state.actors[order.owner]?.name || order.owner)}</summary><div class="operator-form"><label>Update kind <select id="kind-${e(order.id)}">${['delay','needs_attention','pickup_request','availability'].map(kind=>`<option value="${kind}" ${kind===(updateForms.get(order.id)?.kind || 'delay')?'selected':''}>${e(human(kind))}</option>`).join('')}</select></label><label>Staff-authored note <textarea id="note-${e(order.id)}" maxlength="300" rows="2">${e(updateForms.get(order.id)?.note || '')}</textarea></label>${action('Send kitchen update','publish',order.id)}${action('Discard unsent note','discard-update',order.id)}</div></details>`;
+  }
   function ordersMarkup(ctx) {
-    let orders=ownOrders(ctx.state,ctx.actor,kitchen).filter(o=>!['draft','delivered'].includes(o.status));
+    let orders=ownOrders(ctx.state,ctx.actor,kitchen).filter(o=>!['draft','delivered'].includes(o.status) && (!kitchen || o.status!=='picked_up'));
+    if(kitchen) orders.sort((a,b)=>{const sent=o=>Number.isFinite(Date.parse(o.submitted_at))?Date.parse(o.submitted_at):Infinity;return sent(a)-sent(b)||a.id.localeCompare(b.id);});
     const stations=[...new Set(Object.values(ctx.state.dishes).map(d=>d.station).filter(Boolean))];
     return `<div class="operator-controls"><h2>${kitchen?'Kitchen ticket lineup':'Your active tickets'}</h2>${kitchen?`<label>Station <select id="stationFilter"><option value="">All</option>${stations.map(s=>`<option ${s===station?'selected':''} value="${e(s)}">${e(s)}</option>`).join('')}</select></label>`:''}</div>
-      <p class="operator-hint">${kitchen?'Only submitted orders appear here. Acknowledge reserves physical zones atomically; queued cooking can start while waiting for zones. Only finished plates enter assigned zones.':'This view contains your tickets only. Pickup changes a physical unit; Delivered closes an entire picked-up ticket.'}</p>
-      <div class="operator-tickets">${orders.map(order=>{
+      <p class="operator-hint kitchen-lineup-hint">${kitchen?'Only submitted orders appear here. Acknowledge reserves physical zones atomically; queued cooking can start while waiting for zones. Only finished plates enter assigned zones.':'This view contains your tickets only. Pickup changes a physical unit; Delivered closes an entire picked-up ticket.'}</p>
+      <div class="${kitchen?'kds-tickets':'operator-tickets'}" ${kitchen?'aria-label="Kitchen tickets, oldest sent first" tabindex="0"':''}>${orders.map(order=>{
         const allUnits=unitsFor(ctx.state,order.id), units=allUnits.filter(d=>!station || !kitchen || d.station===station);
         if (station && kitchen && !units.length) return '';
         const ready=allUnits.filter(d=>d.stage==='ready').length;
+        const fullyReady=allUnits.length>0&&allUnits.every(d=>d.stage==='ready'&&ctx.state.zones[d.zone_id]?.dish_id===d.id&&!ctx.state.zones[d.zone_id].needs_review);
+        if(kitchen) return `<article class="ticket ${fullyReady?'allready':''}" data-ticket="${e(order.id)}"><header class="ticket-head"><div class="ticket-head-top"><h3 class="ticket-table">Table ${e(order.table_id)}</h3>${order.submitted_at?`<span class="ticket-timer" data-submitted="${e(order.submitted_at)}"></span>`:'<span class="ticket-timer">Sent time unknown</span>'}</div>
+          <div class="ticket-head-sub"><span class="ticket-mode">${e(human(order.status))} · ${allUnits.length} dishes</span><span class="ticket-ready-pill ${fullyReady?'done':''}">${ready}/${allUnits.length} ready</span></div>
+          <p class="operator-label">Ticket ${e(order.id)} · ${e(ctx.state.actors[order.owner]?.name || order.owner)} · zones ${e(order.zone_status)}</p>${station?'<p class="operator-label">Station filter shows matching units; ready count covers the full ticket.</p>':''}
+          ${order.status==='submitted'?action('Acknowledge ticket','acknowledge',order.id):''}</header><div class="ticket-dishes">${units.map(d=>unitMarkup(ctx,order,d)).join('') || '<p>No physical units yet.</p>'}</div><footer class="ticket-coordination">${kitchenUpdateMarkup(ctx,order)}</footer></article>`;
         return `<article class="operator-card"><h3>Table ${e(order.table_id)}</h3><p class="operator-label">Ticket ${e(order.id)} · ${e(ctx.state.actors[order.owner]?.name || order.owner)}</p><p><span class="operator-pill">${e(human(order.status))}</span> · zones ${e(order.zone_status)} · ${ready}/${allUnits.length} currently ready</p>
         ${kitchen&&order.status==='submitted'?action('Acknowledge ticket','acknowledge',order.id):''}
         ${units.map(d=>unitMarkup(ctx,order,d)).join('') || '<p>No physical units yet.</p>'}
         ${!kitchen&&order.status==='picked_up'?action('Mark entire ticket delivered','deliver_order',order.id):''}
-        ${kitchen&&!['picked_up','delivered'].includes(order.status)?`<details data-update-form="${e(order.id)}" ${updateForms.get(order.id)?.open?'open':''}><summary>Send update to ${e(ctx.state.actors[order.owner]?.name || order.owner)}</summary><div class="operator-form"><label>Update kind <select id="kind-${e(order.id)}">${['delay','needs_attention','pickup_request','availability'].map(kind=>`<option value="${kind}" ${kind===(updateForms.get(order.id)?.kind || 'delay')?'selected':''}>${e(human(kind))}</option>`).join('')}</select></label><label>Staff-authored note <textarea id="note-${e(order.id)}" maxlength="300" rows="2">${e(updateForms.get(order.id)?.note || '')}</textarea></label>${action('Send kitchen update','publish',order.id)}${action('Discard unsent note','discard-update',order.id)}</div></details>`:''}</article>`;
-      }).join('') || '<p>No active tickets in this view.</p>'}</div>${kitchen?'':updatesMarkup(ctx)}`;
+        ${kitchen ? kitchenUpdateMarkup(ctx,order) : ''}</article>`;
+      }).join('') || '<p>No active tickets in this view.</p>'}</div>${kitchen?kitchenCountsMarkup(ctx,orders):updatesMarkup(ctx)}`;
+  }
+  function kitchenCountsMarkup(ctx,orders) {
+    const ids=new Set(orders.map(o=>o.id));
+    const units=Object.values(ctx.state.dishes).filter(d=>ids.has(d.order_id)&&d.stage!=='picked_up'&&(!station||d.station===station));
+    return `<aside class="allday-bar" aria-label="Current active physical units"><div class="allday-stat"><span class="allday-num">${units.length}</span><span class="allday-lbl">Active units${station?' · filtered station':''}</span></div>${[['ready','Ready'],['started','Started'],['queued','Queued']].map(([stage,label])=>`<div class="allday-stat"><span class="allday-num">${units.filter(d=>d.stage===stage).length}</span><span class="allday-lbl">${label}</span></div>`).join('')}</aside>`;
   }
   function zonesMarkup(ctx) {
     return `<h2>Physical plating zones</h2><p class="operator-hint">Actual backend zones, independent of table/seat numbering. Occupancy is not food identity or doneness. Camera status below is the adapter-reported state, not a claim that this browser has a live feed. Review unexpected/returned plates in the workbench.</p><div class="operator-zones">${Object.values(ctx.state.zones).map(zone=>{
@@ -169,10 +200,10 @@
     if(force || signature!==nextSignature) {
       let html = composer?composerMarkup(ctx):kitchen?(kitchenTab==='zones'?zonesMarkup(ctx):kitchenTab==='ingredients'?ingredientsMarkup(ctx):ordersMarkup(ctx)):ordersMarkup(ctx);
       if(kitchen) html=`<div class="operator-controls">${['tickets','zones','ingredients'].map(tab=>`<button class="operator-action" data-action="tab" data-id="${tab}" aria-pressed="${tab===kitchenTab}">${human(tab)}</button>`).join('')}</div>`+html;
-      if(!composer) html+=summaryMarkup(ctx);
+      if(!composer) html+=kitchen?`<details class="kitchen-summary" data-kitchen-summary="true" ${kitchenSummaryOpen?'open':''}><summary id="kitchen-summary-toggle">Service summary · on request</summary>${summaryMarkup(ctx)}</details>`:summaryMarkup(ctx);
       safeRender(html); if(!renderPending) signature=nextSignature;
     }
-    syncLocks(ctx);elapsed();
+    syncLocks(ctx);elapsed();ticketAge();
   }
   async function run(payload,success='Change accepted by the shared backend.') {
     try {
@@ -188,13 +219,13 @@
   $('operatorLogin').addEventListener('submit',async event=>{event.preventDefault();try{await client.authenticate($('operatorUsername').value,$('operatorPassword').value);$('operatorPassword').value='';feedback('Demo access verified for this tab. Select a staff session below.');render(client.context(),true);}catch(error){$('operatorPassword').value='';feedback(`Demo access not verified: ${error.message}`,true);}});
   $('enterSession').addEventListener('click',async()=>{
     if(localDirty && !confirm('Discard unsaved local edits before switching staff?')) return;
-    try {await client.enter($('operatorActor').value);editor=null;selectedDraft='';localDirty=false;summary=null;signature='';updateForms.clear();feedback('Session entered. Saved orders remain in the shared backend.');render(client.context(),true);}catch(error){feedback(error.message,true);}
+    try {await client.enter($('operatorActor').value);editor=null;selectedDraft='';localDirty=false;summary=null;kitchenSummaryOpen=false;signature='';updateForms.clear();unitDetails.clear();feedback('Session entered. Saved orders remain in the shared backend.');render(client.context(),true);}catch(error){feedback(error.message,true);}
   });
   $('operatorRefresh').addEventListener('click',()=>client.refresh().catch(error=>feedback(error.message,true)));
   $('operatorRetry').addEventListener('click',async()=>{
     try {const data=await client.retry();localDirty=false;editor=null;feedback(data.replayed?'Original event confirmed; no duplicate change.':'Pending event accepted.');await client.refresh();render(client.context(),true);}catch(error){feedback(error.message,true);}
   });
-  $('operatorMain').addEventListener('toggle',event=>{const id=event.target.dataset.updateForm;if(id)updateForms.set(id,{...updateForms.get(id),open:event.target.open});},true);
+  $('operatorMain').addEventListener('toggle',event=>{if(event.target.dataset.unitDetails)unitDetails.set(event.target.dataset.unitDetails,event.target.open);if(event.target.dataset.kitchenSummary)kitchenSummaryOpen=event.target.open;const id=event.target.dataset.updateForm;if(id)updateForms.set(id,{...updateForms.get(id),open:event.target.open});},true);
   $('operatorMain').addEventListener('focusout',()=>setTimeout(()=>{if(renderPending)render(client.context(),true);},0));
   $('operatorMain').addEventListener('input',event=>{
     const el=event.target;
@@ -222,6 +253,7 @@
     if(!canOperate(ctx))return;
     if(name==='tab'){kitchenTab=id;render(ctx,true);return;}
     if(name==='summary') {
+      kitchenSummaryOpen=true;
       summaryPending=true;render(ctx,true);const before=serviceSignature(ctx);
       try {const data=await client.summary(kitchen?'kitchen':'server');if(data)summary={data,signature:before};else feedback('Session changed while summary loaded. Ask again.',true);}catch(error){feedback(`Summary unavailable: ${error.message}`,true);}finally{summaryPending=false;render(client.context(),true);}return;
     }
@@ -242,5 +274,5 @@
   client.subscribe(ctx=>render(ctx));
   client.refresh().catch(error=>feedback(`Cannot load shared backend: ${error.message}`,true));
   setInterval(()=>{if(!document.hidden&&!client.context().busy)client.refresh().catch(()=>feedback('Backend unavailable · UNSYNCED. No offline action is completed.',true));},3000);
-  setInterval(elapsed,1000);
+  setInterval(()=>{elapsed();ticketAge();},1000);
 })();

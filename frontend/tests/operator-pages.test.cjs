@@ -63,12 +63,12 @@ test('concurrent identity entry cannot race two sessions',async()=>{
 // browser substitute; root also exercises these pages against a live backend.
 function pageHarness(page='order',state=snapshot()) {
  const t=transport(state),elements=new Map(),intervals=[],buttons=[],nodes=[];let currentTime=Date.parse('2026-11-14T22:10:00Z');
- const document={body:{dataset:{operatorPage:page}},activeElement:null,hidden:false,getElementById:id=>elements.get(id)||null,querySelectorAll:selector=>selector.includes('button')?buttons:selector==='[data-started]'?nodes.filter(n=>n.dataset.started):[]};
+ const document={body:{dataset:{operatorPage:page}},activeElement:null,hidden:false,getElementById:id=>elements.get(id)||null,querySelectorAll:selector=>selector.includes('button')?buttons:selector==='[data-started]'?nodes.filter(n=>n.dataset.started):selector==='[data-submitted]'?nodes.filter(n=>n.dataset.submitted):[]};
  function element(tag='div',attributes='',inside=false) {
   const attrs=Object.fromEntries([...attributes.matchAll(/([\w-]+)(?:="([^"]*)")?/g)].map(m=>[m[1],m[2]??'']));
   const el={tagName:tag.toUpperCase(),id:attrs.id||'',dataset:Object.fromEntries(Object.entries(attrs).filter(([k])=>k.startsWith('data-')).map(([k,v])=>[k.slice(5).replace(/-([a-z])/g,(_,c)=>c.toUpperCase()),v])),value:attrs.value||'',checked:'checked'in attrs,disabled:'disabled'in attrs,hidden:false,textContent:'',listeners:{},options:[],inside,
    classList:{toggle(){}},addEventListener(name,fn){this.listeners[name]=fn;},contains(other){return Boolean(other?.inside);},querySelectorAll(selector){return selector==='button'?buttons:[];},focus(){document.activeElement=this;},blur(){if(document.activeElement===this)document.activeElement=null;},setSelectionRange(){},closest(){return this;}};
-  Object.defineProperty(el,'innerHTML',{get(){return this.html||'';},set(value){this.html=value;this.options=[...value.matchAll(/<option\b/g)];if(this.id==='operatorMain'){buttons.length=0;nodes.length=0;}for(const m of value.matchAll(/<(button|input|select|textarea|span)\b([^>]*)>/g)){const node=element(m[1],m[2],this.id==='operatorMain'||this.inside);nodes.push(node);if(node.id)elements.set(node.id,node);if(m[1]==='button')buttons.push(node);}}});
+  Object.defineProperty(el,'innerHTML',{get(){return this.html||'';},set(value){this.html=value;this.options=[...value.matchAll(/<option\b/g)];if(this.id==='operatorMain'){buttons.length=0;nodes.length=0;}for(const m of value.matchAll(/<(button|input|select|textarea|span|summary)\b([^>]*)>/g)){const node=element(m[1],m[2],this.id==='operatorMain'||this.inside);nodes.push(node);if(node.id)elements.set(node.id,node);if(m[1]==='button')buttons.push(node);}}});
   if(el.id)elements.set(el.id,el);return el;
  }
  const html=readFileSync(join(__dirname,`../${page==='order'?'server-order':page==='tables'?'server-tables':'kitchen'}.html`),'utf8');
@@ -142,4 +142,29 @@ test('plaintext HTTP Basic challenge still sets needsAuth and cannot fabricate v
 test('ready units with no captured start event show unknown start time, not a fabricated not-started milestone',async()=>{
  const s=snapshot();s.orders={o:{id:'o',table_id:'1',owner:'server-1',status:'ready'}};s.dishes={d:{id:'d',order_id:'o',line_id:'line',item_name:'Soup',stage:'ready',zone_id:'A',requests:'',modifier_names:[]}};s.zones.A.dish_id='d';
  const h=pageHarness('tables',s);await h.enter();assert.match(h.html(),/Start time unknown/);assert.doesNotMatch(h.html(),/Not started/);
+});
+
+test('glanceable Kitchen sorts oldest sent first and only fully current-ready tickets get green accent',async()=>{
+ const s=snapshot();s.orders={newer:{id:'newer',table_id:'1',owner:'server-1',status:'cooking',submitted_at:'2026-11-14T22:08:00Z'},older:{id:'older',table_id:'1',owner:'server-1',status:'ready',submitted_at:'2026-11-14T22:00:00Z'}};
+ s.dishes={a:{id:'a',order_id:'older',line_id:'a',item_name:'Old dish',stage:'ready',zone_id:'A',requests:'',modifier_names:[]},b:{id:'b',order_id:'newer',line_id:'b',item_name:'New dish',stage:'started',requests:'',modifier_names:[]}};s.zones.A.dish_id='a';
+ const h=pageHarness('kitchen',s);await h.enter();assert.ok(h.html().indexOf('data-ticket="older"')<h.html().indexOf('data-ticket="newer"'));assert.match(h.html(),/class="ticket allready" data-ticket="older"/);assert.doesNotMatch(h.html(),/class="ticket allready" data-ticket="newer"/);assert.match(h.html(),/Active units/);assert.doesNotMatch(h.html(),/>All day</);assert.match(h.html(),/1\/1 ready/);
+ s.dishes.a.stage='picked_up';await h.intervals[0]();await h.settle();assert.doesNotMatch(h.html(),/class="ticket allready" data-ticket="older"/);
+});
+test('Kitchen station filter keeps full-ticket ready ratio and unit actions/context authoritative',async()=>{
+ const s=snapshot();s.orders={o:{id:'o',table_id:'1',owner:'server-1',status:'cooking',acknowledged_at:'2026-11-14T22:00:00Z'}};s.dishes={a:{id:'a',order_id:'o',line_id:'a',item_name:'Grill unit',station:'grill',stage:'ready',zone_id:'A',requests:'Exact guest words',modifier_names:['No onion']},b:{id:'b',order_id:'o',line_id:'b',item_name:'Other unit',station:'oven',stage:'started',requests:'',modifier_names:[]}};s.zones.A.dish_id='a';
+ const h=pageHarness('kitchen',s);await h.enter();const select=h.elements.get('stationFilter');select.value='grill';await h.elements.get('operatorMain').listeners.change({target:select});assert.match(h.html(),/1\/2 ready/);assert.match(h.html(),/ready count covers the full ticket/);assert.doesNotMatch(h.html(),/class="ticket allready"/);assert.match(h.html(),/Exact guest words/);assert.doesNotMatch(h.html(),/Other unit/);
+});
+test('Kitchen sent-age clocks advance without replacing focused actions and retain honest unknown age',async()=>{
+ const s=snapshot();s.orders={o:{id:'o',table_id:'1',owner:'server-1',status:'submitted',submitted_at:'2026-11-14T22:01:00Z'},unknown:{id:'unknown',table_id:'1',owner:'server-1',status:'submitted'}};const h=pageHarness('kitchen',s);await h.enter();const clock=h.nodes.find(n=>n.dataset.submitted);assert.equal(clock.textContent,'9m since sent');const button=h.buttons.find(b=>b.dataset.action==='acknowledge');button.focus();h.advance(61000);assert.equal(clock.textContent,'10m since sent');assert.equal(h.document.activeElement,button);assert.match(h.html(),/Sent time unknown/);
+});
+
+test('ready stage count stays honest while reviewed or reassigned zones withhold actionable green accent',async()=>{
+ const s=snapshot();s.orders={o:{id:'o',table_id:'1',owner:'server-1',status:'ready',submitted_at:'2026-11-14T22:00:00Z'},unknown:{id:'unknown',table_id:'1',owner:'server-1',status:'submitted',created_at:'2026-11-14T20:00:00Z'}};s.dishes={d:{id:'d',order_id:'o',line_id:'l',item_name:'Soup',stage:'ready',zone_id:'A',requests:'',modifier_names:[]}};s.zones.A.dish_id='d';s.zones.A.needs_review=true;
+ const h=pageHarness('kitchen',s);await h.enter();assert.match(h.html(),/1\/1 ready/);assert.doesNotMatch(h.html(),/class="ticket allready"|class="ticket-ready-pill done"/);assert.ok(h.html().indexOf('data-ticket="o"')<h.html().indexOf('data-ticket="unknown"'));
+ s.zones.A.needs_review=false;s.zones.A.dish_id='different';await h.intervals[0]();await h.settle();assert.doesNotMatch(h.html(),/class="ticket allready"/);assert.match(h.html(),/1\/1 ready/);
+});
+
+test('new Kitchen unit disclosure keeps open state and keyboard focus across changed polls',async()=>{
+ const s=snapshot();s.orders={o:{id:'o',table_id:'1',owner:'server-1',status:'cooking'}};s.dishes={d:{id:'d',line_id:'line',order_id:'o',item_name:'Soup',stage:'started',requests:'',modifier_names:[]}};
+ const h=pageHarness('kitchen',s);await h.enter();h.elements.get('operatorMain').listeners.toggle({target:{dataset:{unitDetails:'d'},open:true}});h.elements.get('unit-details-d').focus();s.orders.o.zone_status='waiting';await h.intervals[0]();await h.settle();assert.match(h.html(),/data-unit-details="d" open/);assert.equal(h.document.activeElement.id,'unit-details-d');assert.match(h.html(),/id="kitchen-summary-toggle"/);
 });

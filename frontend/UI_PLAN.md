@@ -24,3 +24,11 @@ Menu PDF/photo extraction, correction, automatic encoding and reviewed activatio
 - Automatic chime/vibration or bulk pickup from a potentially stale banner. Current ready unit actions remain explicit.
 
 Review source in [INTEGRATION](INTEGRATION.md). The original prototype is preserved under `prototypes/ui-abe9fb1` as unloaded `.txt` source for future contributors; its old integration assumptions are historical, not current contracts.
+
+## Kitchen glanceability increment — UI163d9e8
+
+The latest teammate Kitchen redesign is integrated through the existing canonical renderer, retaining its CSS and visual hierarchy: calm dark ticket columns, bold table labels, prominent dish names, quiet seat/physical-zone/station/modifier metadata, consistent right-aligned stage chips and restrained status color. Tickets sort oldest sent first. Neutral submission-age timers turn orange at 10 minutes and red at 15; missing submission/start times remain unknown, and no timer claims doneness. Per-unit elapsed/known typical time stays visible.
+
+A green ticket accent appears only when every physical unit on the full ticket is currently ready, still owns its assigned physical zone and has no zone review pending. Station filters change visible units, while ticket ready ratios always use the complete physical ticket. The bottom bar counts current active units, excluding picked-up/delivered history; it is deliberately not labeled “All day.” Exact guest requests remain visible in each dish row. Unit IDs, outgoing update composition and summaries use secondary disclosure controls to keep the line easy to scan; typed notes/open state and keyboard focus survive polls. Long tickets remain reachable by document scrolling, and narrow screens stack tickets vertically.
+
+No fabricated last-heard/Undo, microphone, source icon, delivery preference or camera feed is introduced. Current `/api/v2` authority, per-unit tap controls, physical-zone review, actor/credential guards, uncertain exact retry and explicit summaries are unchanged. The newest original teammate source/docs remain preserved as unloaded `.txt` reference in `prototypes/ui-163d9e8/` alongside the earlier archive.
