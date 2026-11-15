@@ -61,27 +61,50 @@ All tokens and components live in `style.css` (`:root` custom properties + `.for
 - iPhone: list first with a **Map** button and a line-icon tab bar.
 
 ### 3. Kitchen Display — `kitchen.html` (always dark)
+Built for **glanceability from across the line**, not density.
 - Translucent top bar: **Tickets | Zones | Ingredients** segmented control, mic +
-  camera status indicators, station filter, all-day dish summary.
-- **Last-heard strip:** each voice command → result, with a big Undo, readable across
-  the room.
-- **Tickets:** columns oldest-left, timers warming orange→red, dishes grouped by seat,
-  allergies as red capsules, camera/hand icon on READY dishes, Mark-ready when the
-  camera is offline.
+  camera status indicators, and the station filter. (All-day counts live in the bottom
+  bar, not duplicated up top.)
+- **Slim last-heard strip:** each voice command → result as a compact pill with a small
+  status dot and an Undo button. Deliberately low-profile so it never dominates.
+- **Tickets** (columns, oldest-left) have a clear hierarchy:
+  - Header: bold **Table N**, a **calm timer** (neutral until 10m → orange, 15m → red —
+    not red for everything), delivery mode + dish count, and a ready-count pill.
+  - Each **dish** is self-contained: prominent name, allergy as a red capsule, one quiet
+    meta line (`seat · zone · station · mods`), and a **consistent right-aligned status
+    chip** (colored dot + word + camera/hand source icon). No per-seat sub-headers —
+    seat lives in the meta line to cut a level of visual noise.
+  - A **green left accent** appears **only on fully-ready tickets** (the actionable
+    ones), so the accent means something instead of outlining every card.
 - Head-chef callouts and camera clarification cards render **dashed blue** until
-  confirmed; confirmed tickets get a solid green top accent.
-- **Zones** grid and **Ingredients** (expected vs seen-leaving vs in-stock) views.
+  confirmed; confirming turns them solid.
+- **Zones** grid (status-tinted tiles) and **Ingredients** (expected vs seen-leaving vs
+  in-stock) views share the same restrained palette.
 
 ---
 
-## What the last pass changed (minimalist redesign)
+## Change log
 
-Moved it from a generic "dashboard" look to the Apple direction above:
+**Minimalist redesign pass** — moved from a generic "dashboard" look to the Apple
+direction above:
 - Removed **all emoji** (category tiles, tab bar, delivery chips) → text / line icons.
 - Dropped the **rainbow colored-initial circles** on menu items → calm name+price cards.
 - Floor tables: **saturated blobs with 4 cramped lines → quiet tiles**, number + one
   status line, soft tint, dashed empties.
 - Softer shadows, tighter large-title tracking, consistent radii/spacing.
+
+**Kitchen Display rebuild** — the wall display was hard to read (oversized green
+checkmarks dominating the top, a heavy clarification column, every timer alarming red,
+tiny gray-on-gray dish info). Rebuilt for glanceability:
+- Slim last-heard strip (compact pills + small dot + Undo) replacing the tall
+  checkmark cards.
+- Clear ticket hierarchy: bold table name, calm timer (neutral until 10m/15m), delivery
+  + dish count, ready-count pill.
+- Each dish: prominent name, allergy pill, one meta line (seat · zone · station · mods),
+  and a consistent right-aligned status chip (dot + word + camera/hand source icon).
+- Green accent reserved for **fully-ready tickets only**, not every card.
+- Lighter clarification + head-chef cards; cleaner Zones/Ingredients; removed the
+  redundant top all-day text.
 
 ---
 
