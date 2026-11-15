@@ -28,7 +28,8 @@ async function request(path, {timeoutMs = 10000, ...options} = {}) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${API}${path}`, {...options, headers:{...(voice.auth?{Authorization:`Basic ${voice.auth}`} : {}),...options.headers}, signal: controller.signal});
-    const data = await response.json();
+    if(response.status===401){voice.auth=null;$("voice-login").hidden=false;connected(false);}
+    const data = await response.json().catch(()=>({detail:response.status===401?"Demo sign-in required":"Unexpected backend response"}));
     if (!response.ok) {
       const error = new Error(`${response.status}: ${typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data)}`);
       error.rejected = true;
@@ -90,7 +91,7 @@ async function refresh() {
     state = await request("/api/v2/state");
     render();
   } catch (error) {
-    feedback("Shared backend unavailable · UNSYNCED. Draft text stays visible, but offline orders are not completed. Reconnect before sending.", true);
+    feedback(error.status===401?"Sign in above to connect to the protected demo backend.":"Shared backend unavailable · UNSYNCED. Draft text stays visible, but offline orders are not completed. Reconnect before sending.", true);
   }
 }
 function fillSelect(id, options, placeholder) {
@@ -177,6 +178,7 @@ function flagMarkup(flag) {
   const resolve = (resolution, label) => `<button data-action="resolve-flag" data-id="${esc(flag.id)}" data-resolution="${resolution}" data-command>${label}</button>`;
   if (flag.code === "dietary_check_required") return `<article class="review-flag" role="alert"><strong>Ask the table about allergies or dietary needs</strong><p>Record the answer before sending. If anyone has a need, say it after the dish (for example "one bulldozer, seat 2, allergy to gluten") or type it in that dish's request field.</p><div class="actions">${resolve("asked_none_reported", "Asked: none")}</div></article>`;
   if (flag.code === "dietary_review" || flag.code === "dietary_unattached") return `<article class="review-flag"><strong>${flag.code === "dietary_review" ? "Check the dietary note" : "Attach this dietary note to a dish"}</strong><p>${esc(flag.message)}</p><div class="actions">${resolve("reviewed_keep_note", flag.code === "dietary_review" ? "Note is correct" : "Attach to selected saved dish")}</div><p class="note">Speech-to-text can mishear. For an unattached note, select its saved dish under “Add or edit line” below before attaching; this preserves the note on that dish. Correct an attached dish request manually before confirming.</p></article>`;
+  if (flag.code === "low_confidence") return `<article class="review-flag"><strong>Review the full speech draft</strong><p>${esc(flag.message)}</p><div class="actions">${resolve("reviewed_speech", "Reviewed table, dishes and requests")}</div></article>`;
   const mismatch = flag.code === "table_mismatch";
   const tableRequired = flag.code === "table_required";
   const candidates = flag.candidates?.map(id => menuItem(id)?.name || (typeof id === "string" ? id : JSON.stringify(id))) || [];
@@ -307,9 +309,8 @@ function cancelLive() {
 }
 async function startLive(target) {
   const ui=captureUi(target), Audio=window.AudioContext || window.webkitAudioContext;
-  if (voice.authRequired && !voice.auth) {
-    $("voice-login").hidden=false;$("voice-user").focus();ui.status.textContent="Enter the demo login above to unlock the live mic.";return false;
-  }
+  // Cached browser Basic authentication may already authorize the same-origin
+  // proxy. Attempt the ticket; only an actual 401 exposes the fallback form.
   if (!Audio || !navigator.mediaDevices?.getUserMedia) {
     ui.status.textContent="Live voice needs a secure browser with microphone and AudioContext support. Use typed text or manual entry.";return false;
   }
@@ -330,7 +331,7 @@ async function startLive(target) {
         if(["limit","error","done"].includes(message.type)) {
           stopInput(cap);cap.stopped=true;holding=false;ui.button.classList.remove("holding");ui.button.setAttribute("aria-pressed","false");
           if(message.type==="error")cap.error=message.message;
-          if(message.type==="done")cap.text=message.text || "";
+          if(message.type==="done"){cap.text=message.text || "";cap.confidence=message.confidence ?? null;}
           if(message.message)ui.status.textContent=message.message;
           if(message.type==="done" || message.type==="error") {resolve();queueMicrotask(()=>finishLive(cap));}
           else if(ws.readyState===1)ws.send(JSON.stringify({type:"stop"}));
@@ -372,7 +373,7 @@ async function finishLive(cap) {
   stopMedia(cap);capture=null;
   const text=cap.text.trim();
   if(cap.error || !text){cap.ui.field.value="";cap.ui.status.textContent=cap.error || "Nothing was heard. Try again or use manual entry.";return;}
-  const payload=cap.target==="kitchen"?{action:"kitchen_voice",text}:{action:"capture_voice",order_id:cap.pin.orderId,revision:cap.pin.revision,text,capture_mode:"live_voice"};
+  const payload=cap.target==="kitchen"?{action:"kitchen_voice",text,capture_mode:"live_voice",stt_confidence:cap.confidence ?? null}:{action:"capture_voice",order_id:cap.pin.orderId,revision:cap.pin.revision,text,capture_mode:"live_voice",stt_confidence:cap.confidence ?? null};
   const data=await dispatch(payload,"voice");
   if(data)cap.ui.field.value="";
   cap.ui.status.textContent=cap.target==="order"?"Review the draft and tap Confirm and send when correct.":"Review the exact ticket/unit result below.";
@@ -455,12 +456,13 @@ for (const [id, target] of [["hold-talk", "order"], ["kitchen-hold", "kitchen"]]
   button.addEventListener("keyup", event => { if ([" ", "Enter"].includes(event.key)) endHold(event, false, target); });
   button.addEventListener("blur", event => endHold(event, true, target));
 }
-$("voice-login").addEventListener("submit", event => {
+$("voice-login").addEventListener("submit", async event => {
   event.preventDefault();
   voice.auth = btoa(`${$("voice-user").value}:${$("voice-pass").value}`);
   $("voice-pass").value = "";
-  $("voice-login").hidden = true;
-  feedback("Live mic unlocked for this tab. Hold to talk.");
+  await refresh();
+  if(backendOnline){$("voice-login").hidden=true;await loadVoiceStatus();feedback("Signed in for this tab. Choose a staff session to continue.");}
+  else feedback("Sign-in failed. Check the demo credentials and try again.",true);
 });
 $("kitchen-voice-form").addEventListener("submit", async event => { event.preventDefault(); const data = await dispatch({action: "kitchen_voice", text: $("kitchen-transcript").value.trim()}, "voice"); if (data) $("kitchen-transcript").value = ""; });
 document.addEventListener("click", event => {

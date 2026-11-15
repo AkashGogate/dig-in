@@ -22,7 +22,7 @@ from app.mvp.menu_embeddings import MenuIndex, provider_from_env
 from app.mvp.menu_import import parse_menu, review_warnings
 from app.mvp.service_flow import apply_service_command, build_summary
 from app.mvp.voice import parse_kitchen, parse_order, suggest_items
-from app.mvp.voice_live import live_enabled
+from app.mvp.voice_live import LOW_CONFIDENCE_BELOW, live_enabled
 
 
 class Restaurant:
@@ -447,12 +447,23 @@ class Restaurant:
                     )
                 )
             self._dietary_flag(order)
+            if (
+                p.stt_confidence is not None and p.stt_confidence < LOW_CONFIDENCE_BELOW
+            ) or (p.capture_mode == "live_voice" and p.stt_confidence is None):
+                order.flags.append(
+                    c.DraftFlag(
+                        id=f"{e.event_id}:flag:low_confidence",
+                        code="low_confidence",
+                        message="Speech confidence is low or unavailable. Review the table, every dish, quantity and request before sending.",
+                    )
+                )
             order.revision += 1
             self._emit(
                 "draft.updated",
                 order.id,
                 payload={
                     "capture_mode": order.capture_mode,
+                    "stt_confidence": p.stt_confidence,
                     "initial_voice_draft_line_count": len(order.lines),
                     "flag_codes": [f.code for f in order.flags],
                     "revision": order.revision,
@@ -480,6 +491,11 @@ class Restaurant:
                 if p.resolution == "use_spoken_table":
                     self._validate_table(flag.spoken_table_id)
                     order.table_id = flag.spoken_table_id
+            elif flag.code == "low_confidence":
+                require(
+                    p.resolution in ("reviewed_speech", "reviewed_remove_unknown"),
+                    "Explicitly review the entire current speech draft",
+                )
             elif flag.code == "dietary_check_required":
                 require(
                     p.resolution == "asked_none_reported",
@@ -646,6 +662,13 @@ class Restaurant:
         if isinstance(p, c.KitchenVoice):
             self._kitchen()
             require(e.source == "voice", "Kitchen voice requires voice source")
+            require(
+                p.capture_mode != "live_voice" or live_enabled(),
+                "live_voice capture requires live voice enabled on this server",
+            )
+            low_confidence = (
+                p.stt_confidence is not None and p.stt_confidence < LOW_CONFIDENCE_BELOW
+            ) or (p.capture_mode == "live_voice" and p.stt_confidence is None)
             candidates = []
             for candidate in s.orders.values():
                 parsed = parse_kitchen(s.menus[candidate.menu_revision], p.text)
@@ -658,7 +681,8 @@ class Restaurant:
                 if candidate.table_id == parsed.get("table_id") and eligible:
                     candidates.append((candidate, parsed))
             if (
-                len(candidates) != 1
+                low_confidence
+                or len(candidates) != 1
                 or candidates[0][1].get("flags")
                 or not candidates[0][1].get("action")
             ):
@@ -708,6 +732,8 @@ class Restaurant:
                             "candidates": suggested,
                             "message": f"Did you mean {dish_names}? Tap the exact unit to start it."
                             if suggested
+                            else "Speech confidence is low or unavailable; confirm the exact ticket/unit by tap."
+                            if low_confidence
                             else "Select one eligible order by tap; table/phrase is ambiguous.",
                         }
                     ],

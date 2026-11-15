@@ -34,6 +34,20 @@ NUMBER_WORDS = {
     )
 }
 NUMBER = r"(?:\d+|" + "|".join(NUMBER_WORDS) + r")"
+# Homophones are interpreted only in the explicit table-number slot.
+TABLE_HOMOPHONES = {
+    "for": "4",
+    "fore": "4",
+    "to": "2",
+    "too": "2",
+    "won": "1",
+    "ate": "8",
+}
+TABLE_NUMBER = r"(?:" + NUMBER[3:-1] + "|" + "|".join(TABLE_HOMOPHONES) + r")"
+
+
+def _table(token: str) -> str:
+    return TABLE_HOMOPHONES.get(token.lower()) or _number(token)
 
 
 def _number(token: str) -> str:
@@ -169,8 +183,10 @@ def _extract_extras(menu: MenuDocument, phrase: str) -> tuple[str, dict]:
 def parse_order(
     menu: MenuDocument, text: str, selected_table_id: str, *, suggest=None
 ) -> dict:
-    table = re.match(r"^\s*table\s+(" + NUMBER + r")\b[\s:,.]*", text, re.IGNORECASE)
-    spoken_table = _number(table[1]) if table else None
+    table = re.match(
+        r"^\s*table\s+(" + TABLE_NUMBER + r")\b[\s:,.]*", text, re.IGNORECASE
+    )
+    spoken_table = _table(table[1]) if table else None
     remainder = text[table.end() :] if table else text
     flags = []
     if not table:
@@ -294,22 +310,22 @@ KITCHEN_FILLER = r"(?:\s+(?:thanks|thank you|please|chef|ok|okay))+$"
 
 def parse_kitchen(menu: MenuDocument, text: str) -> dict:
     clean = re.sub(KITCHEN_FILLER, "", normalize(text))
-    heard = re.fullmatch(r"heard table (" + NUMBER + r")", clean)
+    heard = re.fullmatch(r"heard table (" + TABLE_NUMBER + r")", clean)
     if heard:
         return {
             "action": "acknowledge",
-            "table_id": _number(heard[1]),
+            "table_id": _table(heard[1]),
             "menu_id": None,
             "flags": [],
         }
-    started = re.fullmatch(r"start table (" + NUMBER + r") (.+)", clean)
+    started = re.fullmatch(r"start table (" + TABLE_NUMBER + r") (.+)", clean)
     if started:
         # "start table four two bulldozers": quantity is not a unit choice, drop it.
         quantity = re.match(r"^(" + NUMBER + r")\b\s*", started[2])
         if quantity and _number(quantity[1]) != "1":
             return {
                 "action": None,
-                "table_id": _number(started[1]),
+                "table_id": _table(started[1]),
                 "menu_id": None,
                 "flags": [
                     {
@@ -325,7 +341,7 @@ def parse_kitchen(menu: MenuDocument, text: str) -> dict:
             "action": "start_dish"
             if matched["status"] == "matched" and not matched["modifiers"]
             else None,
-            "table_id": _number(started[1]),
+            "table_id": _table(started[1]),
             "dish_phrase": dish,
             "menu_id": matched["menu_id"],
             "flags": _with_suggestions(menu, dish, matched["flags"])

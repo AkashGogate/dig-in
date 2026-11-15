@@ -437,3 +437,168 @@ def test_plural_kitchen_quantity_never_starts_one_remaining_unit(demo):
     )
     assert result["result"]["flags"]
     assert core.snapshot(demo)["dishes"][second["id"]]["started_at"] is None
+
+
+def test_relay_reports_missing_word_confidence_in_done_message(live):
+    client = TestClient(app)
+    response = voice_ticket(client)
+    ticket = response.json()["ticket"]
+    with client.websocket_connect(
+        f"/api/v2/voice/stream?ticket={ticket}&session_id={response.voice_session_id}"
+    ) as ws:
+        ws.send_bytes(b"\x00\x00")
+        ws.send_text(json.dumps({"type": "stop"}))
+        messages = []
+        while not messages or messages[-1]["type"] != "done":
+            messages.append(ws.receive_json())
+    done = messages[-1]
+    # FakeDeepgram's words carry no "confidence" key; done.confidence must stay None, not 0.
+    assert done["confidence"] is None
+
+
+def test_low_confidence_transcript_still_gets_flagged_even_on_an_exact_match(
+    demo, live
+):
+    """Confidence is a second safety net: an exact alias match that Deepgram was
+    unsure about (noisy audio) still needs a human tap, not auto-accept."""
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    confident = core.send(
+        demo,
+        {
+            "action": "capture_voice",
+            "order_id": key,
+            "revision": 1,
+            "text": "Table 1: one salmon",
+            "stt_confidence": 0.95,
+        },
+        source="voice",
+    )
+    assert not confident.json()["result"]["flags"]
+    key2 = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    unsure = core.send(
+        demo,
+        {
+            "action": "capture_voice",
+            "order_id": key2,
+            "revision": 1,
+            "text": "Table 1: one salmon",
+            "stt_confidence": 0.3,
+        },
+        source="voice",
+    )
+    assert any(f["code"] == "low_confidence" for f in unsure.json()["result"]["flags"])
+
+
+def test_low_confidence_kitchen_callout_asks_for_a_tap_instead_of_acting(demo):
+    key = core.order(demo, table="1")
+    core.ack(demo, key)
+    unsure = core.ok(
+        demo,
+        {
+            "action": "kitchen_voice",
+            "text": "Start table one salmon",
+            "stt_confidence": 0.2,
+        },
+        actor="cook-1",
+        source="voice",
+    )
+    assert unsure["result"]["flags"]
+    assert core.units(demo, key)[0]["started_at"] is None
+
+
+@pytest.mark.parametrize(
+    "words,expected",
+    [
+        ([{"confidence": 0.99}, {"confidence": 0.2}], 0.2),
+        ([{"confidence": 0.99}, {}], None),
+        ([{"confidence": float("nan")}], None),
+        ([{"confidence": float("inf")}], None),
+        ([{"confidence": True}], None),
+        ([], None),
+    ],
+)
+def test_confidence_preserves_low_critical_words_and_missing_metadata(words, expected):
+    assert voice_live.transcript_confidence({"words": words}) == expected
+
+
+def test_missing_live_confidence_blocks_server_send_and_kitchen_action(demo, live):
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    result = core.ok(
+        demo,
+        {
+            "action": "capture_voice",
+            "order_id": key,
+            "revision": 1,
+            "text": "table one one salmon",
+            "capture_mode": "live_voice",
+        },
+        source="voice",
+    )
+    order = result["state"]["orders"][key]
+    flag = next(f for f in order["flags"] if f["code"] == "low_confidence")
+    assert (
+        core.send(
+            demo,
+            {
+                "action": "confirm_send",
+                "order_id": key,
+                "revision": order["revision"],
+                "human_confirmed": True,
+            },
+        ).status_code
+        == 409
+    )
+    resolved = core.ok(
+        demo,
+        {
+            "action": "resolve_flag",
+            "order_id": key,
+            "revision": order["revision"],
+            "flag_id": flag["id"],
+            "resolution": "reviewed_speech",
+        },
+    )
+    core.ok(
+        demo,
+        {
+            "action": "confirm_send",
+            "order_id": key,
+            "revision": resolved["state"]["orders"][key]["revision"],
+            "human_confirmed": True,
+        },
+    )
+    result = core.ok(
+        demo,
+        {
+            "action": "kitchen_voice",
+            "text": "heard table one",
+            "capture_mode": "live_voice",
+        },
+        actor="cook-1",
+        source="voice",
+    )
+    assert result["result"]["flags"]
+    assert result["state"]["orders"][key]["acknowledged_at"] is None
+
+
+def test_one_unknown_final_segment_keeps_relay_confidence_unknown(live, monkeypatch):
+    script = [results("Table one", True), results("one salmon", True)]
+    script[0]["channel"]["alternatives"][0]["words"] = [{"confidence": 0.99}]
+    fake = FakeDeepgram(script)
+    monkeypatch.setattr(voice_live, "deepgram_connect", lambda *a, **k: fake)
+    client = TestClient(app)
+    response = voice_ticket(client)
+    with client.websocket_connect(
+        f"/api/v2/voice/stream?ticket={response.json()['ticket']}&session_id={response.voice_session_id}"
+    ) as ws:
+        ws.send_text(json.dumps({"type": "stop"}))
+        message = ws.receive_json()
+        while message["type"] != "done":
+            message = ws.receive_json()
+        assert message["confidence"] is None

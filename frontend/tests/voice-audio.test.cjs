@@ -24,3 +24,13 @@ test('hosted empty API origin is preserved and late startup cannot clear a newer
  const sandbox={busy:false,uncertain:null,session:'s',holding:false,captureEpoch:0,voice:{live:true},state:{orders:{o:{}}},draftId:'o',kitchenRole:()=>true,feedback(){},serviceCoordination:{stopSpeech(){}},captureUi:()=>({button,status:{textContent:''}}),startLive:()=>new Promise(resolve=>attempts.push(resolve))};
  runInNewContext(begin+';this.begin=beginHold;',sandbox);sandbox.begin();sandbox.holding=false;sandbox.begin();attempts[0](false);await Promise.resolve();assert.equal(sandbox.holding,true);attempts[1](true);await Promise.resolve();
 });
+test('protected backend 401 exposes tab login and rejects stale credentials',async()=>{
+ const source=readFileSync(join(__dirname,'../app.js'),'utf8');
+ const request=source.slice(source.indexOf('async function request('),source.indexOf('function setBusy('));
+ const login={hidden:true};let online=true;
+ const sandbox={API:'',voice:{auth:'old'},$:()=>login,connected:ok=>online=ok,AbortController,setTimeout,clearTimeout,
+  fetch:async()=>({status:401,ok:false,json:async()=>{throw new Error('plain text challenge');}})};
+ runInNewContext(request+';this.call=request;',sandbox);
+ await assert.rejects(sandbox.call('/api/v2/state'),error=>error.status===401);
+ assert.equal(login.hidden,false);assert.equal(sandbox.voice.auth,null);assert.equal(online,false);
+});

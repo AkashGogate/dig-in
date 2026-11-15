@@ -1,0 +1,1124 @@
+{
+ "run_id": "20261114T234910Z-mock",
+ "created_at": "2026-11-14T23:49:10+00:00",
+ "commit": "63bff91",
+ "mode": "mock",
+ "test_sets": [
+  "kitchen_callouts",
+  "safety_regressions",
+  "server_orders"
+ ],
+ "personas": [
+  "scripted_text"
+ ],
+ "iterations": 1,
+ "billable_audio_seconds": 0.0,
+ "agent_config": {
+  "menu_id": "dig-in",
+  "parser": "app.mvp.voice + app.mvp.domain (v2)",
+  "stt": "deepgram prerecorded",
+  "stt_params": [
+   [
+    "model",
+    "nova-3"
+   ],
+   [
+    "language",
+    "en"
+   ],
+   [
+    "smart_format",
+    "false"
+   ],
+   [
+    "punctuate",
+    "true"
+   ],
+   [
+    "mip_opt_out",
+    "true"
+   ]
+  ],
+  "keyterm_count": 44,
+  "similarity_min": 0.5
+ },
+ "summary": [
+  {
+   "persona": "recorded_transcript",
+   "test_set": "safety_regressions",
+   "n": 7,
+   "exact": 1,
+   "flagged": 6,
+   "wrong": 0,
+   "passed": 7,
+   "mean_item_recall": 0.571,
+   "mean_wer": 0.734
+  },
+  {
+   "persona": "scripted_text",
+   "test_set": "kitchen_callouts",
+   "n": 9,
+   "exact": 9,
+   "flagged": 0,
+   "wrong": 0,
+   "passed": 9,
+   "mean_item_recall": 1.0,
+   "mean_wer": null
+  },
+  {
+   "persona": "scripted_text",
+   "test_set": "server_orders",
+   "n": 8,
+   "exact": 8,
+   "flagged": 0,
+   "wrong": 0,
+   "passed": 8,
+   "mean_item_recall": 1.0,
+   "mean_wer": null
+  }
+ ],
+ "results": [
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "heard",
+   "flow": "kitchen",
+   "tags": [
+    "acknowledge"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Heard, table four",
+   "heard": "Heard, table four",
+   "actual": {
+    "acknowledged": [
+     "T4"
+    ],
+    "started": [],
+    "candidates": [],
+    "asked": false
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "heard_filler",
+   "flow": "kitchen",
+   "tags": [
+    "acknowledge",
+    "filler"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Heard table four, thanks",
+   "heard": "Heard table four, thanks",
+   "actual": {
+    "acknowledged": [
+     "T4"
+    ],
+    "started": [],
+    "candidates": [],
+    "asked": false
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "start",
+   "flow": "kitchen",
+   "tags": [
+    "start"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Start table four bulldozer",
+   "heard": "Start table four bulldozer",
+   "actual": {
+    "acknowledged": [],
+    "started": [
+     "T4:bulldozer"
+    ],
+    "candidates": [],
+    "asked": false
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "start_with_quantity",
+   "flow": "kitchen",
+   "tags": [
+    "start",
+    "quantity"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Start table four, one bulldozer",
+   "heard": "Start table four, one bulldozer",
+   "actual": {
+    "acknowledged": [],
+    "started": [
+     "T4:bulldozer"
+    ],
+    "candidates": [],
+    "asked": false
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "start_homophone_table",
+   "flow": "kitchen",
+   "tags": [
+    "start",
+    "homophone"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Start table for bulldozer",
+   "heard": "Start table for bulldozer",
+   "actual": {
+    "acknowledged": [],
+    "started": [
+     "T4:bulldozer"
+    ],
+    "candidates": [],
+    "asked": false
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "repeated_dish_asks",
+   "flow": "kitchen",
+   "tags": [
+    "ambiguity"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Start table four bulldozer",
+   "heard": "Start table four bulldozer",
+   "actual": {
+    "acknowledged": [],
+    "started": [],
+    "candidates": [],
+    "asked": true
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": null,
+    "item_recall": null,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "same_table_two_orders_asks",
+   "flow": "kitchen",
+   "tags": [
+    "ambiguity"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Heard, table two",
+   "heard": "Heard, table two",
+   "actual": {
+    "acknowledged": [],
+    "started": [],
+    "candidates": [],
+    "asked": true
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": null,
+    "item_recall": null,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "misheard_dish_suggested_on_ticket",
+   "flow": "kitchen",
+   "tags": [
+    "similarity_candidate"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Start table three back hoe",
+   "heard": "Start table three back hoe",
+   "actual": {
+    "acknowledged": [],
+    "started": [],
+    "candidates": [
+     "backhoe"
+    ],
+    "asked": true
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": null,
+    "item_recall": null,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "kitchen_callouts",
+   "case_id": "wrong_table_not_touched",
+   "flow": "kitchen",
+   "tags": [
+    "safety"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Heard, table one",
+   "heard": "Heard, table one",
+   "actual": {
+    "acknowledged": [],
+    "started": [],
+    "candidates": [],
+    "asked": true
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": null,
+    "item_recall": null,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "safety_regressions",
+   "case_id": "merged_number_table_31",
+   "flow": "server",
+   "tags": [
+    "smart_format_merge"
+   ],
+   "persona": "recorded_transcript",
+   "iteration": 0,
+   "scripted": "Table three, one backhoe without slaw",
+   "heard": "Table 31 backhoe without slaw",
+   "actual": {
+    "table_id": "31",
+    "lines": [
+     {
+      "menu_id": "backhoe",
+      "quantity": 1,
+      "modifiers": [
+       "no_slaw"
+      ],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [
+     "quantity_required",
+     "table_mismatch"
+    ],
+    "candidates": [
+     "3",
+     "31"
+    ],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": false,
+    "safety_outcome": "flagged",
+    "table_accuracy": false,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": null,
+    "flag_correctness": false,
+    "wer": 0.333,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": 1.0
+   },
+   "allowed_outcomes": [
+    "exact",
+    "flagged"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "safety_regressions",
+   "case_id": "merged_number_table_11",
+   "flow": "server",
+   "tags": [
+    "smart_format_merge"
+   ],
+   "persona": "recorded_transcript",
+   "iteration": 0,
+   "scripted": "Table one, one bulldozer",
+   "heard": "Table 11 bulldozer",
+   "actual": {
+    "table_id": "11",
+    "lines": [
+     {
+      "menu_id": "bulldozer",
+      "quantity": 1,
+      "modifiers": [],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [
+     "quantity_required",
+     "table_mismatch"
+    ],
+    "candidates": [
+     "1",
+     "11"
+    ],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": false,
+    "safety_outcome": "flagged",
+    "table_accuracy": false,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": null,
+    "flag_correctness": false,
+    "wer": 0.5,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": 1.0
+   },
+   "allowed_outcomes": [
+    "exact",
+    "flagged"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "safety_regressions",
+   "case_id": "overlap_appended_to_order",
+   "flow": "server",
+   "tags": [
+    "overlap"
+   ],
+   "persona": "recorded_transcript",
+   "iteration": 0,
+   "scripted": "Table two, one mac and cheese and three tots",
+   "heard": "Table two one mac and cheese and three tots table nine",
+   "actual": {
+    "table_id": "2",
+    "lines": [
+     {
+      "menu_id": "cement_mixer_mac",
+      "quantity": 1,
+      "modifiers": [],
+      "seat": null,
+      "requests": ""
+     },
+     {
+      "menu_id": "gravel_pit_tots",
+      "quantity": 3,
+      "modifiers": [],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [
+     "unknown_terms"
+    ],
+    "candidates": [],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": false,
+    "safety_outcome": "flagged",
+    "table_accuracy": true,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": null,
+    "flag_correctness": false,
+    "wer": 0.222,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": 1.0
+   },
+   "allowed_outcomes": [
+    "exact",
+    "flagged"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "safety_regressions",
+   "case_id": "heard_misheard_as_pert",
+   "flow": "kitchen",
+   "tags": [
+    "noise"
+   ],
+   "persona": "recorded_transcript",
+   "iteration": 0,
+   "scripted": "Heard, table four",
+   "heard": "PERT, table four.",
+   "actual": {
+    "acknowledged": [],
+    "started": [],
+    "candidates": [],
+    "asked": true
+   },
+   "metrics": {
+    "exact_parse": false,
+    "safety_outcome": "flagged",
+    "table_accuracy": null,
+    "item_precision": null,
+    "item_recall": 0.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": false,
+    "wer": 0.333,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact",
+    "flagged"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "safety_regressions",
+   "case_id": "table_for_homophone",
+   "flow": "kitchen",
+   "tags": [
+    "homophone"
+   ],
+   "persona": "recorded_transcript",
+   "iteration": 0,
+   "scripted": "Start table four bulldozer",
+   "heard": "Start table for bulldozer",
+   "actual": {
+    "acknowledged": [],
+    "started": [
+     "T4:bulldozer"
+    ],
+    "candidates": [],
+    "asked": false
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": null,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": 0.25,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": 1.0
+   },
+   "allowed_outcomes": [
+    "exact",
+    "flagged"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "safety_regressions",
+   "case_id": "overlap_after_heard",
+   "flow": "kitchen",
+   "tags": [
+    "overlap"
+   ],
+   "persona": "recorded_transcript",
+   "iteration": 0,
+   "scripted": "Heard, table four",
+   "heard": "Heard table four. Grab a refill for table nine.",
+   "actual": {
+    "acknowledged": [],
+    "started": [],
+    "candidates": [],
+    "asked": true
+   },
+   "metrics": {
+    "exact_parse": false,
+    "safety_outcome": "flagged",
+    "table_accuracy": null,
+    "item_precision": null,
+    "item_recall": 0.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": false,
+    "wer": 2.0,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact",
+    "flagged"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "safety_regressions",
+   "case_id": "overlap_after_start",
+   "flow": "kitchen",
+   "tags": [
+    "overlap"
+   ],
+   "persona": "recorded_transcript",
+   "iteration": 0,
+   "scripted": "Start table four bulldozer",
+   "heard": "Start table four bulldozer grab a refill for table nine",
+   "actual": {
+    "acknowledged": [],
+    "started": [],
+    "candidates": [
+     "bulldozer"
+    ],
+    "asked": true
+   },
+   "metrics": {
+    "exact_parse": false,
+    "safety_outcome": "flagged",
+    "table_accuracy": null,
+    "item_precision": null,
+    "item_recall": 0.0,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": false,
+    "wer": 1.5,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": 1.0
+   },
+   "allowed_outcomes": [
+    "exact",
+    "flagged"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "server_orders",
+   "case_id": "two_dishes_modifier",
+   "flow": "server",
+   "tags": [
+    "quantity",
+    "modifier"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Table four, two bulldozers, hold the pickles, and one dirt site",
+   "heard": "Table four, two bulldozers, hold the pickles, and one dirt site",
+   "actual": {
+    "table_id": "4",
+    "lines": [
+     {
+      "menu_id": "bulldozer",
+      "quantity": 2,
+      "modifiers": [
+       "no_pickles"
+      ],
+      "seat": null,
+      "requests": ""
+     },
+     {
+      "menu_id": "dirt_site",
+      "quantity": 1,
+      "modifiers": [],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [],
+    "candidates": [],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": true,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "server_orders",
+   "case_id": "internal_and",
+   "flow": "server",
+   "tags": [
+    "and_in_name"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Table two, one mac and cheese and three tots",
+   "heard": "Table two, one mac and cheese and three tots",
+   "actual": {
+    "table_id": "2",
+    "lines": [
+     {
+      "menu_id": "cement_mixer_mac",
+      "quantity": 1,
+      "modifiers": [],
+      "seat": null,
+      "requests": ""
+     },
+     {
+      "menu_id": "gravel_pit_tots",
+      "quantity": 3,
+      "modifiers": [],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [],
+    "candidates": [],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": true,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "server_orders",
+   "case_id": "table_mismatch",
+   "flow": "server",
+   "tags": [
+    "table_mismatch",
+    "modifier"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Table three, one backhoe without slaw",
+   "heard": "Table three, one backhoe without slaw",
+   "actual": {
+    "table_id": "3",
+    "lines": [
+     {
+      "menu_id": "backhoe",
+      "quantity": 1,
+      "modifiers": [
+       "no_slaw"
+      ],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [
+     "table_mismatch"
+    ],
+    "candidates": [
+     "1",
+     "3"
+    ],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": true,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "server_orders",
+   "case_id": "misheard_name",
+   "flow": "server",
+   "tags": [
+    "similarity_candidate"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Table one, one bull dozer",
+   "heard": "Table one, one bull dozer",
+   "actual": {
+    "table_id": "1",
+    "lines": [],
+    "flag_codes": [
+     "no_items",
+     "unknown_item"
+    ],
+    "candidates": [
+     "bulldozer"
+    ],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": true,
+    "item_precision": null,
+    "item_recall": null,
+    "quantity_accuracy": null,
+    "modifier_accuracy": null,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "server_orders",
+   "case_id": "seat_and_allergy",
+   "flow": "server",
+   "tags": [
+    "seat",
+    "dietary"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Table two, one bulldozer, seat two, allergy to gluten",
+   "heard": "Table two, one bulldozer, seat two, allergy to gluten",
+   "actual": {
+    "table_id": "2",
+    "lines": [
+     {
+      "menu_id": "bulldozer",
+      "quantity": 1,
+      "modifiers": [],
+      "seat": 2,
+      "requests": "allergy to gluten"
+     }
+    ],
+    "flag_codes": [
+     "dietary_review"
+    ],
+    "candidates": [],
+    "dietary_check": "requests_recorded"
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": true,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": 1.0,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "server_orders",
+   "case_id": "no_allergies",
+   "flow": "server",
+   "tags": [
+    "dietary"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Table two, one bulldozer and no allergies",
+   "heard": "Table two, one bulldozer and no allergies",
+   "actual": {
+    "table_id": "2",
+    "lines": [
+     {
+      "menu_id": "bulldozer",
+      "quantity": 1,
+      "modifiers": [],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [],
+    "candidates": [],
+    "dietary_check": "none_reported"
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": true,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": 1.0,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "server_orders",
+   "case_id": "two_modifiers",
+   "flow": "server",
+   "tags": [
+    "modifier"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Table one, one bulldozer, no onions, sauce on the side",
+   "heard": "Table one, one bulldozer, no onions, sauce on the side",
+   "actual": {
+    "table_id": "1",
+    "lines": [
+     {
+      "menu_id": "bulldozer",
+      "quantity": 1,
+      "modifiers": [
+       "no_onions",
+       "sauce_side"
+      ],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [],
+    "candidates": [],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": true,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  },
+  {
+   "test_set": "server_orders",
+   "case_id": "homophone_table",
+   "flow": "server",
+   "tags": [
+    "homophone"
+   ],
+   "persona": "scripted_text",
+   "iteration": 0,
+   "scripted": "Table for, one steel beams",
+   "heard": "Table for, one steel beams",
+   "actual": {
+    "table_id": "4",
+    "lines": [
+     {
+      "menu_id": "steel_beams",
+      "quantity": 1,
+      "modifiers": [],
+      "seat": null,
+      "requests": ""
+     }
+    ],
+    "flag_codes": [],
+    "candidates": [],
+    "dietary_check": "not_asked"
+   },
+   "metrics": {
+    "exact_parse": true,
+    "safety_outcome": "exact",
+    "table_accuracy": true,
+    "item_precision": 1.0,
+    "item_recall": 1.0,
+    "quantity_accuracy": 1.0,
+    "modifier_accuracy": 1.0,
+    "seat_dietary_capture": null,
+    "flag_correctness": true,
+    "wer": null,
+    "stt_latency_ms": null,
+    "menu_term_hit_rate": null
+   },
+   "allowed_outcomes": [
+    "exact"
+   ],
+   "passed": true
+  }
+ ],
+ "gate_passed": true,
+ "regressions": []
+}

@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import secrets
 import threading
@@ -42,6 +43,7 @@ log = logging.getLogger("dig_in.voice")
 DEEPGRAM_LISTEN = "wss://api.deepgram.com/v1/listen"
 GRAMMAR_TERMS = ["table", "heard", "start"]
 MAX_KEYTERMS = 100  # Deepgram caps keyterm prompting; keep well under its token limit.
+LOW_CONFIDENCE_BELOW = 0.6  # Provisional review threshold, not calibrated accuracy.
 TICKET_TTL_SECONDS = 30
 deepgram_connect = websockets.connect  # swapped in tests
 
@@ -81,7 +83,8 @@ def listen_url(menu: MenuDocument) -> str:
         ("sample_rate", "16000"),
         ("channels", "1"),
         ("language", "en"),
-        ("smart_format", "true"),
+        ("smart_format", "false"),  # Avoid merging table and quantity into one number.
+        ("punctuate", "true"),
         ("interim_results", "true"),
         ("mip_opt_out", "true"),
         ("redact_usage", "true"),  # redact keyterm text in provider usage metadata
@@ -264,10 +267,34 @@ async def _send(ws: WebSocket, message: dict) -> None:
         pass  # browser left; keep draining Deepgram so usage is still counted
 
 
+def transcript_confidence(alternative: dict) -> float | None:
+    """Conservative final-word confidence; missing metadata is unknown, not high.
+
+    Shared by live relay and prerecorded evaluator. This is a review hint, not
+    authenticated provider proof or a calibrated probability of correctness.
+    """
+    words = alternative.get("words")
+    if not isinstance(words, list) or not words:
+        return None
+    values = []
+    for word in words:
+        value = word.get("confidence") if isinstance(word, dict) else None
+        if not (
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            and 0 <= value <= 1
+        ):
+            return None
+        values.append(float(value))
+    return min(values)
+
+
 async def relay(ws: WebSocket, menu: MenuDocument, allowed_seconds: float) -> float:
     """Pipe browser audio to Deepgram; return billed audio seconds."""
     started = time.monotonic()
     finals: list[str] = []
+    word_confidences: list[float | None] = []
     billed: float | None = None
     accepted_bytes = 0
     headers = {"Authorization": f"Token {os.environ['DEEPGRAM_API_KEY']}"}
@@ -336,14 +363,13 @@ async def relay(ws: WebSocket, menu: MenuDocument, allowed_seconds: float) -> fl
                         billed = float(event.get("duration") or 0)
                     if event.get("type") != "Results":
                         continue
-                    text = (
-                        event.get("channel", {})
-                        .get("alternatives", [{}])[0]
-                        .get("transcript", "")
-                    )
+                    alternatives = event.get("channel", {}).get("alternatives") or [{}]
+                    alt = alternatives[0]
+                    text = alt.get("transcript", "")
                     if event.get("is_final"):
                         if text:
                             finals.append(text)
+                            word_confidences.append(transcript_confidence(alt))
                         await _send(ws, {"type": "final", "text": " ".join(finals)})
                     elif text:
                         await _send(
@@ -351,7 +377,14 @@ async def relay(ws: WebSocket, menu: MenuDocument, allowed_seconds: float) -> fl
                         )
         finally:
             pump_task.cancel()
-    await _send(ws, {"type": "done", "text": " ".join(finals)})
+    confidence = (
+        min(word_confidences)
+        if word_confidences and all(v is not None for v in word_confidences)
+        else None
+    )
+    await _send(
+        ws, {"type": "done", "text": " ".join(finals), "confidence": confidence}
+    )
     return billed if billed is not None else accepted_bytes / 32000
 
 

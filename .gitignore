@@ -51,3 +51,6 @@ tmp/
 cv-service/logs/
 kitchen-backend/data/
 cv-service/models/
+
+# Regenerated synthetic voice persona audio stays local.
+audio-samples/dig-in/generated/

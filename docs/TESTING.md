@@ -73,9 +73,11 @@ Mock eval feeds ground-truth transcripts and proves scoring/plumbing, not microp
 Server orders and Kitchen callouts, each clean / kitchen noise bed / overlapping second speaker (18 synthetic `say` clips, 52s, `audio-samples/dig-in/`). From `backend/`:
 
 ```bash
-uv run python -m audio_gen.generate_dig_in            # macOS only; regenerates clips + manifest
-uv run python -m eval.run_dig_in_eval --mode mock     # free: ground-truth text through the v2 parser; plumbing proof, not speech accuracy
-uv run python -m eval.run_dig_in_eval --mode deepgram # BILLABLE: prints seconds/cost and refuses without --confirm-billable
+uv run python -m eval.dig_in.run --mode mock
+# Free exact-duration preflight; audio rendering uses macOS say:
+uv run python -m eval.dig_in.run --mode deepgram --max-audio-seconds 600
+# After deliberate authorization, add --confirm-billable and configure the key.
+# Narrow with --test-set server_orders --persona standard_server if needed.
 ```
 
 Live scoring uses the same nova-3/keyterm/`mip_opt_out` params as the live adapter. Run it only within explicit live-testing authorization, then add `--confirm-billable` (needs `DEEPGRAM_API_KEY`). The scorecard (`audio-samples/dig-in/scorecard.md`) states its mode; synthetic TTS is not a real kitchen.
@@ -104,3 +106,17 @@ Credentials come from environment only. `scripts.mvp_smoke` also accepts those
 environment values, but creates labeled simulated orders and needs a fresh menu
 with at least two dishes/free zones. See DEPLOYMENT for real hosted browser,
 large PDF/photo proxy uploads, paced synthetic STT and physical rig checks.
+
+
+The current voice harness uses test sets × six synthetic personas; MOCK collapses
+scripted persona duplicates and includes fixed historical failure transcripts.
+Current test sets use canonical menu IDs. Historical run artifacts are preserved
+unchanged and labeled in eval/dig_in/runs/README.md. Generated audio and routine
+reports stay ignored. Empty/nonfinite clips fail before provider calls. Exact
+sample durations enforce a finite positive cap; only display is rounded.
+Live evaluation propagates the shared minimum finalized-word confidence through
+live domain commands. Any missing/invalid segment metadata remains unknown.
+Low/unknown live speech blocks Server send for explicit full-draft review and
+makes Kitchen clarify; mock text with no confidence stays usable. The0.6 threshold
+is provisional, not calibrated accuracy. Unit scoring retains duplicate physical
+units; a passed safety gate can include safely flagged, inaccurate transcripts.
