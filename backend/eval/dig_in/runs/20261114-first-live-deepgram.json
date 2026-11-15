@@ -1,0 +1,181 @@
+{
+ "run_id": "20261114-first-live-deepgram",
+ "mode": "deepgram",
+ "created_at": "2026-11-14",
+ "commit": "3696a15 (parser before 63bff91)",
+ "note": "First user-approved live run: 18 macOS say clips (6 scenarios x clean/noise/overlap), nova-3 prerecorded with smart_format ON, about 52.4 s audio, about USD 0.0067. Converted from the old audio-samples/dig-in/scorecard.md. Kitchen rescore is parse-level (this run predates end-to-end kitchen simulation). The 7 failure transcripts now live in test_sets/safety_regressions.json.",
+ "summary_at_run": {
+  "exact": 8,
+  "flagged": 10,
+  "wrong": 0
+ },
+ "summary_rescored_current_parser": {
+  "exact": 10,
+  "flagged": 8,
+  "wrong": 0
+ },
+ "results": [
+  {
+   "clip": "server_two_dishes_modifier__clean",
+   "flow": "server",
+   "persona": "standard_server",
+   "scripted": "Table four, two bulldozers, hold the pickles, and one dirt site",
+   "heard": "Table four two bulldozers hold the pickles and one dirt site",
+   "outcome_at_run": "exact",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "server_two_dishes_modifier__noise",
+   "flow": "server",
+   "persona": "line_cook_noise",
+   "scripted": "Table four, two bulldozers, hold the pickles, and one dirt site",
+   "heard": "Table four two bulldozers hold the pickles and one dirt site",
+   "outcome_at_run": "exact",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "server_two_dishes_modifier__overlap",
+   "flow": "server",
+   "persona": "interrupted",
+   "scripted": "Table four, two bulldozers, hold the pickles, and one dirt site",
+   "heard": "Table four, two bulldozers, hold the pickles, and one dirt site.",
+   "outcome_at_run": "exact",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "server_internal_and__clean",
+   "flow": "server",
+   "persona": "standard_server",
+   "scripted": "Table two, one mac and cheese and three tots",
+   "heard": "Table two one mac and cheese and three tots",
+   "outcome_at_run": "exact",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "server_internal_and__noise",
+   "flow": "server",
+   "persona": "line_cook_noise",
+   "scripted": "Table two, one mac and cheese and three tots",
+   "heard": "Table two one mac and cheese and three tots",
+   "outcome_at_run": "exact",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "server_internal_and__overlap",
+   "flow": "server",
+   "persona": "interrupted",
+   "scripted": "Table two, one mac and cheese and three tots",
+   "heard": "Table two one mac and cheese and three tots table nine",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "flagged"
+  },
+  {
+   "clip": "server_table_mismatch__clean",
+   "flow": "server",
+   "persona": "standard_server",
+   "scripted": "Table three, one backhoe without slaw",
+   "heard": "Table three, one backhoe without slaw.",
+   "outcome_at_run": "exact",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "server_table_mismatch__noise",
+   "flow": "server",
+   "persona": "line_cook_noise",
+   "scripted": "Table three, one backhoe without slaw",
+   "heard": "Table 31 backhoe without slaw",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "flagged"
+  },
+  {
+   "clip": "server_table_mismatch__overlap",
+   "flow": "server",
+   "persona": "interrupted",
+   "scripted": "Table three, one backhoe without slaw",
+   "heard": "Table 31 Backho without swab table 9",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "flagged"
+  },
+  {
+   "clip": "server_misheard_name__clean",
+   "flow": "server",
+   "persona": "standard_server",
+   "scripted": "Table one, one bull dozer",
+   "heard": "Table one, one bulldozer.",
+   "outcome_at_run": "exact",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "server_misheard_name__noise",
+   "flow": "server",
+   "persona": "line_cook_noise",
+   "scripted": "Table one, one bull dozer",
+   "heard": "Table 11 bulldozer",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "flagged"
+  },
+  {
+   "clip": "server_misheard_name__overlap",
+   "flow": "server",
+   "persona": "interrupted",
+   "scripted": "Table one, one bull dozer",
+   "heard": "Table one. One bulldozer. Refill for table nine.",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "flagged"
+  },
+  {
+   "clip": "kitchen_heard__clean",
+   "flow": "kitchen",
+   "persona": "standard_server",
+   "scripted": "Heard, table four",
+   "heard": "Heard. Table four.",
+   "outcome_at_run": "exact",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "kitchen_heard__noise",
+   "flow": "kitchen",
+   "persona": "line_cook_noise",
+   "scripted": "Heard, table four",
+   "heard": "PERT, table four.",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "flagged"
+  },
+  {
+   "clip": "kitchen_heard__overlap",
+   "flow": "kitchen",
+   "persona": "interrupted",
+   "scripted": "Heard, table four",
+   "heard": "Heard table four. Grab a refill for table nine.",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "flagged"
+  },
+  {
+   "clip": "kitchen_start__clean",
+   "flow": "kitchen",
+   "persona": "standard_server",
+   "scripted": "Start table four bulldozer",
+   "heard": "Start table for bulldozer",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "kitchen_start__noise",
+   "flow": "kitchen",
+   "persona": "line_cook_noise",
+   "scripted": "Start table four bulldozer",
+   "heard": "Start table for bulldozer",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "exact"
+  },
+  {
+   "clip": "kitchen_start__overlap",
+   "flow": "kitchen",
+   "persona": "interrupted",
+   "scripted": "Start table four bulldozer",
+   "heard": "Start table four bulldozer grab a refill for table nine",
+   "outcome_at_run": "flagged",
+   "outcome_rescored_current_parser": "flagged"
+  }
+ ]
+}

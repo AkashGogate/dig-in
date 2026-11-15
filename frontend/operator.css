@@ -1,0 +1,100 @@
+/* Native UI branch tokens/components; these additions connect real v2 flows. */
+html,body {height:auto;min-height:100%;overflow:auto}
+body {display:block;background:var(--sys-grouped)}
+* {box-sizing:border-box}
+button,input,select,textarea {font:inherit}
+button,input,select {min-height:44px}
+button,a {touch-action:manipulation}
+a {color:var(--blue)}
+:focus-visible {outline:3px solid var(--blue);outline-offset:3px}
+[hidden] {display:none!important}
+.operator-header {position:sticky;top:0;z-index:5;background:var(--bar-bg);backdrop-filter:blur(20px);border-bottom:1px solid var(--sep);padding:14px max(18px,calc((100vw - 1360px)/2));display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.operator-header h1 {font-size:22px;margin:0 auto 0 0}
+.operator-header nav {display:flex;gap:18px;flex-wrap:wrap}
+.operator-header nav a[aria-current] {font-weight:700;color:var(--label)}
+.operator-shell {max-width:1360px;margin:auto;padding:20px 18px 80px}
+.operator-session {padding:16px;background:var(--sys-grouped2);border-radius:var(--r-lg);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.operator-session label {display:flex;gap:8px;align-items:center}
+.operator-session select,.operator-form select,.operator-form input,.operator-form textarea,.operator-controls select,.operator-controls input {border:1px solid var(--sep-opaque);border-radius:10px;padding:8px 10px;background:var(--sys-grouped2);color:var(--label);font-size:16px;max-width:100%}
+.operator-session button,.operator-action {border:0;border-radius:10px;padding:8px 14px;background:var(--blue);color:#fff;font-weight:600;cursor:pointer;min-height:44px}
+button:disabled {opacity:.45;cursor:default}
+.operator-feedback {min-height:32px;padding:12px 0;color:var(--label2)}
+.operator-feedback.error,.operator-warning {color:var(--red)}
+.operator-hint {color:var(--label2);font-size:14px;line-height:1.5;margin:8px 0 16px}
+.operator-layout {display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.operator-card {background:var(--sys-grouped2);border-radius:var(--r-xl);padding:18px;margin-bottom:16px;border:1px solid var(--sep)}
+.operator-card h2,.operator-card h3 {margin:0 0 12px}
+.operator-controls {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}
+.operator-menu {display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.operator-menu .item-card {text-align:left;min-height:110px;padding:16px}
+.operator-form {display:grid;gap:14px}
+.operator-form label {display:grid;gap:6px}
+.operator-modifiers {display:flex;gap:12px;flex-wrap:wrap}
+.operator-modifiers label {display:flex;align-items:center;gap:5px}
+.operator-modifiers input {min-height:24px;width:24px}
+.operator-unit {padding:14px 0;border-top:1px solid var(--sep)}
+.operator-unit:first-child {border-top:0}
+.operator-unit p {margin:5px 0;font-size:14px;color:var(--label2)}
+.operator-unit strong {font-size:17px}
+.operator-tickets {display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;align-items:start}
+.operator-tickets .operator-card {margin:0}
+.operator-label {font-size:13px;color:var(--label2);overflow-wrap:anywhere}
+.operator-pill {padding:5px 10px;border-radius:20px;background:var(--fill3);display:inline-block;font-size:13px}
+.operator-notes {white-space:pre-wrap;color:var(--label);overflow-wrap:anywhere}
+.operator-summary {white-space:pre-wrap;line-height:1.6;font:inherit;background:var(--fill3);padding:16px;border-radius:12px}
+.operator-zones {display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.operator-zones .operator-card {margin:0}
+.operator-section {margin-top:24px}
+.operator-retry {padding:14px;border:2px solid var(--orange);border-radius:12px;margin:8px 0}
+.operator-flag {padding:14px;background:var(--blue-bg);border:1px dashed var(--blue);border-radius:12px;margin:12px 0}
+.operator-section table {width:100%;border-collapse:collapse}
+.operator-section td,.operator-section th {padding:10px;text-align:left;border-bottom:1px solid var(--sep)}
+@media(max-width:760px){.operator-layout{grid-template-columns:1fr}.operator-header{position:relative;gap:12px}.operator-header nav{gap:12px}.operator-shell{padding-top:12px}.operator-tickets{grid-template-columns:1fr}.operator-session{align-items:flex-start}.operator-session label{flex-direction:column;align-items:flex-start}.operator-form textarea{width:100%}}
+.operator-session input {border:1px solid var(--sep-opaque);border-radius:10px;padding:8px 10px;background:var(--sys-grouped2);color:var(--label);font-size:16px;max-width:100%}
+/* Kitchen UI163d9e8: calm oldest-left tickets, exact unit status, sparse chrome. */
+body[data-operator-page="kitchen"] .operator-shell {max-width:none;padding:16px 24px 80px}
+body[data-operator-page="kitchen"] .operator-header {padding:14px 24px}
+body[data-operator-page="kitchen"] .operator-session {padding:10px 14px;font-size:14px}
+body[data-operator-page="kitchen"] .operator-hint {font-size:13px}
+body[data-operator-page="kitchen"] .operator-controls h2 {font-size:18px;margin-right:auto}
+body[data-operator-page="kitchen"] .operator-feedback:empty {min-height:0;padding:0}
+body[data-operator-page="kitchen"] .kitchen-lineup-hint {max-width:1000px}
+.kds-tickets {display:flex;align-items:flex-start;gap:16px;overflow-x:auto;padding:4px 0 18px;scrollbar-width:thin}
+.kds-tickets .ticket {width:360px;max-width:88vw;flex:0 0 auto}
+.kds-tickets .ticket-table {margin:0;font-size:23px;line-height:28px}
+.kds-tickets .ticket-head .operator-label {margin-top:8px;font-size:12px}
+.kds-tickets .ticket-timer {font-size:14px;white-space:nowrap}
+.kds-tickets .dish {gap:8px}
+.kds-tickets .dish-name {font-size:19px;line-height:25px}
+.kds-tickets .dish-meta {color:var(--label2);line-height:19px;overflow-wrap:anywhere}
+.kds-tickets .dish-requests {margin:7px 0;color:var(--label);font-size:14px;line-height:20px;white-space:pre-wrap;overflow-wrap:anywhere}
+.kds-tickets .d-status {padding-top:4px;font-size:12px}
+.kds-tickets .d-status.started {color:var(--orange)}
+.kds-tickets .d-status.queued {color:var(--label2)}
+.kds-tickets .dish-actions {display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.kds-tickets .dish-actions .operator-action {font-size:13px;padding:8px 10px;background:var(--fill3);color:var(--label);border:1px solid var(--sep);min-height:44px}
+.kds-tickets .dish-provenance {font-size:12px;color:var(--label2)}
+.kds-tickets .ticket-coordination {padding:4px 18px 16px;font-size:13px}
+.kds-tickets .ticket-coordination summary {min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--blue)}
+.kds-tickets .ticket-coordination .operator-form {padding-top:8px}
+body[data-operator-page="kitchen"] .allday-bar {position:sticky;bottom:0;z-index:3;border-radius:12px;flex-wrap:wrap;gap:24px}
+.kitchen-summary {margin-top:22px;color:var(--label2)}
+.kitchen-summary>summary {cursor:pointer;min-height:44px;display:flex;align-items:center}
+@media(max-width:620px){body[data-operator-page="kitchen"] .operator-shell{padding:12px 14px 64px}.kds-tickets{display:grid;grid-template-columns:1fr;overflow:visible}.kds-tickets .ticket{width:100%;max-width:none}body[data-operator-page="kitchen"] .allday-bar{gap:14px;padding:12px}.allday-stat{flex-wrap:wrap}.kds-tickets .ticket-table{font-size:22px}}
+/* UI21cc4a5 surfaces: preserve contrast while canonical zone panels stay readable. */
+body[data-operator-page="kitchen"] {background:#0e0e10}
+body[data-operator-page="kitchen"] .operator-session,
+body[data-operator-page="kitchen"] .operator-card {background:#1c1c1e;border-color:rgba(255,255,255,.07);box-shadow:0 1px 3px rgba(0,0,0,.45)}
+.operator-zone-panels {display:flex;flex-direction:column;gap:14px}
+.operator-zone-panels .zone-panel-head {gap:16px;flex-wrap:wrap}
+.operator-zone-panels .zone-panel-title {margin:0;overflow-wrap:anywhere}
+.operator-zone-panels .zone-tiles {display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.operator-zone-card {min-width:0;padding:12px;border-radius:12px;background:#26262a;border:1px solid rgba(255,255,255,.06)}
+.operator-zone-card .zone-tile {width:100%;height:auto;min-height:72px;background:#2a2a2d}
+.operator-zone-card .zone-tile.ready {background:var(--green-bg)}
+.operator-zone-card .zone-tile.cooking {background:var(--orange-bg)}
+.operator-zone-card .zone-tile.needs-review {background:var(--red-bg);border-color:var(--red)}
+.operator-zone-card .zone-tile.needs-review .zt-st {color:var(--red)}
+.operator-zone-card p {margin-top:8px;font-size:14px;line-height:20px;overflow-wrap:anywhere}
+.operator-zone-card .operator-warning {display:block;font-size:14px;margin-top:8px;overflow-wrap:anywhere}
+@media(max-width:520px){.operator-zone-panels .zone-panel{padding:14px}.operator-zone-panels .zone-tiles{grid-template-columns:1fr}.operator-zone-panels .zone-panel-sub{font-size:13px;line-height:20px}}

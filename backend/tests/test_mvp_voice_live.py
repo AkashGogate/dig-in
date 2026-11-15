@@ -1,0 +1,604 @@
+"""Live-voice adapter checks with a fake Deepgram: no key, no network, no spend."""
+
+import asyncio
+import json
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
+
+import pytest
+import test_mvp_core as core
+from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
+
+from app.mvp import api, voice_live
+from app.mvp.menu import load_menu
+from app.mvp.voice import parse_kitchen, parse_order, suggest_items
+from app.server import app
+
+demo = core.demo  # reuse the core MVP fixture
+DIG_IN = Path(__file__).resolve().parents[1] / "fixtures" / "menus" / "dig-in.json"
+
+
+def voice_ticket(client, **kwargs):
+    headers = kwargs.pop("headers", {})
+    session_id = api.restaurant.session("server-1")["session_id"]
+    headers.setdefault("X-Demo-Session", session_id)
+    response = client.post("/api/v2/voice/ticket", headers=headers, **kwargs)
+    if response.status_code == 200:
+        response.voice_session_id = session_id
+    return response
+
+
+class FakeDeepgram:
+    def __init__(self, script):
+        self.script, self.sent, self.queue = script, [], asyncio.Queue()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def send(self, data):
+        self.sent.append(data)
+        if isinstance(data, str) and json.loads(data)["type"] == "CloseStream":
+            for event in self.script:
+                await self.queue.put(json.dumps(event))
+            await self.queue.put(None)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        item = await self.queue.get()
+        if item is None:
+            raise StopAsyncIteration
+        return item
+
+
+def results(text, final):
+    return {
+        "type": "Results",
+        "is_final": final,
+        "channel": {"alternatives": [{"transcript": text}]},
+    }
+
+
+@pytest.fixture
+def live(monkeypatch):
+    monkeypatch.setenv("DIG_IN_VOICE_LIVE", "1")
+    monkeypatch.setenv("DEEPGRAM_API_KEY", "test-key-not-real")
+    monkeypatch.delenv("DEMO_AUTH_USER", raising=False)
+    monkeypatch.delenv("DEMO_AUTH_PASS", raising=False)
+    monkeypatch.setattr(voice_live, "budget", voice_live.VoiceBudget())
+    fakes = []
+
+    def connect(url, additional_headers):
+        assert additional_headers == {"Authorization": "Token test-key-not-real"}
+        fake = FakeDeepgram(
+            [
+                results("table four two", False),
+                results("Table 4: two bulldozers, hold the pickles", True),
+                {"type": "Metadata", "duration": 3.5},
+            ]
+        )
+        fake.url = url
+        fakes.append(fake)
+        return fake
+
+    monkeypatch.setattr(voice_live, "deepgram_connect", connect)
+    return fakes
+
+
+def test_dig_in_menu_parses_spoken_orders_with_plurals_and_modifiers():
+    menu = load_menu(DIG_IN)
+    parsed = parse_order(
+        menu, "Table 4: two bulldozers, hold the pickles, and one dirt site", "4"
+    )
+    assert parsed["lines"] == [
+        {"menu_id": "the_bulldozer", "quantity": 2, "modifiers": ["no_pickles"]},
+        {"menu_id": "dirt_site", "quantity": 1, "modifiers": []},
+    ]
+    assert not parsed["flags"]
+    assert (
+        parse_order(menu, "Table 1: one mac and cheese", "1")["lines"][0]["menu_id"]
+        == "cement_mixer_mac"
+    )
+    assert parse_kitchen(menu, "Start table 4 bulldozer")["action"] == "start_dish"
+
+
+def test_keyterms_come_from_menu_and_url_opts_out_of_retention_without_diarization():
+    menu = load_menu(DIG_IN)
+    terms = voice_live.keyterms(menu)
+    assert {
+        "The Bulldozer",
+        "bulldozers",
+        "Gravel Pit Tots",
+        "No pickles",
+        "table",
+        "heard",
+    } <= set(terms)
+    assert len(terms) == len(set(terms)) <= voice_live.MAX_KEYTERMS
+    query = parse_qs(urlsplit(voice_live.listen_url(menu)).query)
+    assert query["model"] == ["nova-3"] and query["mip_opt_out"] == ["true"]
+    assert "diarize" not in query and "The Bulldozer" in query["keyterm"]
+
+
+def test_budget_caps_daily_spend_concurrency_and_reports_cost(monkeypatch):
+    monkeypatch.setenv("DIG_IN_VOICE_DAILY_MINUTES", "1")
+    monkeypatch.setenv("DIG_IN_VOICE_MAX_STREAM_SECONDS", "30")
+    monkeypatch.setenv("DIG_IN_DEEPGRAM_USD_PER_MINUTE", "0.01")
+    b = voice_live.VoiceBudget()
+    assert b.start("a") == 30
+    with pytest.raises(voice_live.VoiceLimit):
+        b.start("a")  # one open capture per device
+    b.finish("a", 45)
+    assert b.start("b") == 15  # stream cap shrinks to remaining daily budget
+    b.finish("b", 15)
+    with pytest.raises(voice_live.VoiceLimit):
+        b.start("c")
+    usage = b.usage()
+    assert usage["audio_seconds_used"] == 60 and usage["estimated_usd_used"] == 0.01
+    assert usage["streams_rejected"] == {"ip_active": 1, "daily_budget": 1}
+
+
+def test_ticket_is_off_unless_live_enabled(monkeypatch):
+    monkeypatch.delenv("DIG_IN_VOICE_LIVE", raising=False)
+    assert TestClient(app).post("/api/v2/voice/ticket").status_code == 503
+
+
+def test_ticket_requires_demo_password_when_configured(live, monkeypatch):
+    monkeypatch.setenv("DEMO_AUTH_USER", "u")
+    monkeypatch.setenv("DEMO_AUTH_PASS", "p")
+    client = TestClient(app)
+    assert voice_ticket(client).status_code == 401
+    assert voice_ticket(client, auth=("u", "wrong")).status_code == 401
+    assert voice_ticket(client, auth=("u", "p")).status_code == 200
+    assert client.get("/api/v2/voice/usage").status_code == 401
+
+
+def test_stream_relays_transcript_records_billed_seconds_and_ticket_is_single_use(live):
+    client = TestClient(app)
+    issued = voice_ticket(client)
+    ticket = issued.json()["ticket"]
+    session_id = issued.voice_session_id
+    with client.websocket_connect(
+        f"/api/v2/voice/stream?ticket={ticket}&session_id={session_id}"
+    ) as ws:
+        ws.send_bytes(b"opus-chunk")
+        ws.send_text(json.dumps({"type": "stop"}))
+        messages = []
+        while not messages or messages[-1]["type"] != "done":
+            messages.append(ws.receive_json())
+    assert [m["type"] for m in messages] == ["interim", "final", "done"]
+    assert messages[-1]["text"] == "Table 4: two bulldozers, hold the pickles"
+    assert live[0].sent[0] == b"opus-chunk"
+    assert voice_live.budget.usage()["audio_seconds_used"] == 3.5
+    assert voice_live.budget.usage()["active_streams"] == 0
+    with pytest.raises(WebSocketDisconnect) as closed:
+        with client.websocket_connect(
+            f"/api/v2/voice/stream?ticket={ticket}&session_id={session_id}"
+        ) as ws:
+            ws.receive_json()
+    assert closed.value.code == 4401
+
+
+def test_voice_status_reports_live_mode(live):
+    status = TestClient(app).get("/api/v2/voice/status").json()
+    assert (
+        status["mode"] == "deepgram_stream" and status["live_capture_available"] is True
+    )
+    assert status["discard_audio_after_transcription"] is True
+
+
+def test_real_deepgram_transcript_with_spelled_numbers_parses_cleanly():
+    """Regression from the first live run: nova-3 returned 'Table four. Two bulldozers.'"""
+    menu = load_menu(DIG_IN)
+    parsed = parse_order(
+        menu, "Table four. Two bulldozers. Hold the pickles. And one dirt site.", "4"
+    )
+    assert parsed["table_id"] == "4" and not parsed["flags"]
+    assert parsed["lines"] == [
+        {"menu_id": "the_bulldozer", "quantity": 2, "modifiers": ["no_pickles"]},
+        {"menu_id": "dirt_site", "quantity": 1, "modifiers": []},
+    ]
+    assert parse_kitchen(menu, "Heard, table four.")["table_id"] == "4"
+    assert parse_kitchen(menu, "Start table four bulldozer.")["action"] == "start_dish"
+
+
+def _voice_capture(demo, mode=None):
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    payload = {
+        "action": "capture_voice",
+        "order_id": key,
+        "revision": 1,
+        "text": "Table 1: one salmon",
+    }
+    if mode:
+        payload["capture_mode"] = mode
+    return key, core.send(demo, payload, source="voice")
+
+
+def test_capture_mode_defaults_to_mock_and_live_label_needs_live_server(
+    demo, monkeypatch
+):
+    monkeypatch.delenv("DIG_IN_VOICE_LIVE", raising=False)
+    key, response = _voice_capture(demo)
+    assert response.status_code == 200
+    assert core.snapshot(demo)["orders"][key]["capture_mode"] == "mock_voice"
+    _, refused = _voice_capture(demo, "live_voice")
+    assert refused.status_code == 409  # browser can't mislabel typed text as live
+
+
+def test_live_capture_is_labeled_live_in_state_and_analytics(demo, live):
+    key, response = _voice_capture(demo, "live_voice")
+    assert response.status_code == 200
+    assert core.snapshot(demo)["orders"][key]["capture_mode"] == "live_voice"
+    events = [e for e in demo[2].snapshot()["events"] if e["type"] == "draft.updated"]
+    assert events[-1]["payload"]["capture_mode"] == "live_voice"
+
+
+def test_kitchen_voice_with_spoken_numbers_acknowledges_and_starts(demo):
+    key = core.order(demo, table="3")
+    heard = core.ok(
+        demo,
+        {"action": "kitchen_voice", "text": "Heard, table three."},
+        actor="cook-1",
+        source="voice",
+    )
+    assert not heard["result"].get("flags")
+    assert core.snapshot(demo)["orders"][key]["acknowledged_at"] is not None
+    core.ok(
+        demo,
+        {"action": "kitchen_voice", "text": "Start table three salmon."},
+        actor="cook-1",
+        source="voice",
+    )
+    assert core.units(demo, key)[0]["started_at"] is not None
+
+
+@pytest.mark.parametrize(
+    ("heard", "expected"),
+    [
+        ("bull dozer", "the_bulldozer"),
+        ("back hoe", "the_backhoe"),
+        ("wreking ball", "wrecking_ball_brownie"),
+        ("dirt sight", "dirt_site"),
+    ],
+)
+def test_similarity_suggests_misheard_dishes_but_never_selects(heard, expected):
+    menu = load_menu(DIG_IN)
+    assert suggest_items(menu, heard)[0] == expected
+    parsed = parse_order(menu, f"Table 1: one {heard}", "1")
+    assert parsed["lines"] == []  # exact matching stays the authority
+    flag = next(f for f in parsed["flags"] if f["code"] == "unknown_item")
+    assert flag["candidates"][0] == expected
+
+
+def test_similarity_stays_silent_for_off_menu_words():
+    assert suggest_items(load_menu(DIG_IN), "lobster") == []
+
+
+def test_table_key_narrows_misheard_callout_to_that_tickets_dishes(demo):
+    key = core.order(demo, table="3", menu_id="risotto")
+    core.ack(demo, key)
+    other = core.order(demo, table="2", menu_id="salmon", actor="server-2")
+    core.ack(demo, other)
+
+    def callout(text):
+        return core.ok(
+            demo,
+            {"action": "kitchen_voice", "text": text},
+            actor="cook-1",
+            source="voice",
+        )["result"]["flags"][0]
+
+    on_ticket = callout("Start table three rizotto")
+    assert on_ticket["candidates"] == ["risotto"]
+    assert "Garden risotto" in on_ticket["message"]
+    # Salmon exists on the menu (and on table 2) but not on table 3's ticket.
+    assert suggest_items(load_menu(), "sammon") == ["salmon"]
+    assert callout("Start table three sammon")["candidates"] == []
+    assert all(d["started_at"] is None for d in core.units(demo, key))
+    events = [
+        e for e in demo[2].snapshot()["events"] if e["type"] == "voice.clarification"
+    ]
+    assert events[-2]["payload"]["candidate_menu_ids"] == ["risotto"]
+
+
+def test_per_device_limits_use_real_client_ip_behind_fly_proxy(live):
+    client = TestClient(app)
+    voice_live.budget.active["203.0.113.1"] = 1  # that device already has a mic open
+    busy = voice_ticket(client, headers={"Fly-Client-IP": "203.0.113.1"})
+    assert busy.status_code == 429
+    other = voice_ticket(client, headers={"Fly-Client-IP": "203.0.113.2"})
+    assert other.status_code == 200
+
+
+def test_daily_allowance_reserves_in_flight_streams(monkeypatch):
+    monkeypatch.setenv("DIG_IN_VOICE_DAILY_MINUTES", "0.75")
+    b = voice_live.VoiceBudget()
+    assert b.start("a") == 30
+    assert b.start("b") == 15
+    assert b.remaining_seconds() == 0
+    with pytest.raises(voice_live.VoiceLimit):
+        b.start("c")
+    assert b.usage()["audio_seconds_reserved"] == 45
+    b.finish("a", 10)
+    assert b.remaining_seconds() == 20
+    b.finish("b", 15)
+    assert b.usage()["audio_seconds_reserved"] == 0
+    assert b.remaining_seconds() == 20
+
+
+def test_ticket_requires_same_demo_session_before_consumption(live):
+    client = TestClient(app)
+    issued = voice_ticket(client)
+    ticket, session_id = issued.json()["ticket"], issued.voice_session_id
+    for wrong in ("", "another-session"):
+        with pytest.raises(WebSocketDisconnect) as closed:
+            with client.websocket_connect(
+                f"/api/v2/voice/stream?ticket={ticket}&session_id={wrong}"
+            ) as ws:
+                ws.receive_json()
+        assert closed.value.code == 4401
+    # Wrong-session attempts do not consume the rightful device's ticket.
+    with client.websocket_connect(
+        f"/api/v2/voice/stream?ticket={ticket}&session_id={session_id}"
+    ) as ws:
+        ws.send_text('{"type":"stop"}')
+        while ws.receive_json()["type"] != "done":
+            pass
+
+
+@pytest.mark.parametrize(
+    "chunks", [[b"x"], [b"x" * 64002], [b"x" * 32000, b"x" * 32000]]
+)
+def test_raw_audio_rejects_misaligned_oversized_or_accelerated_chunks(live, chunks):
+    client = TestClient(app)
+    issued = voice_ticket(client)
+    url = f"/api/v2/voice/stream?ticket={issued.json()['ticket']}&session_id={issued.voice_session_id}"
+    with client.websocket_connect(url) as ws:
+        for chunk in chunks:
+            ws.send_bytes(chunk)
+        messages = []
+        while not messages or messages[-1]["type"] != "done":
+            messages.append(ws.receive_json())
+    assert any(
+        message["type"] == "error" and "format/rate" in message["message"]
+        for message in messages
+    )
+    forwarded = [chunk for chunk in live[0].sent if isinstance(chunk, bytes)]
+    assert sum(map(len, forwarded)) <= 32000
+
+
+def test_ticket_pins_original_draft_menu_for_provider_keyterms(live, demo):
+    from app.mvp.contracts import Command
+    from app.mvp.menu_import import MenuPrepareRequest
+
+    client, tokens, restaurant = demo
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    original_revision = restaurant.state.orders[key].menu_revision
+    issued = client.post(
+        "/api/v2/voice/ticket",
+        headers={"X-Demo-Session": tokens["server-1"]},
+        json={"order_id": key, "menu_revision": original_revision},
+    )
+    assert issued.status_code == 200
+    lead = restaurant.session("lead-1")["session_id"]
+    prepared = restaurant.prepare_menu(
+        MenuPrepareRequest(content=load_menu(DIG_IN).model_dump_json()), lead
+    )
+    restaurant.execute(
+        Command(
+            event_id="voice-test-menu-change",
+            payload={
+                "action": "activate_menu",
+                "candidate_id": prepared["candidate_id"],
+                "expected_menu_revision": prepared["expected_menu_revision"],
+                "human_confirmed": True,
+            },
+        ),
+        lead,
+    )
+    with client.websocket_connect(
+        f"/api/v2/voice/stream?ticket={issued.json()['ticket']}&session_id={tokens['server-1']}"
+    ) as ws:
+        ws.send_text('{"type":"stop"}')
+        while ws.receive_json()["type"] != "done":
+            pass
+    terms = parse_qs(urlsplit(live[0].url).query)["keyterm"]
+    assert "Salmon & greens" in terms and "The Bulldozer" not in terms
+
+
+def test_keyterm_budget_is_bounded_for_long_mutable_menu():
+    menu = load_menu(DIG_IN).model_copy(deep=True)
+    for item in menu.items:
+        item.aliases = ["very long alias " * 20] * 10
+    terms = voice_live.keyterms(menu)
+    assert sum(len(term.encode("utf-8")) + 2 for term in terms) <= 400
+    assert {"table", "heard", "start"} <= set(terms)
+
+
+def test_plural_kitchen_quantity_never_starts_one_remaining_unit(demo):
+    key = core.order(demo, quantity=2)
+    core.ack(demo, key)
+    first, second = core.units(demo, key)
+    core.dish_action(demo, first["id"], "start_dish")
+    result = core.ok(
+        demo,
+        {"action": "kitchen_voice", "text": "Start table one two salmon"},
+        actor="cook-1",
+        source="voice",
+    )
+    assert result["result"]["flags"]
+    assert core.snapshot(demo)["dishes"][second["id"]]["started_at"] is None
+
+
+def test_relay_reports_missing_word_confidence_in_done_message(live):
+    client = TestClient(app)
+    response = voice_ticket(client)
+    ticket = response.json()["ticket"]
+    with client.websocket_connect(
+        f"/api/v2/voice/stream?ticket={ticket}&session_id={response.voice_session_id}"
+    ) as ws:
+        ws.send_bytes(b"\x00\x00")
+        ws.send_text(json.dumps({"type": "stop"}))
+        messages = []
+        while not messages or messages[-1]["type"] != "done":
+            messages.append(ws.receive_json())
+    done = messages[-1]
+    # FakeDeepgram's words carry no "confidence" key; done.confidence must stay None, not 0.
+    assert done["confidence"] is None
+
+
+def test_low_confidence_transcript_still_gets_flagged_even_on_an_exact_match(
+    demo, live
+):
+    """Confidence is a second safety net: an exact alias match that Deepgram was
+    unsure about (noisy audio) still needs a human tap, not auto-accept."""
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    confident = core.send(
+        demo,
+        {
+            "action": "capture_voice",
+            "order_id": key,
+            "revision": 1,
+            "text": "Table 1: one salmon",
+            "stt_confidence": 0.95,
+        },
+        source="voice",
+    )
+    assert not confident.json()["result"]["flags"]
+    key2 = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    unsure = core.send(
+        demo,
+        {
+            "action": "capture_voice",
+            "order_id": key2,
+            "revision": 1,
+            "text": "Table 1: one salmon",
+            "stt_confidence": 0.3,
+        },
+        source="voice",
+    )
+    assert any(f["code"] == "low_confidence" for f in unsure.json()["result"]["flags"])
+
+
+def test_low_confidence_kitchen_callout_asks_for_a_tap_instead_of_acting(demo):
+    key = core.order(demo, table="1")
+    core.ack(demo, key)
+    unsure = core.ok(
+        demo,
+        {
+            "action": "kitchen_voice",
+            "text": "Start table one salmon",
+            "stt_confidence": 0.2,
+        },
+        actor="cook-1",
+        source="voice",
+    )
+    assert unsure["result"]["flags"]
+    assert core.units(demo, key)[0]["started_at"] is None
+
+
+@pytest.mark.parametrize(
+    "words,expected",
+    [
+        ([{"confidence": 0.99}, {"confidence": 0.2}], 0.2),
+        ([{"confidence": 0.99}, {}], None),
+        ([{"confidence": float("nan")}], None),
+        ([{"confidence": float("inf")}], None),
+        ([{"confidence": True}], None),
+        ([], None),
+    ],
+)
+def test_confidence_preserves_low_critical_words_and_missing_metadata(words, expected):
+    assert voice_live.transcript_confidence({"words": words}) == expected
+
+
+def test_missing_live_confidence_blocks_server_send_and_kitchen_action(demo, live):
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    result = core.ok(
+        demo,
+        {
+            "action": "capture_voice",
+            "order_id": key,
+            "revision": 1,
+            "text": "table one one salmon",
+            "capture_mode": "live_voice",
+        },
+        source="voice",
+    )
+    order = result["state"]["orders"][key]
+    flag = next(f for f in order["flags"] if f["code"] == "low_confidence")
+    assert (
+        core.send(
+            demo,
+            {
+                "action": "confirm_send",
+                "order_id": key,
+                "revision": order["revision"],
+                "human_confirmed": True,
+            },
+        ).status_code
+        == 409
+    )
+    resolved = core.ok(
+        demo,
+        {
+            "action": "resolve_flag",
+            "order_id": key,
+            "revision": order["revision"],
+            "flag_id": flag["id"],
+            "resolution": "reviewed_speech",
+        },
+    )
+    core.ok(
+        demo,
+        {
+            "action": "confirm_send",
+            "order_id": key,
+            "revision": resolved["state"]["orders"][key]["revision"],
+            "human_confirmed": True,
+        },
+    )
+    result = core.ok(
+        demo,
+        {
+            "action": "kitchen_voice",
+            "text": "heard table one",
+            "capture_mode": "live_voice",
+        },
+        actor="cook-1",
+        source="voice",
+    )
+    assert result["result"]["flags"]
+    assert result["state"]["orders"][key]["acknowledged_at"] is None
+
+
+def test_one_unknown_final_segment_keeps_relay_confidence_unknown(live, monkeypatch):
+    script = [results("Table one", True), results("one salmon", True)]
+    script[0]["channel"]["alternatives"][0]["words"] = [{"confidence": 0.99}]
+    fake = FakeDeepgram(script)
+    monkeypatch.setattr(voice_live, "deepgram_connect", lambda *a, **k: fake)
+    client = TestClient(app)
+    response = voice_ticket(client)
+    with client.websocket_connect(
+        f"/api/v2/voice/stream?ticket={response.json()['ticket']}&session_id={response.voice_session_id}"
+    ) as ws:
+        ws.send_text(json.dumps({"type": "stop"}))
+        message = ws.receive_json()
+        while message["type"] != "done":
+            message = ws.receive_json()
+        assert message["confidence"] is None

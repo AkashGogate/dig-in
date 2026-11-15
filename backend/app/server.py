@@ -1,30 +1,38 @@
-"""FastAPI/WebSocket demo server.
+"""Application composition: one Menu/Core, service journeys and CV/voice adapters.
 
-ARCHITECTURE.md #2.2: the public demo ships BOTH the live-mic path and the
-test-scenario fallback through the identical call_parser -> mismatch -> log
-code path, so the demo is honestly representative either way.
+Legacy scenario/log routes remain isolated for regression demos. Paid microphone
+capture is available only through the bounded, deliberate v2 voice relay.
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import os
-import secrets
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.call_parser import parse_call
+from app.coordination.api import router as coordination_router
+from app.demo_auth import DemoAccessMiddleware, require_demo_auth
 from app.log_store import init_db, make_session_factory, write_result
 from app.mismatch import check_mismatch
-from app.deepgram_live import stream_transcripts
+from app.mvp import api as mvp_api
+from app.mvp.api import export_loop
+from app.mvp.api import router as mvp_router
+from app.mvp.cv_api import create_cv_router
 from app.session import KitchenSession, SessionLimitExceeded
 from app.ticket_queue import TicketQueue
-from app.coordination.api import router as coordination_router
-from app.mvp.api import router as mvp_router, export_loop
 
 engine, SessionFactory = make_session_factory()
 
@@ -46,9 +54,24 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(coordination_router)
 app.include_router(mvp_router)
+app.include_router(create_cv_router(lambda: mvp_api.restaurant))
+app.add_middleware(DemoAccessMiddleware)
+
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok", "schema_version": 2}
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ponytail: wide open for a public demo; narrow to the Vercel origin once that URL exists.
+    allow_origins=[
+        v.strip()
+        for v in os.environ.get(
+            "DIG_IN_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+        ).split(",")
+        if v.strip()
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -60,23 +83,6 @@ _active: dict[str, KitchenSession] = {}
 
 def _client_ip(request_or_ws) -> str:
     return request_or_ws.client.host if request_or_ws.client else "unknown"
-
-
-_basic_auth = HTTPBasic()
-
-
-def require_demo_auth(credentials: HTTPBasicCredentials = Depends(_basic_auth)) -> None:
-    """Gates the one endpoint that creates a Deepgram-billable session, so
-    bot/bulk traffic can't reach the live-mic path without the demo password
-    (ARCHITECTURE.md #6 cost controls). No-op if DEMO_AUTH_USER/PASS aren't set."""
-    expected_user = os.environ.get("DEMO_AUTH_USER")
-    expected_pass = os.environ.get("DEMO_AUTH_PASS")
-    if not expected_user or not expected_pass:
-        return
-    user_ok = secrets.compare_digest(credentials.username, expected_user)
-    pass_ok = secrets.compare_digest(credentials.password, expected_pass)
-    if not (user_ok and pass_ok):
-        raise HTTPException(status_code=401, detail="Unauthorized", headers={"WWW-Authenticate": "Basic"})
 
 
 @app.post("/session/start", dependencies=[Depends(require_demo_auth)])
@@ -105,7 +111,13 @@ async def kill_session(session_id: str):
 
 def _fixture_path() -> str:
     import pathlib
-    return str(pathlib.Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "transcripts.json")
+
+    return str(
+        pathlib.Path(__file__).resolve().parent.parent
+        / "tests"
+        / "fixtures"
+        / "transcripts.json"
+    )
 
 
 @app.get("/scenarios")
@@ -132,39 +144,22 @@ async def call_log_ws(websocket: WebSocket, session_id: str):
     await websocket.accept()
     queue = _queues[session_id]
 
-    mic_audio_queue: asyncio.Queue[bytes | None] | None = None
-    mic_task: asyncio.Task | None = None
-
     async def _emit_result(call, result):
         async with SessionFactory() as db_session:
             await write_result(db_session, result)
-        await websocket.send_json({
-            "raw_text": call.raw_text,
-            "item": call.item,
-            "quantity": call.quantity,
-            "station": call.station,
-            "speaker_turn": call.speaker_turn,
-            "is_call": call.is_call,
-            "matched": result.matched,
-            "reason": result.reason,
-            "ticket_id": result.ticket_id,
-        })
-
-    async def _consume_mic_audio(audio_queue: asyncio.Queue[bytes | None]):
-        """Live-mic path: forward browser audio to Deepgram, run results through
-        the same parse_call -> check_mismatch -> log path the scenario path uses
-        (fixes the two-pipelines-behind-one-UI gap: both sources hit Deepgram)."""
-        async def _chunks():
-            while True:
-                chunk = await audio_queue.get()
-                if chunk is None:
-                    return
-                yield chunk
-
-        async for speaker_turn, text in stream_transcripts(_chunks()):
-            call = parse_call(text, speaker_turn=speaker_turn)
-            result = check_mismatch(call, queue)
-            await _emit_result(call, result)
+        await websocket.send_json(
+            {
+                "raw_text": call.raw_text,
+                "item": call.item,
+                "quantity": call.quantity,
+                "station": call.station,
+                "speaker_turn": call.speaker_turn,
+                "is_call": call.is_call,
+                "matched": result.matched,
+                "reason": result.reason,
+                "ticket_id": result.ticket_id,
+            }
+        )
 
     try:
         while not session.expired():
@@ -174,30 +169,27 @@ async def call_log_ws(websocket: WebSocket, session_id: str):
                 break
 
             if "bytes" in msg and msg["bytes"] is not None:
-                # Binary frame = a MediaRecorder audio chunk from the live-mic path.
-                if "DEEPGRAM_API_KEY" not in os.environ:
-                    await websocket.send_json({"error": "DEEPGRAM_API_KEY not set on the server; live mic needs it"})
-                    continue
-                if mic_audio_queue is None:
-                    mic_audio_queue = asyncio.Queue()
-                    mic_task = asyncio.create_task(_consume_mic_audio(mic_audio_queue))
-                await mic_audio_queue.put(msg["bytes"])
+                # Legacy scenarios remain inspectable, but all paid microphone
+                # capture goes through the bounded, privacy-controlled v2 relay.
+                await websocket.send_json(
+                    {
+                        "error": "Legacy live audio is disabled. Use Server or Kitchen voice."
+                    }
+                )
                 continue
 
             if "text" not in msg or msg["text"] is None:
                 continue
             payload = json.loads(msg["text"])
 
-            if payload.get("type") == "mic_stop" and mic_audio_queue is not None:
-                await mic_audio_queue.put(None)
-                continue
-
             if payload.get("type") == "scenario":
                 with open(_fixture_path()) as f:
                     scenarios = {c["name"]: c for c in json.load(f)}
                 scenario = scenarios.get(payload["name"])
                 if scenario is None:
-                    await websocket.send_json({"error": f"unknown scenario {payload['name']!r}"})
+                    await websocket.send_json(
+                        {"error": f"unknown scenario {payload['name']!r}"}
+                    )
                     continue
                 for turn in scenario["turns"]:
                     call = parse_call(turn["text"], speaker_turn=turn["speaker_turn"])
@@ -206,10 +198,6 @@ async def call_log_ws(websocket: WebSocket, session_id: str):
     except WebSocketDisconnect:
         pass
     finally:
-        if mic_audio_queue is not None:
-            await mic_audio_queue.put(None)
-        if mic_task is not None:
-            await mic_task
         session.close()
         _active.pop(session_id, None)
         _queues.pop(session_id, None)

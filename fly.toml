@@ -1,0 +1,30 @@
+# Canonical deploy uses the repository root context: fly deploy --ha=false
+app = "frictionless-kitchen"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  DIG_IN_REQUIRE_AUTH = "1"
+  DIG_IN_MENU_PATH = "fixtures/menus/dig-in.json"
+  DIG_IN_VOICE_LIVE = "0"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/healthz"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

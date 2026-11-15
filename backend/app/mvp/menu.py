@@ -8,20 +8,25 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Annotated, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class MenuModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, allow_inf_nan=False
+    )
 
 
 class Modifier(MenuModel):
-    id: str = Field(min_length=1)
-    name: str = Field(min_length=1)
-    aliases: list[str] = Field(default_factory=list)
+    id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    aliases: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        default_factory=list, max_length=32
+    )
 
 
 class RecipeIngredient(MenuModel):
@@ -31,10 +36,14 @@ class RecipeIngredient(MenuModel):
 
 
 class MenuItem(MenuModel):
-    id: str = Field(min_length=1)
-    name: str = Field(min_length=1)
-    aliases: list[str] = Field(default_factory=list)
+    id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    aliases: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        default_factory=list, max_length=32
+    )
     modifiers: list[Modifier] = Field(default_factory=list)
+    description: str | None = Field(default=None, max_length=1000)
+    category: str | None = Field(default=None, max_length=200)
     price_cents: int | None = Field(default=None, ge=0)
     call_out_name: str | None = None
     station: str | None = None
@@ -43,6 +52,8 @@ class MenuItem(MenuModel):
 
     @model_validator(mode="after")
     def unique_modifiers(self):
+        if not normalize(self.name):
+            raise ValueError("Item name must contain letters or numbers")
         if len({m.id for m in self.modifiers}) != len(self.modifiers):
             raise ValueError("Modifier IDs must be unique per item")
         return self
@@ -50,9 +61,9 @@ class MenuItem(MenuModel):
 
 class MenuDocument(MenuModel):
     schema_version: Literal[2] = 2
-    id: str = Field(min_length=1)
-    name: str = Field(min_length=1)
-    items: list[MenuItem] = Field(min_length=1)
+    id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    items: list[MenuItem] = Field(min_length=1, max_length=500)
     ingredient_zones: dict[str, str | None] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -99,7 +110,9 @@ def _occurrences(text: str, aliases: set[str]):
     ]
 
 
-def match_menu(menu: MenuDocument, text: str) -> dict:
+def match_menu(
+    menu: MenuDocument, text: str, *, suggest: Callable[[str], list[str]] | None = None
+) -> dict:
     """Match a single item clause; return candidates/flags instead of fuzzy guesses.
 
     A longer exact alias takes precedence over an overlapping shorter alias.
@@ -131,6 +144,8 @@ def match_menu(menu: MenuDocument, text: str) -> dict:
                 for item in menu.items
                 if any(words & set(alias.split()) for alias in names(item))
             )
+        if not matches and suggest is not None:
+            candidates = list(dict.fromkeys([*candidates, *suggest(text)]))
         return {
             "status": "ambiguous" if matches else "unknown",
             "menu_id": None,
@@ -239,9 +254,11 @@ def import_status(menu: MenuDocument) -> dict:
         if fields:
             missing[item.id] = fields
     return {
-        "mode": "adapter_only",
+        "mode": "structured_review",
         "live_import_available": False,
         "requires_human_review": True,
         "missing_kitchen_fields": missing,
-        "message": "Load reviewed JSON today. Kitchen data absent from a customer menu stays unknown.",
+        "structured_import_available": True,
+        "supported_media_types": ["application/json", "text/csv", "text/plain"],
+        "message": "Prepare structured JSON/CSV/item-per-line text, review, then activate. PDF/photo local extraction readiness is at /api/v2/menu/extraction-status. Missing kitchen data stays unknown.",
     }

@@ -1,0 +1,165 @@
+{
+  "schema_version": 2,
+  "id": "dig-in",
+  "name": "DIG IN — The Construction Kitchen (demo)",
+  "items": [
+    {
+      "id": "gravel_pit_tots",
+      "name": "Gravel Pit Tots",
+      "description": "Crispy tots buried under queso, bacon, and scallions.",
+      "category": "Appetizers",
+      "aliases": [
+        "tots",
+        "gravel tots",
+        "gravel pit tot"
+      ],
+      "modifiers": [
+        {
+          "id": "no_bacon",
+          "name": "No bacon",
+          "aliases": [
+            "without bacon",
+            "hold the bacon"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "steel_beams",
+      "name": "Steel Beams",
+      "description": "Golden mozzarella sticks with marinara for dipping.",
+      "category": "Appetizers",
+      "aliases": [
+        "mozzarella sticks",
+        "steel beam",
+        "mozz sticks"
+      ],
+      "modifiers": [
+        {
+          "id": "no_marinara",
+          "name": "No marinara",
+          "aliases": [
+            "without marinara",
+            "hold the marinara"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "dynamite_poppers",
+      "name": "Dynamite Poppers",
+      "description": "Bacon-wrapped jalapeños stuffed with cream cheese.",
+      "category": "Appetizers",
+      "aliases": [
+        "poppers",
+        "jalapeno poppers",
+        "dynamite popper"
+      ],
+      "modifiers": []
+    },
+    {
+      "id": "the_bulldozer",
+      "name": "The Bulldozer",
+      "description": "Double smash burger, cheddar, crispy onions, pickles, and house sauce.",
+      "category": "Mains",
+      "aliases": [
+        "bulldozer",
+        "smash burger",
+        "bulldozers",
+        "smash burgers"
+      ],
+      "modifiers": [
+        {
+          "id": "no_pickles",
+          "name": "No pickles",
+          "aliases": [
+            "without pickles",
+            "hold the pickles"
+          ]
+        },
+        {
+          "id": "no_onions",
+          "name": "No onions",
+          "aliases": [
+            "without onions",
+            "hold the onions"
+          ]
+        },
+        {
+          "id": "sauce_side",
+          "name": "Sauce on side",
+          "aliases": [
+            "sauce on the side"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "the_backhoe",
+      "name": "The Backhoe",
+      "description": "BBQ pulled pork on a toasted bun with slaw and pickles.",
+      "category": "Mains",
+      "aliases": [
+        "backhoe",
+        "pulled pork",
+        "backhoes",
+        "pulled pork sandwich"
+      ],
+      "modifiers": [
+        {
+          "id": "no_slaw",
+          "name": "No slaw",
+          "aliases": [
+            "without slaw",
+            "hold the slaw"
+          ]
+        },
+        {
+          "id": "no_pickles",
+          "name": "No pickles",
+          "aliases": [
+            "without pickles",
+            "hold the pickles"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cement_mixer_mac",
+      "name": "Cement Mixer Mac",
+      "description": "Three-cheese macaroni with a crunchy breadcrumb topping.",
+      "category": "Mains",
+      "aliases": [
+        "mac and cheese",
+        "cement mixer",
+        "cement mixers"
+      ],
+      "modifiers": []
+    },
+    {
+      "id": "dirt_site",
+      "name": "Dirt Site",
+      "description": "Chocolate pudding, Oreo soil, gummy worms, and a shovel spoon.",
+      "category": "Desserts",
+      "aliases": [
+        "dirt pudding",
+        "dirt sites"
+      ],
+      "modifiers": []
+    },
+    {
+      "id": "wrecking_ball_brownie",
+      "name": "Wrecking Ball Brownie",
+      "description": "Warm fudge brownie, chocolate ice cream, and caramel.",
+      "category": "Desserts",
+      "aliases": [
+        "brownie",
+        "wrecking ball",
+        "wrecking balls",
+        "wrecking ball brownies",
+        "brownies"
+      ],
+      "modifiers": []
+    }
+  ]
+}

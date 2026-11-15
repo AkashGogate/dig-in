@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from uuid import uuid4
 
 import httpx
@@ -11,7 +12,11 @@ from app.mvp.contracts import Command
 
 
 def run(base_url):
-    with httpx.Client(base_url=base_url, timeout=10) as client:
+    user, password = os.getenv("DEMO_AUTH_USER"), os.getenv("DEMO_AUTH_PASS")
+    if bool(user) != bool(password):
+        raise SystemExit("Set both demo credential environment variables or neither")
+    auth = httpx.BasicAuth(user, password) if user and password else None
+    with httpx.Client(base_url=base_url, timeout=10, auth=auth) as client:
         sessions = {}
         for actor in ("server-1", "cook-1"):
             response = client.post("/api/v2/sessions", json={"actor_id": actor})
@@ -51,11 +56,24 @@ def run(base_url):
                 "lines": lines,
             }
         )
+        # Record a simulated dietary answer if this deployment enables the gate.
+        # This command is still human/tap test provenance, never voice approval.
+        for flag in data["state"]["orders"][key]["flags"]:
+            if flag["code"] == "dietary_check_required" and not flag.get("resolved"):
+                data, _ = send(
+                    {
+                        "action": "resolve_flag",
+                        "order_id": key,
+                        "revision": data["state"]["orders"][key]["revision"],
+                        "flag_id": flag["id"],
+                        "resolution": "asked_none_reported",
+                    }
+                )
         data, body = send(
             {
                 "action": "confirm_send",
                 "order_id": key,
-                "revision": data["result"]["revision"],
+                "revision": data["state"]["orders"][key]["revision"],
                 "human_confirmed": True,
             }
         )

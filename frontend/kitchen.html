@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en" class="force-dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kitchen · Dig In</title>
+<link rel="stylesheet" href="style.css">
+<style>
+html, body { height: 100%; overflow: hidden; background: #0e0e10; }
+body { display: flex; flex-direction: column; }
+
+/* Layered dark surfaces for depth (Apple dark uses tone, not pure black) */
+.surface   { background: #1c1c1e; border: 1px solid rgba(255,255,255,.07); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.surface-2 { background: #2a2a2d; border: 1px solid rgba(255,255,255,.06); }
+
+/* ── Top bar ──────────────────────────────────────────────────────────────── */
+.kds-bar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 24px;
+  background: var(--bar-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--bar-border);
+  flex-shrink: 0; z-index: 10;
+}
+.kds-title { font: 700 22px/26px var(--font); letter-spacing: -.02em; color: var(--label); }
+.kds-spacer { flex: 1; }
+.kds-devices { display: flex; gap: 8px; align-items: center; }
+.station-filter { display: flex; gap: 6px; align-items: center; }
+.station-pill {
+  padding: 7px 15px; border-radius: var(--r-pill);
+  font: 590 13px/18px var(--font);
+  background: var(--fill3); color: var(--label2);
+  transition: background .15s, color .15s;
+}
+.station-pill.active { background: var(--label); color: var(--sys-bg); }
+
+/* ── Last-heard strip (slim) ──────────────────────────────────────────────── */
+.lh-strip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--sep);
+  overflow-x: auto; flex-shrink: 0; scrollbar-width: none;
+}
+.lh-strip::-webkit-scrollbar { display: none; }
+.lh-label {
+  font: 600 11px/14px var(--font); color: var(--label3);
+  text-transform: uppercase; letter-spacing: .07em;
+  flex-shrink: 0; margin-right: 2px;
+}
+.lh-chip {
+  display: flex; align-items: center; gap: 9px;
+  background: #1c1c1e; border: 1px solid rgba(255,255,255,.07);
+  border-radius: var(--r-pill);
+  padding: 6px 6px 6px 14px; flex-shrink: 0;
+}
+.lh-chip .lh-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.lh-chip .lh-cmd { font: 600 13px/16px var(--font); color: var(--label); }
+.lh-chip .lh-res { font: 400 13px/16px var(--font); color: var(--label2); }
+.lh-chip .lh-undo {
+  font: 590 13px/16px var(--font); color: var(--blue);
+  background: var(--fill3); border-radius: var(--r-pill);
+  padding: 5px 13px; min-height: 30px;
+}
+.lh-chip .lh-undo:hover { background: var(--fill2); }
+.lh-empty { font: 400 13px/16px var(--font); color: var(--label3); }
+
+/* ── Body ─────────────────────────────────────────────────────────────────── */
+.kds-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+#ticketView {
+  flex: 1; overflow-x: auto; overflow-y: hidden;
+  display: flex; gap: 16px; padding: 20px 24px; align-items: flex-start;
+}
+#ticketView::-webkit-scrollbar { height: 8px; }
+#ticketView::-webkit-scrollbar-thumb { background: var(--fill2); border-radius: 4px; }
+
+/* ── Ticket card ──────────────────────────────────────────────────────────── */
+.ticket {
+  flex-shrink: 0; width: 300px;
+  background: #1c1c1e;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: var(--r-xl);
+  box-shadow: 0 1px 3px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.25);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.ticket.allready { border-color: rgba(52,199,89,.45); box-shadow: 0 1px 3px rgba(0,0,0,.45), 0 8px 28px rgba(52,199,89,.12); }
+.ticket.allready .ticket-head { box-shadow: inset 3px 0 0 var(--green); }
+
+.ticket-head { padding: 16px 18px 14px; }
+.ticket-head-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ticket-table { font: 700 21px/24px var(--font); letter-spacing: -.02em; color: var(--label); }
+.ticket-timer { font: 600 17px/22px var(--font); font-variant-numeric: tabular-nums; color: var(--label2); }
+.ticket-timer.warn { color: var(--orange); }
+.ticket-timer.crit { color: var(--red); }
+.ticket-head-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.ticket-mode { font: 400 14px/18px var(--font); color: var(--label2); }
+.ticket-ready-pill {
+  font: 600 12px/16px var(--font); color: var(--label2);
+  padding: 3px 10px; border-radius: var(--r-pill); background: var(--fill3);
+}
+.ticket-ready-pill.done { color: var(--green); background: var(--green-bg); }
+
+/* ── Dish rows ────────────────────────────────────────────────────────────── */
+.ticket-dishes { padding: 2px 18px 8px; }
+.dish {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 0; border-top: 1px solid var(--sep);
+}
+.dish-main { flex: 1; min-width: 0; }
+.dish-name {
+  font: 600 17px/21px var(--font); color: var(--label);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.dish-meta { font: 400 13px/18px var(--font); color: var(--label2); margin-top: 3px; }
+.dish-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+
+.d-status { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/16px var(--font); white-space: nowrap; }
+.d-status .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.d-status.ready   { color: var(--green); }
+.d-status.cooking { color: var(--orange); }
+.d-status.queued  { color: var(--label3); }
+.d-status .src { display: inline-flex; margin-left: 1px; opacity: .85; }
+.d-status .src svg { width: 15px; height: 15px; }
+
+.btn-mark-ready {
+  font: 600 13px/16px var(--font);
+  color: var(--orange); background: var(--orange-bg);
+  border: 1px solid rgba(255,149,0,.35);
+  padding: 7px 12px; border-radius: var(--r); min-height: 34px;
+}
+.btn-mark-ready:hover { filter: brightness(1.08); }
+
+/* ── Clarification card (lighter, action-focused) ─────────────────────────── */
+.clarify {
+  flex-shrink: 0; width: 300px; align-self: flex-start;
+  background: #171a21;
+  border: 1.5px dashed var(--blue-border);
+  border-radius: var(--r-xl);
+  box-shadow: 0 1px 3px rgba(0,0,0,.45);
+  padding: 16px 18px;
+}
+.clarify-head {
+  display: flex; align-items: center; gap: 7px;
+  font: 600 12px/15px var(--font); color: var(--blue);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px;
+}
+.clarify-head svg { width: 16px; height: 16px; }
+.clarify-q { font: 600 17px/22px var(--font); color: var(--label); margin-bottom: 12px; }
+.clarify-opts { display: flex; flex-direction: column; gap: 7px; }
+.btn-clarify {
+  text-align: left; font: 590 15px/20px var(--font);
+  color: var(--label); background: #24262c;
+  border: 1px solid rgba(255,255,255,.08);
+  padding: 11px 14px; border-radius: var(--r); min-height: 44px;
+}
+.btn-clarify:hover { border-color: var(--blue-border); background: var(--blue-bg); }
+.btn-clarify .z { color: var(--label3); font-weight: 400; }
+.btn-clarify.dismiss { color: var(--label2); }
+
+/* ── Head-chef callout (dashed-blue, awaiting confirm) ────────────────────── */
+.callout {
+  flex-shrink: 0; width: 300px; align-self: flex-start;
+  background: #171a21;
+  border: 1.5px dashed var(--blue-border);
+  border-radius: var(--r-xl);
+  box-shadow: 0 1px 3px rgba(0,0,0,.45);
+  padding: 16px 18px;
+}
+.callout-head {
+  display: flex; align-items: center; gap: 7px;
+  font: 600 12px/15px var(--font); color: var(--blue);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px;
+}
+.callout-head svg { width: 16px; height: 16px; }
+.callout-table { font: 700 20px/24px var(--font); color: var(--label); }
+.callout-raw { font: 400 14px/18px var(--font); color: var(--label2); margin: 2px 0 12px; }
+.callout-items { font: 500 15px/22px var(--font); color: var(--label); margin-bottom: 14px; }
+.btn-confirm {
+  width: 100%; padding: 13px; border-radius: var(--r);
+  background: var(--blue); color: #fff; font: 600 15px/20px var(--font); min-height: 46px;
+}
+.btn-confirm:hover { filter: brightness(1.06); }
+
+/* ── Zones view (full-width table panels) ─────────────────────────────────── */
+#zoneView { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+.zone-panel {
+  background: #1c1c1e; border: 1px solid rgba(255,255,255,.07);
+  border-radius: var(--r-lg); box-shadow: 0 1px 3px rgba(0,0,0,.45);
+  padding: 16px 18px;
+}
+.zone-panel-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.zone-panel-title { font: 650 18px/22px var(--font); color: var(--label); letter-spacing: -.01em; }
+.zone-panel-sub { font: 400 14px/18px var(--font); color: var(--label2); }
+.zone-tiles { display: flex; flex-wrap: wrap; gap: 10px; }
+.zone-tile {
+  position: relative; width: 104px; height: 68px; border-radius: var(--r);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: #26262a; border: 1px solid rgba(255,255,255,.06);
+}
+.zone-tile .zt-num { font: 650 19px/22px var(--font); color: var(--label); }
+.zone-tile .zt-st { font: 600 10px/13px var(--font); text-transform: uppercase; letter-spacing: .04em; color: var(--label2); }
+.zone-tile.ready   { background: var(--green-bg); border-color: var(--green-border); }
+.zone-tile.ready   .zt-st { color: var(--green); }
+.zone-tile.cooking { background: var(--orange-bg); border-color: rgba(255,149,0,.35); }
+.zone-tile.cooking .zt-st { color: var(--orange); }
+
+/* ── Ingredients view ─────────────────────────────────────────────────────── */
+#ingredientsView { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
+.ing-note { font: 400 14px/20px var(--font); color: var(--label2); margin-bottom: 2px; }
+.ing-row {
+  display: flex; align-items: center; gap: 16px;
+  background: #1c1c1e; border: 1px solid rgba(255,255,255,.07);
+  border-radius: var(--r-lg); box-shadow: 0 1px 3px rgba(0,0,0,.45); padding: 16px 20px;
+}
+.ing-name { font: 600 18px/22px var(--font); color: var(--label); flex: 1; }
+.ing-stat { text-align: center; min-width: 88px; }
+.ing-num { font: 650 24px/28px var(--font); font-variant-numeric: tabular-nums; color: var(--label); }
+.ing-num.good { color: var(--green); } .ing-num.warn { color: var(--orange); } .ing-num.info { color: var(--label); }
+.ing-lbl { font: 400 11px/14px var(--font); color: var(--label3); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── Bottom summary bar ───────────────────────────────────────────────────── */
+.allday-bar {
+  display: flex; gap: 28px; align-items: center;
+  padding: 10px 24px;
+  background: var(--bar-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--bar-border); flex-shrink: 0;
+}
+.allday-stat { display: flex; align-items: baseline; gap: 7px; }
+.allday-num { font: 700 20px/24px var(--font); font-variant-numeric: tabular-nums; }
+.allday-lbl { font: 400 13px/16px var(--font); color: var(--label3); }
+.empty-note { color: var(--label3); font: 400 17px/22px var(--font); padding: 48px; text-align: center; width: 100%; }
+</style>
+<link rel="stylesheet" href="operator.css">
+<script src="config.js"></script>
+<script defer src="data.js"></script>
+<script defer src="operator-pages.js"></script>
+</head>
+<body data-operator-page="kitchen">
+<header class="operator-header"><h1>Kitchen</h1><nav aria-label="Operator screens"><a href="server-order.html">New order</a><a href="server-tables.html">My tables</a><a href="kitchen.html" aria-current="page">Kitchen</a><a href="index.html">Full workbench</a></nav></header>
+<main class="operator-shell">
+  <form id="operatorLogin" class="operator-session" hidden>
+    <p>Protected demo sign-in. Credentials stay in this tab’s memory. Browser sign-in is used automatically when available.</p>
+    <label>Username <input id="operatorUsername" autocomplete="username" required></label>
+    <label>Password <input id="operatorPassword" type="password" autocomplete="current-password" required></label>
+    <button id="operatorLoginSubmit" type="submit">Verify demo access</button>
+  </form>
+  <section class="operator-session" aria-label="Demo staff session">
+    <label>Staff member <select id="operatorActor" aria-label="Staff member"></select></label>
+    <button id="enterSession">Enter session</button>
+    <button id="operatorRefresh" class="operator-action">Refresh shared state</button>
+    <span id="operatorIdentity">Choose a simulated staff session.</span>
+    <span id="operatorConnection" role="status">Connecting to shared backend…</span>
+  </section>
+  <p class="operator-hint">Menu, orders, physical dish units and kitchen updates share the same backend. Select a session again after navigating between pages; saved orders remain available. Voice, menu PDF/photo upload and device print/speech are in the full workbench.</p>
+  <div id="operatorFeedback" class="operator-feedback" role="status" aria-live="polite"></div>
+  <div id="operatorRetryBar" class="operator-retry" hidden><p>The last command may have arrived. New changes and session switching are blocked. Reconnect, then retry its exact event ID, time and original session.</p><button id="operatorRetry" class="operator-action">Retry exact pending event</button></div>
+  <div id="operatorMain"><p>Loading shared backend…</p></div>
+</main>
+</body>
+</html>

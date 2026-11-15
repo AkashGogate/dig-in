@@ -13,6 +13,11 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validato
 
 from app.analytics.events import CanonicalEvent
 from app.mvp.menu import MenuDocument
+from app.mvp.service_contracts import (
+    PublishServiceUpdate,
+    RespondServiceUpdate,
+    ServiceUpdate,
+)
 
 
 def now():
@@ -45,6 +50,7 @@ class LineInput(Model):
 
 class Line(LineInput):
     item_name: str
+    modifier_names: list[str] = Field(default_factory=list)
     station: str | None = None
     typical_minutes: float | None = None
     recipe: list[dict] | None = None
@@ -57,9 +63,12 @@ class DraftFlag(Model):
     message: str
     candidates: list[str] = Field(default_factory=list)
     spoken_table_id: str | None = None
+    line_id: str | None = None
+    request_text: str | None = Field(default=None, max_length=500)
 
 
 class Order(Model):
+    menu_revision: str = ""
     id: str
     owner: str
     table_id: str
@@ -77,6 +86,9 @@ class Order(Model):
     flags: list[DraftFlag] = Field(default_factory=list)
     voice_baseline: list[Line] | None = None
     capture_mode: Literal["manual", "mock_voice", "live_voice"] = "manual"
+    dietary_check: Literal["not_asked", "none_reported", "requests_recorded"] = (
+        "not_asked"
+    )
     corrected_draft_lines: int = 0
     initial_voice_draft_line_count: int = 0
     zone_status: Literal["unassigned", "waiting", "assigned", "released"] = "unassigned"
@@ -96,6 +108,7 @@ class Dish(Model):
     line_id: str
     menu_id: str
     item_name: str
+    modifier_names: list[str] = Field(default_factory=list)
     modifiers: list[str]
     seat: int | None = None
     requests: str = ""
@@ -160,6 +173,8 @@ class State(Model):
     actors: dict[str, Actor]
     tables: dict[str, Table]
     menu: MenuDocument
+    menu_revision: str = ""
+    menus: dict[str, MenuDocument] = Field(default_factory=dict)
     orders: dict[str, Order] = Field(default_factory=dict)
     dishes: dict[str, Dish] = Field(default_factory=dict)
     zones: dict[str, PlatingZone]
@@ -167,9 +182,17 @@ class State(Model):
     ingredient_zones: dict[str, IngredientZone]
     stock_movements: list[StockMovement] = Field(default_factory=list)
     stock_observations: dict[str, dict] = Field(default_factory=dict)
+    service_updates: dict[str, ServiceUpdate] = Field(default_factory=dict)
     notifications: list[Notification] = Field(default_factory=list)
     events: list[CanonicalEvent] = Field(default_factory=list)
     stable_ms_required: int = Field(default=1500, ge=1000, le=2000)
+
+
+class ActivateMenu(Model):
+    action: Literal["activate_menu"]
+    candidate_id: str
+    expected_menu_revision: str
+    human_confirmed: bool
 
 
 class StartOrder(Model):
@@ -190,15 +213,23 @@ class CaptureVoice(Model):
     order_id: str
     revision: int
     text: str = Field(min_length=1, max_length=2000)
+    capture_mode: Literal["mock_voice", "live_voice"] = "mock_voice"
+    stt_confidence: float | None = Field(default=None, ge=0, le=1)
 
 
 class ResolveFlag(Model):
+    line_id: str | None = None
     action: Literal["resolve_flag"]
     order_id: str
     revision: int
     flag_id: str
     resolution: Literal[
-        "keep_selected_table", "use_spoken_table", "reviewed_remove_unknown"
+        "keep_selected_table",
+        "use_spoken_table",
+        "reviewed_remove_unknown",
+        "asked_none_reported",
+        "reviewed_keep_note",
+        "reviewed_speech",
     ]
 
 
@@ -245,8 +276,10 @@ class ReconcileZone(Model):
 
 
 class KitchenVoice(Model):
+    capture_mode: Literal["mock_voice", "live_voice"] = "mock_voice"
     action: Literal["kitchen_voice"]
     text: str = Field(min_length=1, max_length=1000)
+    stt_confidence: float | None = Field(default=None, ge=0, le=1)
 
 
 class StockObservation(Model):
@@ -268,7 +301,10 @@ class AcceptStock(Model):
 
 
 Payload = Annotated[
-    StartOrder
+    PublishServiceUpdate
+    | RespondServiceUpdate
+    | ActivateMenu
+    | StartOrder
     | EditDraft
     | CaptureVoice
     | ResolveFlag

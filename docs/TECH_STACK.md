@@ -5,7 +5,7 @@ FastAPI/Python 3.11+, Pydantic, uv lock, pytest/Ruff and buildless static HTML/C
 | Component | Current seam / limit |
 | --- | --- |
 | Menu | Canonical Pydantic/JSON schema, deterministic alias/modifier matcher; importer protocol/status only |
-| Voice | Constrained ephemeral text parsing and visible hold/release transcript simulator; no live capture/STT/noisy-hall claim |
+| Voice | Constrained ephemeral parsing (exact menu aliases first, char-trigram similarity only for review suggestions); text simulator by default; optional live Deepgram nova-3 streaming with menu keyterms, `mip_opt_out`, demo-password tickets and spend caps. Verified on synthetic clips only; no noisy-hall claim |
 | CV | Stable-duration/no-hand/status/versioned occupancy command seam and mock controls; no pixel detector or verified UNO Q ingestion |
 | Core | One-process locked v2 state, revisions, all-K zone allocation, timestamps/notifications and canonical events |
 | Analytics | Background fake/JSONL export, retry outbox, local analyzer, ten-order fixture and Databricks SQL templates; live warehouse/dashboard adapter unimplemented |

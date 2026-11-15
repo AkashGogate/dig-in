@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="mvp.css">
   <script src="config.js"></script>
+  <script src="menu-document.js" defer></script>
+  <script src="menu-setup.js" defer></script>
+  <script src="service-coordination.js" defer></script>
+  <script src="voice-audio.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -20,8 +24,10 @@
     <label for="actor">Simulated staff session<select id="actor"><option value="">Loading staff…</option></select></label>
     <button id="connect">Enter demo session</button>
     <p id="identity">Choose a staff session. Voice recognition is never authentication.</p>
+    <form id="voice-login" class="inline-form" hidden><label for="voice-user">Demo login<input id="voice-user" autocomplete="username" required></label><label for="voice-pass">Password<input id="voice-pass" type="password" autocomplete="current-password" required></label><button type="submit">Sign in for this tab</button></form>
   </section>
-  <nav class="view-nav" aria-label="Primary screens"><button data-view="server" aria-pressed="true">Server</button><button data-view="kitchen" aria-pressed="false">Kitchen</button></nav>
+  <nav class="view-nav" aria-label="Primary screens"><button data-view="server" aria-pressed="true">Server</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button class="menu-setup-nav" data-view="menu-setup" aria-pressed="false">Menu setup</button></nav>
+  <nav class="view-nav" aria-label="Operator pages"><a href="server-order.html">Take orders</a><a href="server-tables.html">Server tickets</a><a href="kitchen.html">Kitchen operator</a></nav>
   <div id="feedback" role="status" aria-live="polite">Tap controls work without voice or cameras.</div>
   <div id="retry-bar" hidden><p>The last change has an uncertain result. Reconnect and retry the exact event; it will not create a duplicate.</p><button id="retry">Retry last event</button></div>
   <main id="workspace" tabindex="-1">
@@ -36,10 +42,10 @@
           <div id="draft-summary" class="empty">No draft selected.</div>
           <div id="editor" hidden>
             <section class="voice-capture" aria-labelledby="voice-title">
-              <div class="panel-heading"><h3 id="voice-title">Read the order back</h3><span class="tag">SIMULATED TRANSCRIPTION</span></div>
-              <p class="note">No microphone is connected or recording. Enter a table-first read-back below, then hold and release to send this text to the menu matcher. This creates an editable draft, never a submitted order. Existing draft entries are replaced only by this deliberate action.</p>
+              <div class="panel-heading"><h3 id="voice-title">Read the order back</h3><span id="voice-mode-tag" class="tag">SIMULATED TRANSCRIPTION</span></div>
+              <p id="voice-note" class="note">No microphone is connected or recording. Enter a table-first read-back below, then hold and release to send this text to the menu matcher. This creates an editable draft, never a submitted order. Existing draft entries are replaced only by this deliberate action.</p>
               <label for="transcript">Mock transcript<textarea id="transcript" rows="3" maxlength="2000" placeholder="Table 1: one menu item and one other item"></textarea></label>
-              <div class="actions"><button id="hold-talk" type="button" data-command>Hold to transcribe mock text</button><button id="use-transcript" type="button" data-command>Use transcript text</button></div>
+              <div class="actions"><button id="hold-talk" type="button" aria-pressed="false" data-command>Hold to transcribe mock text</button><button id="use-transcript" type="button" data-command>Use transcript text</button></div>
               <p id="capture-status" class="note" aria-live="polite">Hold with pointer, Space or Enter; release to create the draft. Audio adapter is not connected.</p>
             </section>
             <div id="draft-flags"></div>
@@ -55,17 +61,67 @@
             <div class="send-review"><p id="send-note">Review the table, food, quantity and requests before sending.</p><button id="confirm-send" class="primary" data-command>Confirm and send</button><p id="confirmation-blocker" class="note"></p></div>
           </div>
         </section>
-        <aside class="panel" aria-labelledby="menu-title"><h2 id="menu-title">Configured menu</h2><div id="menu-summary"></div><p class="note">Unknown menu words and ambiguous matches stay flagged. Kitchen fields may be unknown; this demo does not invent recipes or times.</p><div class="health-note"><h3>Analytics export</h3><div id="analytics-health">Checking outbox…</div><p class="note">Service continues when export is unavailable. No live Databricks workspace or dashboard is claimed here.</p></div></aside>
+        <aside class="panel" aria-labelledby="menu-title"><h2 id="menu-title">Configured menu</h2><button class="small" data-view="menu-setup" type="button">Upload & review a menu</button><div id="menu-summary"></div><p class="note">Unknown menu words and ambiguous matches stay flagged. Kitchen fields may be unknown; this demo does not invent recipes or times.</p><div class="health-note"><h3>Analytics export</h3><div id="analytics-health">Checking outbox…</div><p class="note">Service continues when export is unavailable. No live Databricks workspace or dashboard is claimed here.</p></div></aside>
       </div>
+      <section class="panel service-summary-panel" aria-labelledby="service-server-title"><div class="panel-heading"><div><p class="eyebrow">ON-DEMAND SERVICE SNAPSHOT</p><h2 id="service-server-title">Your next front-of-house actions</h2></div><button id="service-server-ask" type="button" class="primary">Ask for a summary</button></div><p id="service-server-permissions" class="note">Enter a Server or lead session for this flow.</p><p id="service-server-summary-meta" class="note">No summary requested in this session.</p><pre id="service-server-summary" class="service-summary-text" tabindex="-1">Ask for a summary when you want a fresh service snapshot.</pre><div class="actions"><button id="service-server-print" type="button" disabled>Print summary…</button><button id="service-server-speak" type="button" disabled>Speak summary</button><button id="service-server-stop" type="button" disabled>Stop speaking</button></div><p id="service-server-speech-note" class="note"></p></section>
+      <section class="panel" aria-labelledby="service-server-updates-title"><div class="panel-heading"><h2 id="service-server-updates-title">Kitchen updates for your orders</h2><span class="tag">COORDINATION · NOT FOOD STATUS</span></div><p class="note">Acknowledge a message when seen; mark it handled after coordinating with staff. These actions do not change cooking, readiness, pickup, or delivery.</p><div id="service-server-updates"></div></section>
       <section class="panel"><div class="panel-heading"><h2>Sent orders</h2><span class="tag">ALL-READY NOTIFY · PARTIAL COUNT</span></div><p class="note">A ready plate counts once. Pickup frees its zone. Delivered is an optional explicit close-out.</p><div id="server-orders"></div></section>
     </section>
     <section id="kitchen-view" class="view" hidden>
       <div class="section-heading"><div><p class="eyebrow">02 / KITCHEN</p><h1>Every plate has a zone.</h1></div><p>Only finished plates enter these zones.<br>Stable occupancy means ready by that convention.</p></div>
-      <section class="panel"><div class="panel-heading"><h2>Kitchen voice</h2><span class="tag">TEXT SIMULATOR</span></div><form id="kitchen-voice-form" class="inline-form"><label for="kitchen-transcript">Constrained kitchen phrase<input id="kitchen-transcript" maxlength="500" placeholder="Heard, table 1" required></label><button type="submit" data-command>Interpret kitchen phrase</button></form><p class="note">“Heard, table N” or “Start table N [menu item]”. When table or dish is ambiguous, select the exact ticket/unit below. This is not a live kitchen microphone.</p><div id="kitchen-clarification"></div></section>
-      <section class="panel"><div class="panel-heading"><h2>Plating camera & zones</h2><span class="tag">SIMULATED OBSERVATIONS</span></div><p class="note">Acknowledgment reserves one zone per physical dish, all or none. A camera observation needs a current assignment, 1.5 seconds of stability and no hand. Blocked/unknown is never treated as empty.</p><div id="cameras"></div><div id="zones" class="mvp-zone-grid"></div></section>
+      <section class="panel" aria-labelledby="service-kitchen-lineup-title"><div class="panel-heading"><h2 id="service-kitchen-lineup-title">Cooking lineup</h2><span class="tag">ONE TASK PER PHYSICAL DISH</span></div><p class="note">These tasks are the existing dish units, not a separate progress system. Acknowledge tickets below, start each unit deliberately, and keep ready-only zones for finished plates.</p><div id="service-kitchen-lineup"></div></section>
+      <section class="panel service-summary-panel" aria-labelledby="service-kitchen-title"><div class="panel-heading"><div><p class="eyebrow">ON-DEMAND SERVICE SNAPSHOT</p><h2 id="service-kitchen-title">Kitchen service snapshot</h2></div><button id="service-kitchen-ask" type="button" class="primary">Ask for a summary</button></div><p id="service-kitchen-permissions" class="note">Enter a Kitchen or lead session for this flow.</p><p id="service-kitchen-summary-meta" class="note">No summary requested in this session.</p><pre id="service-kitchen-summary" class="service-summary-text" tabindex="-1">Ask for a summary when you want a fresh service snapshot.</pre><div class="actions"><button id="service-kitchen-print" type="button" disabled>Print summary…</button><button id="service-kitchen-speak" type="button" disabled>Speak summary</button><button id="service-kitchen-stop" type="button" disabled>Stop speaking</button></div><p id="service-kitchen-speech-note" class="note"></p></section>
+      <section class="panel" aria-labelledby="service-update-title"><div class="panel-heading"><h2 id="service-update-title">Update the front staff</h2><span class="tag">SENT TO THE TICKET'S SERVER</span></div><form id="service-update-form"><fieldset id="service-update-fields" disabled><legend class="sr-only">Kitchen-to-server update</legend><div class="form-grid"><label for="service-update-order">Ticket<select id="service-update-order"><option value="">Choose the exact ticket</option></select></label><label for="service-update-kind">Update type<select id="service-update-kind"><option value="delay">Delay</option><option value="needs_attention">Needs staff attention</option><option value="pickup_request">Pickup coordination</option><option value="availability">Availability change</option></select></label></div><label for="service-update-note">Staff note (optional)<textarea id="service-update-note" rows="2" maxlength="300" placeholder="Explicit operational note for this ticket's server"></textarea></label></fieldset><button id="service-update-submit" type="submit" disabled>Send update to server</button></form><p class="note">This is a deliberate staff note, not a transcript or food-ready command. Use the existing dish controls for cooking and readiness.</p><h3>Sent updates</h3><div id="service-kitchen-updates"></div></section>
+      <section class="panel"><div class="panel-heading"><h2>Kitchen voice</h2><span id="kitchen-voice-mode" class="tag">TEXT SIMULATOR</span></div><form id="kitchen-voice-form" class="inline-form"><label for="kitchen-transcript">Constrained kitchen phrase<input id="kitchen-transcript" maxlength="500" placeholder="Heard, table 1" required></label><button type="submit" data-command>Interpret kitchen phrase</button><button id="kitchen-hold" type="button" aria-pressed="false" data-command hidden>Hold to talk</button></form><p id="kitchen-capture-status" class="note" aria-live="polite"></p><p id="kitchen-voice-note" class="note">“Heard, table N” or “Start table N [menu item]”. When table or dish is ambiguous, select the exact ticket/unit below. Live microphone availability is shown above.</p><div id="kitchen-clarification"></div></section>
+      <section class="panel"><div class="panel-heading"><h2>Plating camera & zones</h2><span class="tag">OCCUPANCY · READY-ONLY ZONES</span></div><p class="note">Acknowledgment reserves one zone per physical dish, all or none. A camera observation needs a current assignment, 1.5 seconds of stability and no hand. Blocked/unknown is never treated as empty.</p><div id="cameras"></div><div id="zones" class="mvp-zone-grid"></div></section>
       <section class="panel"><div class="panel-heading"><h2>Kitchen tickets</h2><span class="tag">ELAPSED TIME · NO COOKING PERCENTAGE</span></div><div id="tickets"></div></section>
     </section>
+    <section id="menu-setup-view" class="view" aria-labelledby="menu-setup-title" hidden>
+      <div class="section-heading"><div><p class="eyebrow">MENU SETUP</p><h1 id="menu-setup-title" tabindex="-1">A new menu. Ready to review.</h1></div><p>Upload, encode, review, activate.<br>Open tickets keep their original menu.</p></div>
+      <section class="menu-current" aria-label="Active menu"><div><p class="eyebrow">ACTIVE MENU</p><h2 id="menu-current-name">Connecting…</h2><p id="menu-current-count">Waiting for the shared backend.</p></div><p class="note">Menu changes apply to new orders. This demo resets on backend restart.</p></section>
+      <p id="menu-permission" class="review-flag">To upload and activate menus, choose <strong>Integration demo lead</strong> in Simulated staff session above, then select <strong>Enter demo session</strong>.</p>
+      <div id="menu-setup-status" class="menu-setup-status" role="status" aria-live="polite" tabindex="-1">Choose a file or paste your menu to begin.</div>
+      <div class="menu-setup-grid">
+        <section id="menu-input-panel" class="panel" aria-labelledby="menu-input-title" aria-busy="false">
+          <p class="eyebrow">01 / IMPORT</p><h2 id="menu-input-title">Bring your menu</h2>
+          <p class="note">Upload PDF or PNG/JPEG photos to extract editable dishes (8 MiB, up to 10 PDF pages). JSON, CSV and TXT also work. Review OCR against the original; up to 500 dishes.</p>
+          <form id="menu-import-form" novalidate>
+            <fieldset id="menu-input-fields" disabled>
+              <legend class="sr-only">Menu input</legend>
+              <label class="menu-upload-box" for="menu-upload">Upload a menu file<input id="menu-upload" type="file" accept=".json,.csv,.txt,.pdf,.png,.jpg,.jpeg,application/json,text/csv,text/plain,application/pdf,image/png,image/jpeg" aria-describedby="menu-source-name"></label>
+              <p id="menu-source-name" class="note">Or paste your menu content below.</p>
+              <label for="menu-name">Menu name<input id="menu-name" type="text" maxlength="200" placeholder="Evening menu" aria-describedby="menu-name-help"></label><p id="menu-name-help" class="note">Used when the file does not contain a menu name.</p>
+              <label for="menu-format">Input format<select id="menu-format" aria-describedby="menu-format-help"><option value="text/plain">Text · one item per line</option><option value="text/csv">CSV · name column required</option><option value="application/json">JSON · item list or menu document</option></select></label>
+              <details id="menu-format-help"><summary>See supported examples</summary><p class="note">Text: one dish per line, optionally followed by | and a description. Omit headings and price-only lines.</p><pre>Tomato soup | Roasted tomato and basil
+Basil pasta | Fresh basil and parmesan</pre><p class="note">CSV supports name, description, category, price_cents and aliases. JSON also supports nested modifiers and kitchen details.</p><pre>name,description,price_cents
+Tomato soup,Roasted tomato and basil,900</pre><pre>[{"name":"Tomato soup","aliases":["soup"]}]</pre></details>
+              <section id="menu-extracted-editor" hidden aria-labelledby="menu-extracted-title"><h3 id="menu-extracted-title">Correct extracted dishes</h3><p id="menu-extraction-warning" class="review-flag"></p><div id="menu-extracted-items"></div><button id="menu-add-extracted" type="button">Add missing dish</button><details><summary>Compare extracted source text</summary><pre id="menu-ocr-source"></pre></details></section>
+              <label for="menu-content">Menu content<textarea id="menu-content" rows="8" maxlength="100000" spellcheck="false" aria-describedby="menu-setup-status" placeholder="Tomato soup | Roasted tomato and basil&#10;Basil pasta | Fresh basil and parmesan"></textarea></label>
+            </fieldset>
+            <button id="menu-prepare" class="primary" type="submit" disabled>Prepare & encode menu</button>
+            <p class="note">Preparation creates a preview. Your active menu stays in use until you activate the reviewed menu.</p>
+          </form>
+        </section>
+        <section class="panel menu-review-panel" aria-labelledby="menu-preview-heading">
+          <p class="eyebrow">02 / REVIEW & ACTIVATE</p><h2 id="menu-preview-heading" tabindex="-1">Check every dish</h2>
+          <div id="menu-preview-empty" class="menu-preview-empty"><h3>Your preview appears here.</h3><p>Prepare a menu to check its names, aliases, modifiers, prices, and kitchen details before it reaches the order desk.</p></div>
+          <div id="menu-preview" hidden>
+            <div class="panel-heading"><h3 id="menu-preview-name"></h3><span id="menu-preview-state" class="tag">Encoded · awaiting review</span></div>
+            <p id="menu-encoding-summary" class="note"></p><p id="menu-review-summary"></p>
+            <div id="menu-matching-warnings" class="review-flag" hidden></div>
+            <p class="note">Unknown kitchen fields remain unknown. To correct an item, edit the input and prepare again.</p>
+            <ol id="menu-preview-items" class="menu-review-list"></ol>
+          </div>
+          <div class="menu-activation-area">
+            <p id="menu-activation-gate" class="note">Prepare a menu to begin review.</p>
+            <div id="menu-review-confirmation" hidden><label class="check" for="menu-reviewed"><input id="menu-reviewed" type="checkbox" disabled>I reviewed every item, alias, modifier, price, and unknown kitchen detail.</label><button id="menu-activate" class="primary" type="button" disabled>Activate menu</button><p class="note">This replaces the menu for new orders on every connected device.</p></div>
+            <div class="actions"><button id="menu-discard" type="button">Discard preview</button><button type="button" data-view="server">Back to Server</button></div>
+          </div>
+        </section>
+      </div>
+    </section>
   </main>
+  <section id="service-print-sheet" aria-label="Printable service summary"><h1 id="service-print-title"></h1><pre id="service-print-text"></pre></section>
   <footer>Dig In · Human approval, menu IDs, visible uncertainty. <a href="http://localhost:8000/docs" id="api-link">API contracts</a><details class="legacy-links"><summary>Earlier experiments</summary><a href="coordination-v1.html">Archived coordination v1</a> · <a href="legacy.html">Legacy voice lab</a><p>Separate legacy state and contracts; outside the MVP demo.</p></details></footer>
 </body>
 </html>

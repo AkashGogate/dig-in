@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import os
 import threading
 from uuid import uuid4
 
@@ -16,17 +17,88 @@ from app.analytics.outbox import Outbox
 from app.coordination.rules import Conflict, require
 from app.mvp import contracts as c
 from app.mvp.fixtures import seed
-from app.mvp.voice import parse_kitchen, parse_order
+from app.mvp.menu import import_status, match_menu
+from app.mvp.menu_embeddings import MenuIndex, provider_from_env
+from app.mvp.menu_import import parse_menu, review_warnings
+from app.mvp.service_flow import apply_service_command, build_summary
+from app.mvp.voice import parse_kitchen, parse_order, suggest_items
+from app.mvp.voice_live import LOW_CONFIDENCE_BELOW, live_enabled
 
 
 class Restaurant:
-    def __init__(self, menu=None, outbox=None):
+    def __init__(self, menu=None, outbox=None, embedding_provider=None):
         self.state = seed(menu)
+        self.embedding_provider = embedding_provider or provider_from_env()
+        initial_index = MenuIndex.build(self.state.menu, self.embedding_provider)
+        self.state.menu_revision = initial_index.revision
+        self.state.menus = {
+            initial_index.revision: self.state.menu.model_copy(deep=True)
+        }
+        self.menu_indexes = {initial_index.revision: initial_index}
+        self.menu_candidates = {}
         self.lock = threading.RLock()
         self.outbox = outbox or Outbox()
         self.sessions = {}
         self.receipts = {}
         self.waiting = []
+
+    def _menu_lead(self, session_id):
+        require(session_id in self.sessions, "Select a demo staff/device session")
+        require(
+            self.state.actors[self.sessions[session_id]].role == "lead",
+            "Menu changes require a lead session",
+        )
+
+    def prepare_menu(self, request, session_id):
+        # Authorize before work/provider usage. Never hold the operational lock
+        # during parsing/encoding; failed preparation cannot replace active state.
+        with self.lock:
+            self._menu_lead(session_id)
+            base_revision = self.state.menu_revision
+        menu = parse_menu(request)
+        index = MenuIndex.build(menu, self.embedding_provider)
+        candidate_id = str(uuid4())
+        with self.lock:
+            self.menu_candidates[candidate_id] = (menu, index, base_revision)
+            while len(self.menu_candidates) > 16:
+                del self.menu_candidates[next(iter(self.menu_candidates))]
+        return {
+            "candidate_id": candidate_id,
+            "expected_menu_revision": base_revision,
+            "menu_revision": index.revision,
+            "menu": menu.model_dump(mode="json"),
+            "index": index.status(),
+            "warnings": review_warnings(menu),
+            "import_status": import_status(menu),
+            "requires_human_review": True,
+        }
+
+    def search_menu(self, text, revision=None, limit=5):
+        with self.lock:
+            revision = revision or self.state.menu_revision
+            require(revision in self.state.menus, "Unknown menu revision")
+            index = self.menu_indexes[revision]
+        # Explicit API search may call the configured provider; no capture text
+        # is automatically sent to it and no query is retained/exported.
+        return {
+            **index.status(),
+            "candidates": index.search(text, limit),
+            "requires_human_review": True,
+        }
+
+    def match_menu(self, text):
+        with self.lock:
+            index = self.menu_indexes[self.state.menu_revision]
+            return match_menu(self.state.menu, text, suggest=index.suggest_local)
+
+    def service_summary(self, session_id, audience):
+        # Capture identity, state and generation time together. Rendering and
+        # device delivery happen after the operational lock has been released.
+        with self.lock:
+            require(session_id in self.sessions, "Select a demo staff/device session")
+            actor = self.state.actors[self.sessions[session_id]].model_copy(deep=True)
+            state, generated_at = self.state.model_copy(deep=True), c.now()
+        return build_summary(state, actor, audience, generated_at)
 
     def session(self, actor_id):
         with self.lock:
@@ -132,8 +204,8 @@ class Restaurant:
         )
         return order
 
-    def _line(self, value):
-        item = self.state.menu.item(value.menu_id)
+    def _line(self, value, menu):
+        item = menu.item(value.menu_id)
         require(item is not None, "Unknown menu ID; choose a configured item")
         require(
             set(value.modifiers) <= {m.id for m in item.modifiers},
@@ -142,6 +214,7 @@ class Restaurant:
         return c.Line(
             **value.model_dump(),
             item_name=item.name,
+            modifier_names=[m.name for m in item.modifiers if m.id in value.modifiers],
             station=item.station,
             typical_minutes=item.typical_minutes,
             recipe=None
@@ -156,6 +229,18 @@ class Restaurant:
     def _validate_table(self, table_id):
         require(table_id in self.state.tables, "Choose a configured table")
 
+    def _voice_fallback(self):
+        """Ack/start automation is kitchen voice: record if it was available."""
+        if self._current.source == "voice":
+            return {"automation_available": True, "fallback_reason": None}
+        live = live_enabled()
+        return {
+            "automation_available": live,
+            "fallback_reason": None
+            if live
+            else "Live kitchen voice is off on this server; staff used the tap",
+        }
+
     def _fallback(self, dish, reason=None):
         zone = self.state.zones.get(dish.zone_id)
         camera = self.state.cameras[zone.camera_id] if zone else None
@@ -164,8 +249,74 @@ class Restaurant:
             "fallback_reason": reason,
         }
 
+    def _dietary_flag(self, order):
+        """Reminder to ask the table; blocks Confirm until an answer is recorded."""
+        if (
+            os.environ.get("DIG_IN_REQUIRE_DIETARY_CHECK") == "1"
+            and order.dietary_check == "not_asked"
+            and not any(f.code == "dietary_check_required" for f in order.flags)
+        ):
+            order.flags.append(
+                c.DraftFlag(
+                    id=f"{order.id}:dietary:{order.revision}",
+                    code="dietary_check_required",
+                    message="Ask the table about allergies or dietary needs, then record the answer.",
+                )
+            )
+        if order.dietary_check != "not_asked":
+            order.flags = [f for f in order.flags if f.code != "dietary_check_required"]
+
     def _apply(self, p):
         s, e = self.state, self._current
+        service_result = apply_service_command(self, p)
+        if service_result is not None:
+            return service_result
+        if isinstance(p, c.ActivateMenu):
+            require(
+                self._actor.role == "lead" and e.source == "tap" and p.human_confirmed,
+                "Menu activation requires a lead human review tap",
+            )
+            require(
+                p.candidate_id in self.menu_candidates,
+                "Unknown/expired menu candidate; prepare again",
+            )
+            menu, index, base_revision = self.menu_candidates[p.candidate_id]
+            require(
+                p.expected_menu_revision == s.menu_revision == base_revision,
+                "Active menu changed; prepare and review again",
+            )
+            # Preserve physical ingredient-zone IDs/balances. A menu cannot
+            # silently redefine an existing zone or invent initial stock.
+            for ingredient, zone_id in menu.ingredient_zones.items():
+                if zone_id is not None:
+                    require(
+                        zone_id in s.ingredient_zones
+                        and s.ingredient_zones[zone_id].ingredient == ingredient,
+                        "Ingredient zones require explicit physical setup before activation",
+                    )
+            for item in menu.items:
+                for ingredient in item.recipe or []:
+                    if ingredient.zone_id is not None:
+                        require(
+                            ingredient.zone_id in s.ingredient_zones
+                            and s.ingredient_zones[ingredient.zone_id].ingredient
+                            == ingredient.ingredient,
+                            "Recipe zone does not match configured physical ingredient",
+                        )
+            s.menu, s.menu_revision = menu.model_copy(deep=True), index.revision
+            s.menus[index.revision] = s.menu.model_copy(deep=True)
+            self.menu_indexes[index.revision] = index
+            self._emit(
+                "menu.activated",
+                payload={
+                    "menu_id": menu.id,
+                    "menu_revision": index.revision,
+                    "previous_menu_revision": base_revision,
+                    "item_count": len(menu.items),
+                    "embedding_provider": index.provider.name,
+                },
+            )
+            return {"menu_revision": index.revision}
         if isinstance(p, c.StartOrder):
             require(
                 self._actor.role in ("server", "lead") and e.source == "tap",
@@ -177,8 +328,10 @@ class Restaurant:
                 owner=self._actor.id,
                 table_id=p.table_id,
                 created_at=e.time,
+                menu_revision=s.menu_revision,
             )
             s.orders[order.id] = order
+            self._dietary_flag(order)
             self._emit("draft.created", order.id, payload={"table_id": order.table_id})
             return {"order_id": order.id}
         if isinstance(p, c.EditDraft):
@@ -195,7 +348,30 @@ class Restaurant:
                 ),
                 "Seat is not at this table",
             )
-            order.table_id, order.lines = p.table_id, [self._line(x) for x in p.lines]
+            previous_lines = {line.id: line for line in order.lines}
+            order.table_id, order.lines = (
+                p.table_id,
+                [self._line(x, s.menus[order.menu_revision]) for x in p.lines],
+            )
+            surviving_ids = {line.id for line in order.lines}
+            for flag in order.flags:
+                if flag.code == "dietary_review" and flag.line_id not in surviving_ids:
+                    # Deleting a dish must neither erase its unreviewed dietary
+                    # note nor leave an impossible review target. Reuse the
+                    # explicit attach-to-saved-line correction path instead.
+                    previous = previous_lines.get(flag.line_id)
+                    flag.request_text = flag.request_text or (
+                        previous.requests if previous else None
+                    )
+                    flag.code = "dietary_unattached"
+                    flag.line_id = None
+                    flag.message = f'Dietary note from a removed dish: "{flag.request_text or "unknown"}". Select the correct saved dish and attach the note before sending.'
+            has_requests = any(x.requests.strip() for x in order.lines)
+            if has_requests:
+                order.dietary_check = "requests_recorded"
+            elif order.dietary_check == "requests_recorded":
+                order.dietary_check = "not_asked"
+            self._dietary_flag(order)
             order.revision += 1
             self._emit(
                 "draft.updated",
@@ -208,20 +384,51 @@ class Restaurant:
                 e.source == "voice", "Capture must be an explicit voice-adapter action"
             )
             order = self._draft(p)
-            parsed = parse_order(s.menu, p.text, order.table_id)
+            parsed = parse_order(
+                s.menus[order.menu_revision],
+                p.text,
+                order.table_id,
+                suggest=self.menu_indexes[order.menu_revision].suggest_local,
+            )
+            seats = s.tables[order.table_id].seats
+            for n, value in enumerate(parsed["lines"]):
+                if value.get("seat") is not None and value["seat"] not in seats:
+                    parsed["flags"].append(
+                        {
+                            "code": "seat_unknown",
+                            "message": f"Seat {value['seat']} is not at table {order.table_id}; set the seat manually.",
+                            "line_index": n,
+                        }
+                    )
+                    value["seat"] = None
             order.lines = [
-                self._line(c.LineInput(id=f"{e.event_id}:line:{n}", **value))
+                self._line(
+                    c.LineInput(id=f"{e.event_id}:line:{n}", **value),
+                    s.menus[order.menu_revision],
+                )
                 for n, value in enumerate(parsed["lines"])
             ]
             order.voice_baseline = copy.deepcopy(order.lines)
             order.initial_voice_draft_line_count = len(order.lines)
-            order.capture_mode = "mock_voice"  # no live STT wired in this scaffold
+            require(
+                p.capture_mode != "live_voice" or live_enabled(),
+                "live_voice capture requires live voice enabled on this server",
+            )
+            order.capture_mode = p.capture_mode
+            if parsed.get("dietary_check"):
+                order.dietary_check = parsed["dietary_check"]
+            elif order.dietary_check == "requests_recorded":
+                order.dietary_check = "not_asked"  # re-capture replaced the noted lines
             order.flags = [
                 c.DraftFlag(
                     id=f"{e.event_id}:flag:{n}",
                     code=f["code"],
                     message=f["message"],
                     candidates=f.get("candidates", []),
+                    request_text=f.get("request_text"),
+                    line_id=f"{e.event_id}:line:{f['line_index']}"
+                    if f["code"] == "dietary_review"
+                    else None,
                     spoken_table_id=parsed.get("table_id")
                     if f["code"] == "table_mismatch"
                     else None,
@@ -239,12 +446,24 @@ class Restaurant:
                         spoken_table_id=parsed.get("table_id"),
                     )
                 )
+            self._dietary_flag(order)
+            if (
+                p.stt_confidence is not None and p.stt_confidence < LOW_CONFIDENCE_BELOW
+            ) or (p.capture_mode == "live_voice" and p.stt_confidence is None):
+                order.flags.append(
+                    c.DraftFlag(
+                        id=f"{e.event_id}:flag:low_confidence",
+                        code="low_confidence",
+                        message="Speech confidence is low or unavailable. Review the table, every dish, quantity and request before sending.",
+                    )
+                )
             order.revision += 1
             self._emit(
                 "draft.updated",
                 order.id,
                 payload={
                     "capture_mode": order.capture_mode,
+                    "stt_confidence": p.stt_confidence,
                     "initial_voice_draft_line_count": len(order.lines),
                     "flag_codes": [f.code for f in order.flags],
                     "revision": order.revision,
@@ -272,6 +491,55 @@ class Restaurant:
                 if p.resolution == "use_spoken_table":
                     self._validate_table(flag.spoken_table_id)
                     order.table_id = flag.spoken_table_id
+            elif flag.code == "low_confidence":
+                require(
+                    p.resolution in ("reviewed_speech", "reviewed_remove_unknown"),
+                    "Explicitly review the entire current speech draft",
+                )
+            elif flag.code == "dietary_check_required":
+                require(
+                    p.resolution == "asked_none_reported",
+                    "Record the table's answer: tap 'Asked: none' or add the dietary needs to a dish",
+                )
+                order.dietary_check = "none_reported"
+            elif flag.code in ("dietary_review", "dietary_unattached"):
+                target_id = (
+                    p.line_id if flag.code == "dietary_unattached" else flag.line_id
+                )
+                target = next(
+                    (line for line in order.lines if line.id == target_id), None
+                )
+                require(
+                    target is not None,
+                    "Select the saved dish line that owns this dietary note before resolving",
+                )
+                if flag.code == "dietary_unattached":
+                    require(
+                        bool(flag.request_text),
+                        "Repeat capture to recover the unattached dietary note",
+                    )
+                    attached = (
+                        target.requests
+                        if flag.request_text in target.requests
+                        else "; ".join(
+                            filter(None, [target.requests, flag.request_text])
+                        )
+                    )
+                    require(
+                        len(attached) <= 500,
+                        "Dietary note is too long; correct the dish note explicitly",
+                    )
+                    target.requests = attached
+                    order.dietary_check = "requests_recorded"
+                    self._dietary_flag(order)
+                require(
+                    bool(target.requests.strip()),
+                    "The dietary note was removed; record the corrected request before review",
+                )
+                require(
+                    p.resolution == "reviewed_keep_note",
+                    "Check the dietary note, edit the dish if needed, then confirm the note",
+                )
             else:
                 require(
                     p.resolution == "reviewed_remove_unknown",
@@ -291,6 +559,10 @@ class Restaurant:
                 "Human Confirm and send tap required",
             )
             order = self._draft(p)
+            require(
+                not any(f.code == "dietary_check_required" for f in order.flags),
+                "Ask the table about allergies or dietary needs and record the answer first",
+            )
             require(not order.flags, "Resolve table mismatch/unknown menu flags first")
             require(bool(order.lines), "Add at least one configured dish")
             count = sum(x.quantity for x in order.lines)
@@ -325,6 +597,7 @@ class Restaurant:
                         line_id=line.id,
                         menu_id=line.menu_id,
                         item_name=line.item_name,
+                        modifier_names=line.modifier_names,
                         modifiers=line.modifiers,
                         seat=line.seat,
                         requests=line.requests,
@@ -336,8 +609,10 @@ class Restaurant:
                 order.id,
                 payload={
                     "table_id": order.table_id,
+                    "menu_revision": order.menu_revision,
                     "dishes": [d.model_dump(mode="json") for d in self._dishes(order)],
                     "corrected_draft_lines": order.corrected_draft_lines,
+                    "dietary_check": order.dietary_check,
                     "initial_voice_draft_line_count": order.initial_voice_draft_line_count,
                     "capture_mode": order.capture_mode,
                     "final_line_count": len(order.lines),
@@ -387,37 +662,84 @@ class Restaurant:
         if isinstance(p, c.KitchenVoice):
             self._kitchen()
             require(e.source == "voice", "Kitchen voice requires voice source")
-            parsed = parse_kitchen(s.menu, p.text)
-            flags = parsed.get("flags", [])
-            candidates = [
-                o
-                for o in s.orders.values()
-                if o.table_id == parsed.get("table_id")
-                and (
-                    o.status == "submitted"
+            require(
+                p.capture_mode != "live_voice" or live_enabled(),
+                "live_voice capture requires live voice enabled on this server",
+            )
+            low_confidence = (
+                p.stt_confidence is not None and p.stt_confidence < LOW_CONFIDENCE_BELOW
+            ) or (p.capture_mode == "live_voice" and p.stt_confidence is None)
+            candidates = []
+            for candidate in s.orders.values():
+                parsed = parse_kitchen(s.menus[candidate.menu_revision], p.text)
+                eligible = (
+                    candidate.status == "submitted"
                     if parsed.get("action") == "acknowledge"
-                    else o.acknowledged_at is not None
-                    and o.status not in ("picked_up", "delivered")
+                    else candidate.acknowledged_at is not None
+                    and candidate.status not in ("picked_up", "delivered")
                 )
-            ]
-            if flags or len(candidates) != 1:
+                if candidate.table_id == parsed.get("table_id") and eligible:
+                    candidates.append((candidate, parsed))
+            if (
+                low_confidence
+                or len(candidates) != 1
+                or candidates[0][1].get("flags")
+                or not candidates[0][1].get("action")
+            ):
+                # A pinned menu narrows suggestions to this ticket's queued units.
+                # Suggestions are observations only; a human still taps the unit.
+                suggested = []
+                selected = candidates[0] if len(candidates) == 1 else None
+                if (
+                    selected
+                    and selected[1].get("flags")
+                    and selected[1].get("dish_phrase")
+                ):
+                    candidate_order, parsed_candidate = selected
+                    suggested = suggest_items(
+                        s.menus[candidate_order.menu_revision],
+                        parsed_candidate["dish_phrase"],
+                        only={
+                            d.menu_id
+                            for d in self._dishes(candidate_order)
+                            if d.stage == "queued"
+                        },
+                    )
                 self._emit(
                     "voice.clarification",
+                    selected[0].id if suggested else None,
                     payload={
-                        "reason": "ambiguous_or_unknown_order",
-                        "candidate_order_ids": [o.id for o in candidates],
+                        "reason": "unknown_dish_on_table"
+                        if suggested
+                        else "ambiguous_or_unknown_order",
+                        "candidate_order_ids": [o.id for o, _ in candidates],
+                        "candidate_menu_ids": suggested,
                     },
                     outcome="observed",
+                )
+                dish_names = (
+                    ", ".join(
+                        s.menus[selected[0].menu_revision].item(m).name
+                        for m in suggested
+                    )
+                    if selected
+                    else ""
                 )
                 return {
                     "flags": [
                         {
                             "code": "clarification",
-                            "message": "Select one eligible order by tap; table/phrase is ambiguous.",
+                            "candidates": suggested,
+                            "message": f"Did you mean {dish_names}? Tap the exact unit to start it."
+                            if suggested
+                            else "Speech confidence is low or unavailable; confirm the exact ticket/unit by tap."
+                            if low_confidence
+                            else "Select one eligible order by tap; table/phrase is ambiguous.",
                         }
-                    ]
+                    ],
+                    "suggested_menu_ids": suggested,
                 }
-            order = candidates[0]
+            order, parsed = candidates[0]
             if parsed["action"] == "acknowledge":
                 return self._acknowledge(order)
             matches = [
@@ -674,7 +996,7 @@ class Restaurant:
         self._emit(
             "order.acknowledged",
             order.id,
-            payload={"automation_available": None, "fallback_reason": None},
+            payload=self._voice_fallback(),
         )
         self.waiting.append(order.id)
         self._allocate()
@@ -744,8 +1066,7 @@ class Restaurant:
             {
                 "station": dish.station,
                 "typical_minutes": dish.typical_minutes,
-                "automation_available": None,
-                "fallback_reason": None,
+                **self._voice_fallback(),
             },
         )
         return {"dish_id": dish.id}
@@ -843,11 +1164,9 @@ class Restaurant:
                 if order.submitted_at is not None:
                     for line in order.lines:
                         for ingredient in line.recipe or []:
-                            key = ingredient.get(
-                                "zone_id"
-                            ) or self.state.menu.ingredient_zones.get(
-                                ingredient["ingredient"]
-                            )
+                            key = ingredient.get("zone_id") or self.state.menus[
+                                order.menu_revision
+                            ].ingredient_zones.get(ingredient["ingredient"])
                             if key in expected:
                                 expected[key] += ingredient["qty"] * line.quantity
             result["computed"] = {

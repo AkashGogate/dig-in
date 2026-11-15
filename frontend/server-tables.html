@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My tables · Dig In</title>
+<link rel="stylesheet" href="style.css">
+<style>
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--sys-grouped); }
+.app { display: flex; flex-direction: column; height: 100%; }
+
+/* ── Tab bar (iPhone) ─────────────────────────────────────────────────────── */
+.tab-bar {
+  display: none;
+  flex-shrink: 0;
+  background: var(--bar-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--bar-border);
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+}
+.tab-bar-items { display: flex; justify-content: space-around; }
+.tab-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font: 400 10px/13px var(--font); color: var(--label3);
+  padding: 4px 16px; min-height: 44px; min-width: 44px;
+  position: relative;
+}
+.tab-item.active { color: var(--blue); }
+.tab-item-icon { font-size: 20px; height: 26px; display: flex; align-items: center; }
+.tab-item-icon svg { width: 25px; height: 25px; }
+.tab-badge {
+  position: absolute; top: 2px; right: 10px;
+  background: var(--red); color: #fff;
+  font: 700 10px/14px var(--font);
+  min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: var(--r-pill);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Top nav ──────────────────────────────────────────────────────────────── */
+.top-nav {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 20px 10px;
+  background: var(--bar-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--bar-border);
+  flex-shrink: 0; z-index: 10;
+}
+.nav-title { font: 700 17px/22px var(--font); flex: 1; }
+.nav-live {
+  display: flex; align-items: center; gap: 5px;
+  font: 600 13px/18px var(--font); color: var(--green);
+}
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: voice-pulse 2s ease-in-out infinite; }
+
+/* ── Main layout: sidebar + content ──────────────────────────────────────── */
+.main-area { display: flex; flex: 1; overflow: hidden; }
+
+/* Sidebar */
+.sidebar {
+  width: 300px; flex-shrink: 0;
+  border-right: 1px solid var(--sep-opaque);
+  overflow-y: auto;
+  background: var(--sys-grouped);
+}
+
+/* Floor / content */
+.floor-area {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+.floor-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sep);
+  flex-shrink: 0;
+}
+.floor-title { font: 700 28px/34px var(--font); flex:1; }
+.floor-canvas { flex: 1; position: relative; overflow: hidden; background: var(--canvas); box-shadow: inset 0 1px 3px rgba(0,0,0,.18); }
+
+/* iPhone overrides */
+@media (max-width: 767px) {
+  .sidebar { width: 100%; border-right: none; display: none; }
+  .floor-area { display: none; }
+  .sidebar.show-mobile { display: flex; flex-direction: column; }
+  .floor-area.show-mobile { display: flex; }
+  .tab-bar { display: block; }
+  .nav-map-btn { display: flex !important; }
+}
+.nav-map-btn { display: none; }
+
+/* ── Sidebar list styles ──────────────────────────────────────────────────── */
+.sidebar-section-header {
+  font: 600 13px/18px var(--font);
+  color: var(--label2);
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 20px 20px 8px;
+}
+.sidebar-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sep);
+  cursor: pointer;
+  min-height: 60px;
+  transition: background .12s;
+}
+.sidebar-row:hover { background: var(--fill4); }
+.sidebar-row:last-child { border-bottom: none; }
+
+.table-circle {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: 700 18px/1 var(--font); color: #fff;
+  flex-shrink: 0;
+}
+.sidebar-row-info { flex: 1; min-width: 0; }
+.sidebar-row-title { font: 600 15px/20px var(--font); color: var(--label); }
+.sidebar-row-sub   { font: 400 13px/18px var(--font); color: var(--label2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-row-time  { font: 400 13px/18px var(--font); color: var(--label3); flex-shrink: 0; }
+
+/* Floor-table visuals live in style.css; see .floor-table status variants. */
+
+/* ── Sheet ────────────────────────────────────────────────────────────────── */
+.sheet-backdrop { display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px); }
+.sheet-backdrop.open { display:block; }
+.sheet { position:fixed;bottom:0;left:0;right:0;background:var(--sys-grouped);border-radius:20px 20px 0 0;z-index:51;max-height:92vh;overflow-y:auto;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,.0,.2,1);box-shadow:0 -4px 32px rgba(0,0,0,.18); }
+.sheet.open { transform:translateY(0); }
+.sheet-handle { display:flex;justify-content:center;padding:12px 0 4px; }
+.sheet-handle::before { content:'';display:block;width:36px;height:5px;background:var(--fill2);border-radius:var(--r-pill); }
+.sheet-title { font:700 20px/26px var(--font);padding:4px 20px 12px; }
+.sheet-subtitle { font:400 15px/20px var(--font);color:var(--label2);padding:0 20px 12px; }
+
+/* ── Sheet dish rows ──────────────────────────────────────────────────────── */
+.sheet-dish-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--sep);
+  min-height: 56px;
+}
+.sheet-dish-row:last-child { border-bottom: none; }
+.zone-badge {
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: var(--r);
+  display: flex; align-items: center; justify-content: center;
+  font: 700 12px/16px var(--font);
+}
+.zone-badge.ready   { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.zone-badge.cooking { background: var(--orange-bg); color: var(--orange); border: 1px solid rgba(255,149,0,.3); }
+.zone-badge.queued  { background: var(--fill3); color: var(--label3); border: 1px solid var(--sep); }
+
+/* ── Action buttons in sheet ──────────────────────────────────────────────── */
+.sheet-actions { padding: 12px 20px 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-action {
+  flex: 1; min-width: 120px; padding: 14px;
+  border-radius: var(--r-lg);
+  font: 600 15px/20px var(--font);
+}
+.btn-primary   { background: var(--blue);  color: #fff; }
+.btn-secondary { background: var(--fill3); color: var(--label2); }
+.btn-green     { background: var(--green); color: #fff; }
+.btn-action:hover:not(:disabled) { opacity: .9; }
+</style>
+<link rel="stylesheet" href="operator.css">
+<script src="config.js"></script>
+<script defer src="data.js"></script>
+<script defer src="operator-pages.js"></script>
+</head>
+<body data-operator-page="tables">
+<header class="operator-header"><h1>My tables</h1><nav aria-label="Operator screens"><a href="server-order.html">New order</a><a href="server-tables.html" aria-current="page">My tables</a><a href="kitchen.html">Kitchen</a><a href="index.html">Full workbench</a></nav></header>
+<main class="operator-shell">
+  <form id="operatorLogin" class="operator-session" hidden>
+    <p>Protected demo sign-in. Credentials stay in this tab’s memory. Browser sign-in is used automatically when available.</p>
+    <label>Username <input id="operatorUsername" autocomplete="username" required></label>
+    <label>Password <input id="operatorPassword" type="password" autocomplete="current-password" required></label>
+    <button id="operatorLoginSubmit" type="submit">Verify demo access</button>
+  </form>
+  <section class="operator-session" aria-label="Demo staff session">
+    <label>Staff member <select id="operatorActor" aria-label="Staff member"></select></label>
+    <button id="enterSession">Enter session</button>
+    <button id="operatorRefresh" class="operator-action">Refresh shared state</button>
+    <span id="operatorIdentity">Choose a simulated staff session.</span>
+    <span id="operatorConnection" role="status">Connecting to shared backend…</span>
+  </section>
+  <p class="operator-hint">Menu, orders, physical dish units and kitchen updates share the same backend. Select a session again after navigating between pages; saved orders remain available. Voice, menu PDF/photo upload and device print/speech are in the full workbench.</p>
+  <div id="operatorFeedback" class="operator-feedback" role="status" aria-live="polite"></div>
+  <div id="operatorRetryBar" class="operator-retry" hidden><p>The last command may have arrived. New changes and session switching are blocked. Reconnect, then retry its exact event ID, time and original session.</p><button id="operatorRetry" class="operator-action">Retry exact pending event</button></div>
+  <div id="operatorMain"><p>Loading shared backend…</p></div>
+</main>
+</body>
+</html>

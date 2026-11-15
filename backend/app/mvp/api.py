@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import Response
 
 from app.analytics.events import CanonicalEvent
@@ -13,11 +13,60 @@ from app.analytics.outbox import FakeAdapter, JsonlAdapter
 from app.coordination.rules import Conflict
 from app.mvp import contracts as c
 from app.mvp.domain import Restaurant
-from app.mvp.menu import import_status, match_menu
+from app.mvp.menu import MenuDocument, import_status
+from app.mvp.menu_embeddings import EmbeddingError
+from app.mvp.menu_extraction import (
+    MAX_UPLOAD,
+    ExtractionUnavailable,
+    extract_menu,
+    extraction_status,
+)
+from app.mvp.menu_import import MenuPrepareRequest, MenuSearchRequest
+from app.mvp.service_contracts import Audience, ServiceSummary
 from app.mvp.voice import adapter_status
+from app.mvp.voice_live import make_router as make_voice_router
 
 router = APIRouter(prefix="/api/v2", tags=["MVP v2"])
 restaurant = Restaurant()
+
+
+def pinned_voice_menu(body, session_id):
+    with restaurant.lock:
+        if session_id not in restaurant.sessions:
+            raise HTTPException(409, "Select a demo session before voice capture")
+        if body and body.order_id:
+            if session_id not in restaurant.sessions:
+                raise HTTPException(409, "Select a demo session before voice capture")
+            order = restaurant.state.orders.get(body.order_id)
+            if (
+                order is None
+                or order.status != "draft"
+                or order.owner != restaurant.sessions[session_id]
+            ):
+                raise HTTPException(
+                    409, "Capture must target your current editable draft"
+                )
+            if body.menu_revision != order.menu_revision:
+                raise HTTPException(
+                    409, "Draft menu revision changed; refresh before capture"
+                )
+            return restaurant.state.menus[order.menu_revision].model_copy(deep=True)
+        if body and body.menu_revision:
+            if session_id not in restaurant.sessions or restaurant.state.actors[
+                restaurant.sessions[session_id]
+            ].role not in ("cook", "lead"):
+                raise HTTPException(
+                    409, "Kitchen session required for menu-scoped capture"
+                )
+            if body.menu_revision not in restaurant.state.menus:
+                raise HTTPException(409, "Unknown menu revision")
+            return restaurant.state.menus[body.menu_revision].model_copy(deep=True)
+        return restaurant.state.menu.model_copy(deep=True)
+
+
+router.include_router(
+    make_voice_router(lambda: restaurant.state.menu, pinned_voice_menu)
+)
 
 
 def checked(fn):
@@ -42,10 +91,19 @@ def commands(body: c.Command, x_demo_session: str = Header(default="")):
     return checked(lambda: restaurant.execute(body, x_demo_session))
 
 
+@router.get("/service/summary", response_model=ServiceSummary)
+def service_summary(audience: Audience, x_demo_session: str = Header(default="")):
+    return checked(lambda: restaurant.service_summary(x_demo_session, audience))
+
+
 @router.get("/contracts")
 def contracts():
     return {
         "schema_version": 2,
+        "menu": MenuDocument.model_json_schema(),
+        "menu_prepare": MenuPrepareRequest.model_json_schema(),
+        "menu_search": MenuSearchRequest.model_json_schema(),
+        "service_summary": ServiceSummary.model_json_schema(),
         "command": c.Command.model_json_schema(),
         "state": c.Snapshot.model_json_schema(),
         "event": CanonicalEvent.model_json_schema(),
@@ -54,12 +112,79 @@ def contracts():
 
 @router.get("/menu")
 def menu():
-    return restaurant.state.menu
+    with restaurant.lock:
+        return restaurant.state.menu.model_copy(deep=True)
 
 
 @router.post("/menu/match")
 def match(body: c.MatchRequest):
-    return match_menu(restaurant.state.menu, body.text)
+    return restaurant.match_menu(body.text)
+
+
+@router.get("/menu/extraction-status")
+def menu_extraction_status():
+    return extraction_status()
+
+
+@router.post("/menu/extract")
+async def extract_menu_document(
+    request: Request, x_demo_session: str = Header(default="")
+):
+    # Authorize before accepting file bytes. OCR/provider I/O never owns Core's lock.
+    with restaurant.lock:
+        checked(lambda: restaurant._menu_lead(x_demo_session))
+    content = bytearray()
+    async for chunk in request.stream():
+        content.extend(chunk)
+        if len(content) > MAX_UPLOAD:
+            raise HTTPException(status_code=413, detail="Menu upload exceeds 8 MiB")
+    media_type = request.headers.get("content-type", "").split(";")[0]
+    try:
+        return await asyncio.to_thread(extract_menu, bytes(content), media_type)
+    except ExtractionUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail="Document extraction failed. Use a readable PDF (1–10 unlocked pages), PNG or JPEG, or paste the menu text.",
+        ) from exc
+    finally:
+        content.clear()
+
+
+@router.post("/menu/prepare")
+def prepare_menu(body: MenuPrepareRequest, x_demo_session: str = Header(default="")):
+    try:
+        return checked(lambda: restaurant.prepare_menu(body, x_demo_session))
+    except EmbeddingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        # Validation errors may contain input excerpts; never echo raw content.
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid menu input; check the documented format, unique IDs and field bounds",
+        ) from exc
+
+
+@router.get("/menu/index")
+def menu_index():
+    with restaurant.lock:
+        return restaurant.menu_indexes[restaurant.state.menu_revision].status()
+
+
+@router.post("/menu/search")
+def search_menu(body: MenuSearchRequest, x_demo_session: str = Header(default="")):
+    # Require a demo session before any potential provider cost; not real auth.
+    def search():
+        with restaurant.lock:
+            if x_demo_session not in restaurant.sessions:
+                raise Conflict("Select a demo staff/device session")
+        return restaurant.search_menu(body.text, body.menu_revision, body.limit)
+
+    try:
+        return checked(search)
+    except EmbeddingError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/menu/import-status")

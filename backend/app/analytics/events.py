@@ -12,6 +12,10 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 EVENT_TYPES = (
+    "service.update_published",
+    "service.update_acknowledged",
+    "service.update_resolved",
+    "menu.activated",
     "order.submitted",
     "order.acknowledged",
     "zones.assigned",
