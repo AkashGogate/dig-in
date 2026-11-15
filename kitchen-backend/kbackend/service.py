@@ -592,6 +592,7 @@ class Kitchen:
             self._badge(t["id"], add=f"partially plated ({p['count_after']} of {expected})",
                         remove_prefix="partially plated")
             return
+        self._advance_active_ticket(t["id"], f"{t['id']} plated in bay {bay_id}", ev["event_id"])
         if self.s.readiness_mode == "auto":
             self._make_ready(t, "cv", ev["event_id"])
         else:
@@ -826,6 +827,8 @@ class Kitchen:
             assert t is not None
             if self.s.allocate_on == "submit":
                 self._allocate(t)
+            if self.active_ticket() is None:
+                self._advance_active_ticket(None, "new order, none active")
             self._touch("ticket", tid)
         return self.ticket(tid)  # type: ignore[return-value]
 
@@ -855,6 +858,7 @@ class Kitchen:
             if t["status"] in ("served", "canceled"):
                 raise Conflict(f"ticket is {t['status']}")
             self._make_ready(t, source)
+            self._advance_active_ticket(ticket_id, f"{ticket_id} declared ready")
         return self.ticket(ticket_id)  # type: ignore[return-value]
 
     def confirm_served(self, ticket_id: str, server_id: str | None = None, source: str = "staff") -> dict[str, Any]:
@@ -912,6 +916,7 @@ class Kitchen:
                 self.db.execute("DELETE FROM active_ticket")
                 self._touch("active_ticket", "1")
                 self._ctx_changed()
+                self._advance_active_ticket(None, f"{ticket_id} canceled")
         return self.ticket(ticket_id)  # type: ignore[return-value]
 
     # ---- tasks ----
@@ -983,6 +988,33 @@ class Kitchen:
             self._touch("active_ticket", "1")
             self._ctx_changed()
         return self.active_ticket()  # type: ignore[return-value]
+
+    def _next_unplated_ticket(self, exclude: str | None = None) -> dict[str, Any] | None:
+        """Oldest order still being prepared that isn't fully plated yet."""
+        return row(self.db.execute(
+            "SELECT * FROM tickets WHERE status IN ('submitted','kitchen_ack','preparing') "
+            "AND plated_count < plates_expected AND id IS NOT ? ORDER BY created_at, rowid LIMIT 1",
+            (exclude,)).fetchone())
+
+    def _advance_active_ticket(self, finished: str | None, reason: str, obs: str | None = None) -> None:
+        """Move the active ticket on from `finished` (or fill an empty slot). Source: system."""
+        if not self.s.auto_advance_active_ticket:
+            return
+        cur = self.active_ticket()
+        if cur is not None and cur["ticket_id"] != finished:
+            return  # someone else is active; leave it
+        nxt = self._next_unplated_ticket(exclude=finished)
+        if nxt is None:
+            if cur is not None:
+                self.db.execute("DELETE FROM active_ticket")
+                self._log("system", "active_ticket", None, "cleared", {"reason": reason, "finished": finished}, obs)
+        else:
+            self.db.execute("INSERT INTO active_ticket(id, ticket_id, set_by, set_at) VALUES (1,?,?,?) "
+                            "ON CONFLICT(id) DO UPDATE SET ticket_id=excluded.ticket_id, set_by=excluded.set_by, "
+                            "set_at=excluded.set_at", (nxt["id"], "auto", self.now()))
+            self._log("system", "active_ticket", nxt["id"], "set", {"reason": reason, "finished": finished}, obs)
+        self._touch("active_ticket", "1")
+        self._ctx_changed()
 
     def clear_active_ticket(self) -> None:
         with self.tx():

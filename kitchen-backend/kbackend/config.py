@@ -29,6 +29,9 @@ class Settings(BaseModel):
     schema_path: str = "../schema/events.schema.json"
     zone_count_tolerance: int = 0
     default_trip_qty: int = 1  # INGREDIENT_TRIP with no recipe line for the zone
+    # the active ticket moves to the next unplated order when the active one is fully plated
+    # (all its plates in its bay); a new order becomes active if none is
+    auto_advance_active_ticket: bool = True
     zones: dict[str, ZoneSeed] = Field(default_factory=dict)
     recipes: dict[str, list[RecipeLine]] = Field(default_factory=dict)
     push_context: bool = True  # tests turn this off
