@@ -52,7 +52,7 @@ does not synchronize code. DEPLOYMENT describes the concrete Fly/Vercel wiring.
 ## Standing branch integration
 
 `codex/application-integration` combines the reviewed Menu/service, Voice and CV
-refs. Future UI/analytics branches enter through this same contract review path.
+refs. Additional UI/analytics updates enter through this same contract review path.
 `backend/scripts/integration_watch.py` makes one remote-head request and compares
 ignored outputs/integration-watch.json. Unchanged heads require no tests/builds
 or paid API calls. Missing cache establishes a baseline, not integration proof.

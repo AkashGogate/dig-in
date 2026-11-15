@@ -2,6 +2,42 @@
 
 [PROJECT_SPEC](../PROJECT_SPEC.md) owns intended behavior; this file owns execution evidence. [Normalized brief](MVP_TEAM_BRIEF.md) is portable team context. The Menu workstream **also owns Core/backend and integration**; personal names remain unassigned. STATUS is not a concurrency lock.
 
+## Final integration snapshot — 2026-11-14
+
+All currently requested/fetched workstreams are integrated: Menu/service9d3face,
+Voice9fcdd95, CV7133aaf and UI163d9e8. They are ancestors of the reviewed
+application code commit0c56900. PR: https://github.com/AkashGogate/dig-in/pull/1.
+
+- Exact code-tip Linux CI and PR CI **passed**:245 backend +71 CV +49 legacy
+  kitchen = **365Python tests**, **53Node tests**, root Docker build and actual
+  container HTTP/CV-contract smoke. See
+  [push CI](https://github.com/AkashGogate/dig-in/actions/runs/43662231728) and
+  [PR CI](https://github.com/AkashGogate/dig-in/actions/runs/43662236456).
+- Final CV reconnect guards preserve calibrated background, invalidate dwell on
+  reconciliation, reject stale buffered frames and ambiguous devices, fail health
+  immediately and keep canonical adaptation off. Synthetic subprocess/video tests
+  run without opening cameras. Darwin-only PyObjC dependencies/lock validated.
+- Latest Kitchen glance layout preserves the teammate stylesheet, chronological
+  sent-ticket order, physical-unit actions/counts, review-aware ready accent and
+  stable disclosure focus. Full frontend53cases pass; prior protected3page browser
+  flow is recorded below. No fake UI authority or camera feed was reintroduced.
+- Hygiene passed282indexed paths; all38commits scanned with Gitleaks8.30.1,
+  no findings. Actual backend/.env remains ignored/undisplayed; calibration tip
+  contains only.gitkeep. Main and teammate branches were preserved.
+- Real voice evidence remains102synthetic provider cases:66expected behavior,
+  36safelyflagged,0silentlywrong, plus9fixed cases;246.518s, estimatedUSD0.0316.
+  Separate1.82s v2stream produced only a draft, estimatedUSD0.0002. No further
+  paid calls were needed for the last UI/CV changes.
+
+The user assigned actual Fly/Vercel republishing to another signed-in agent.
+CLI tools were installed, pending sign-ins canceled, and **no production change**
+was made here. The local demo uses real shared API state with labeled simulated
+voice/camera inputs. [Acceptance map](INTEGRATION_ACCEPTANCE.md) and
+[deployment handoff](DEPLOYMENT_HANDOFF.md) distinguish completed software from
+hosted release, physical rig/mic/phone/printer and cloud validation still needed.
+
+## Earlier incremental evidence
+
 ## Latest pushed workstreams integrated — 2026-11-14
 
 Source now includes Voice9fcdd95, CV7e13c16 and UIabe9fb1 on top of the Menu/service

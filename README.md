@@ -18,7 +18,7 @@ In another terminal from the repository root:
 python3 -m http.server 5173 --directory frontend
 ```
 
-Open [Server/Kitchen MVP](http://localhost:5173), [API docs](http://localhost:8000/docs), [menu](http://localhost:8000/api/v2/menu), or [generated contracts](http://localhost:8000/api/v2/contracts). Select a simulated staff/device session. Use two server tabs and a kitchen tab against **the same one-worker backend**. Restart/reload loses orders, sessions, deduplication receipts and pending analytics rows. Backend outage is visibly unsynced; offline transactions are not promised.
+Open [Server/Kitchen MVP](http://localhost:5173), [API docs](http://localhost:8000/docs), [menu](http://localhost:8000/api/v2/menu), or [generated contracts](http://localhost:8000/api/v2/contracts). Select a simulated staff/device session. Use two server tabs and a kitchen tab against **the same one-worker backend**. Backend restart loses orders, sessions, deduplication receipts and pending analytics rows. Page reload loses this tab’s session and unsaved edits; accepted backend orders remain until backend restart. Backend outage is visibly unsynced; offline transactions are not promised.
 
 `frontend/config.js` uses localhost port8000 locally and same-origin `/api` behind Vercel. Configure a reachable backend explicitly when serving on a phone/LAN. A phone’s `localhost` is the phone itself. `.env.example` documents modes; uvicorn does not automatically read the root example. Export variables or deliberately run with `--env-file ../.env` after copying the example. Do not put secrets in browser code. The optional old Pipecat pipeline requires `uv sync --locked --extra live-pipeline`; it is not needed for this MVP.
 
