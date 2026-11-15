@@ -168,3 +168,17 @@ test('new Kitchen unit disclosure keeps open state and keyboard focus across cha
  const s=snapshot();s.orders={o:{id:'o',table_id:'1',owner:'server-1',status:'cooking'}};s.dishes={d:{id:'d',line_id:'line',order_id:'o',item_name:'Soup',stage:'started',requests:'',modifier_names:[]}};
  const h=pageHarness('kitchen',s);await h.enter();h.elements.get('operatorMain').listeners.toggle({target:{dataset:{unitDetails:'d'},open:true}});h.elements.get('unit-details-d').focus();s.orders.o.zone_status='waiting';await h.intervals[0]();await h.settle();assert.match(h.html(),/data-unit-details="d" open/);assert.equal(h.document.activeElement.id,'unit-details-d');assert.match(h.html(),/id="kitchen-summary-toggle"/);
 });
+
+test('grouped zone panels preserve exact tickets at the same table and every physical unassigned zone',async()=>{
+ const s=snapshot();s.orders={one:{id:'one',table_id:'1',owner:'server-1',status:'cooking'},two:{id:'two',table_id:'1',owner:'server-1',status:'cooking'}};
+ s.zones={A:{id:'A',order_id:'one',dish_id:'d1',camera_id:'cam',assignment_version:2,occupancy:'occupied'},B:{id:'B',order_id:'two',dish_id:'d2',camera_id:'cam',assignment_version:3,occupancy:'empty'},C:{id:'C',order_id:null,dish_id:null,camera_id:'cam',assignment_version:4,occupancy:'unknown',needs_review:true}};
+ s.dishes={d1:{id:'d1',order_id:'one',zone_id:'A',line_id:'l1',item_name:'First',station:'grill',stage:'ready',requests:'',modifier_names:[]},d2:{id:'d2',order_id:'two',zone_id:'B',line_id:'l2',item_name:'Second',station:'oven',stage:'started',requests:'',modifier_names:[]}};
+ const h=pageHarness('kitchen',s);await h.enter();const select=h.elements.get('stationFilter');select.value='grill';h.elements.get('operatorMain').listeners.change({target:select});await h.click('tab','zones');
+ assert.match(h.html(),/Table 1 · ticket one/);assert.match(h.html(),/Table 1 · ticket two/);assert.match(h.html(),/Unassigned physical zones/);for(const id of ['A','B','C'])assert.equal((h.html().match(new RegExp(`data-physical-zone="${id}"`,'g'))||[]).length,1);
+ assert.match(h.html(),/unknown · assignment v4/);assert.match(h.html(),/Camera: offline · mock/);assert.match(h.html(),/Requires review/);assert.match(h.html(),/1 ready for pickup/);
+});
+test('zone panel never paints reviewed or mismatched ready units green and escapes unknown ticket/health text',async()=>{
+ const s=snapshot();s.zones={A:{id:'A',order_id:'<unknown>',dish_id:'d',camera_id:'cam',assignment_version:1,occupancy:'occupied',needs_review:true},B:{id:'B',order_id:'different-ticket',dish_id:'d',camera_id:'cam',assignment_version:2,occupancy:'unknown'}};
+ s.dishes={d:{id:'d',order_id:'<unknown>',zone_id:'A',line_id:'l',item_name:'Ready dish',stage:'ready',requests:'',modifier_names:[]}};s.cameras.cam.reason='<img onerror=bad>';
+ const h=pageHarness('kitchen',s);await h.enter();await h.click('tab','zones');assert.doesNotMatch(h.html(),/class="zone-tile ready"/);assert.match(h.html(),/0 ready for pickup/);assert.match(h.html(),/Unknown ticket &lt;unknown&gt;/);assert.match(h.html(),/Assignment mismatch/);assert.match(h.html(),/&lt;img onerror=bad&gt;/);assert.doesNotMatch(h.html(),/<img onerror/);
+});

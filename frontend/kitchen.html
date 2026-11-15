@@ -6,8 +6,12 @@
 <title>Kitchen · Dig In</title>
 <link rel="stylesheet" href="style.css">
 <style>
-html, body { height: 100%; overflow: hidden; background: var(--sys-bg); }
+html, body { height: 100%; overflow: hidden; background: #0e0e10; }
 body { display: flex; flex-direction: column; }
+
+/* Layered dark surfaces for depth (Apple dark uses tone, not pure black) */
+.surface   { background: #1c1c1e; border: 1px solid rgba(255,255,255,.07); box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+.surface-2 { background: #2a2a2d; border: 1px solid rgba(255,255,255,.06); }
 
 /* ── Top bar ──────────────────────────────────────────────────────────────── */
 .kds-bar {
@@ -46,7 +50,7 @@ body { display: flex; flex-direction: column; }
 }
 .lh-chip {
   display: flex; align-items: center; gap: 9px;
-  background: var(--sys-grouped2); border: 1px solid var(--sep);
+  background: #1c1c1e; border: 1px solid rgba(255,255,255,.07);
   border-radius: var(--r-pill);
   padding: 6px 6px 6px 14px; flex-shrink: 0;
 }
@@ -74,13 +78,14 @@ body { display: flex; flex-direction: column; }
 /* ── Ticket card ──────────────────────────────────────────────────────────── */
 .ticket {
   flex-shrink: 0; width: 300px;
-  background: var(--sys-grouped2);
-  border: 1px solid var(--sep);
+  background: #1c1c1e;
+  border: 1px solid rgba(255,255,255,.07);
   border-radius: var(--r-xl);
+  box-shadow: 0 1px 3px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.25);
   overflow: hidden;
   display: flex; flex-direction: column;
 }
-.ticket.allready { border-color: var(--green-border); }
+.ticket.allready { border-color: rgba(52,199,89,.45); box-shadow: 0 1px 3px rgba(0,0,0,.45), 0 8px 28px rgba(52,199,89,.12); }
 .ticket.allready .ticket-head { box-shadow: inset 3px 0 0 var(--green); }
 
 .ticket-head { padding: 16px 18px 14px; }
@@ -130,9 +135,10 @@ body { display: flex; flex-direction: column; }
 /* ── Clarification card (lighter, action-focused) ─────────────────────────── */
 .clarify {
   flex-shrink: 0; width: 300px; align-self: flex-start;
-  background: rgba(0,122,255,.05);
+  background: #171a21;
   border: 1.5px dashed var(--blue-border);
   border-radius: var(--r-xl);
+  box-shadow: 0 1px 3px rgba(0,0,0,.45);
   padding: 16px 18px;
 }
 .clarify-head {
@@ -145,8 +151,8 @@ body { display: flex; flex-direction: column; }
 .clarify-opts { display: flex; flex-direction: column; gap: 7px; }
 .btn-clarify {
   text-align: left; font: 590 15px/20px var(--font);
-  color: var(--label); background: var(--sys-grouped2);
-  border: 1px solid var(--sep);
+  color: var(--label); background: #24262c;
+  border: 1px solid rgba(255,255,255,.08);
   padding: 11px 14px; border-radius: var(--r); min-height: 44px;
 }
 .btn-clarify:hover { border-color: var(--blue-border); background: var(--blue-bg); }
@@ -156,9 +162,10 @@ body { display: flex; flex-direction: column; }
 /* ── Head-chef callout (dashed-blue, awaiting confirm) ────────────────────── */
 .callout {
   flex-shrink: 0; width: 300px; align-self: flex-start;
-  background: rgba(0,122,255,.05);
+  background: #171a21;
   border: 1.5px dashed var(--blue-border);
   border-radius: var(--r-xl);
+  box-shadow: 0 1px 3px rgba(0,0,0,.45);
   padding: 16px 18px;
 }
 .callout-head {
@@ -176,17 +183,23 @@ body { display: flex; flex-direction: column; }
 }
 .btn-confirm:hover { filter: brightness(1.06); }
 
-/* ── Zones view ───────────────────────────────────────────────────────────── */
-#zoneView { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; }
-.zone-row { display: flex; align-items: center; gap: 14px; }
-.zone-row-label { font: 600 16px/20px var(--font); color: var(--label); width: 92px; flex-shrink: 0; }
-.zone-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
-.zone-tile {
-  position: relative; width: 92px; height: 66px; border-radius: var(--r);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  background: var(--sys-grouped2); border: 1px solid var(--sep);
+/* ── Zones view (full-width table panels) ─────────────────────────────────── */
+#zoneView { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+.zone-panel {
+  background: #1c1c1e; border: 1px solid rgba(255,255,255,.07);
+  border-radius: var(--r-lg); box-shadow: 0 1px 3px rgba(0,0,0,.45);
+  padding: 16px 18px;
 }
-.zone-tile .zt-num { font: 650 18px/22px var(--font); color: var(--label); }
+.zone-panel-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.zone-panel-title { font: 650 18px/22px var(--font); color: var(--label); letter-spacing: -.01em; }
+.zone-panel-sub { font: 400 14px/18px var(--font); color: var(--label2); }
+.zone-tiles { display: flex; flex-wrap: wrap; gap: 10px; }
+.zone-tile {
+  position: relative; width: 104px; height: 68px; border-radius: var(--r);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: #26262a; border: 1px solid rgba(255,255,255,.06);
+}
+.zone-tile .zt-num { font: 650 19px/22px var(--font); color: var(--label); }
 .zone-tile .zt-st { font: 600 10px/13px var(--font); text-transform: uppercase; letter-spacing: .04em; color: var(--label2); }
 .zone-tile.ready   { background: var(--green-bg); border-color: var(--green-border); }
 .zone-tile.ready   .zt-st { color: var(--green); }
@@ -198,8 +211,8 @@ body { display: flex; flex-direction: column; }
 .ing-note { font: 400 14px/20px var(--font); color: var(--label2); margin-bottom: 2px; }
 .ing-row {
   display: flex; align-items: center; gap: 16px;
-  background: var(--sys-grouped2); border: 1px solid var(--sep);
-  border-radius: var(--r-lg); padding: 16px 20px;
+  background: #1c1c1e; border: 1px solid rgba(255,255,255,.07);
+  border-radius: var(--r-lg); box-shadow: 0 1px 3px rgba(0,0,0,.45); padding: 16px 20px;
 }
 .ing-name { font: 600 18px/22px var(--font); color: var(--label); flex: 1; }
 .ing-stat { text-align: center; min-width: 88px; }

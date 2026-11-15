@@ -175,10 +175,24 @@
     return `<aside class="allday-bar" aria-label="Current active physical units"><div class="allday-stat"><span class="allday-num">${units.length}</span><span class="allday-lbl">Active units${station?' · filtered station':''}</span></div>${[['ready','Ready'],['started','Started'],['queued','Queued']].map(([stage,label])=>`<div class="allday-stat"><span class="allday-num">${units.filter(d=>d.stage===stage).length}</span><span class="allday-lbl">${label}</span></div>`).join('')}</aside>`;
   }
   function zonesMarkup(ctx) {
-    return `<h2>Physical plating zones</h2><p class="operator-hint">Actual backend zones, independent of table/seat numbering. Occupancy is not food identity or doneness. Camera status below is the adapter-reported state, not a claim that this browser has a live feed. Review unexpected/returned plates in the workbench.</p><div class="operator-zones">${Object.values(ctx.state.zones).map(zone=>{
-      const dish=ctx.state.dishes[zone.dish_id],camera=ctx.state.cameras[zone.camera_id];
-      return `<article class="operator-card"><h3>Zone ${e(zone.id)}</h3><p>${e(zone.occupancy)} · assignment v${zone.assignment_version}</p><p>${dish?e(dish.item_name):'No assigned unit'}</p><p class="operator-label">${e(zone.order_id || '')} ${e(zone.dish_id || '')}</p><p>Camera: ${e(camera?.status || 'unknown')} · ${e(camera?.mode || 'unknown')}</p><p class="operator-label">${e(camera?.reason || '')}</p>${zone.needs_review?'<strong class="operator-warning">Requires review</strong>':''}</article>`;
-    }).join('')}</div><p><a href="index.html">Open camera/zone reconciliation and ingredient observation controls in the workbench</a></p>`;
+    // Group current physical assignments by ticket, never by a derived table/seat
+    // label. Two tickets at one table remain separate; unassigned zones stay real.
+    const groups=new Map();
+    Object.values(ctx.state.zones).forEach(zone=>{const key=zone.order_id || '';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(zone);});
+    const entries=[...groups.entries()].sort(([a],[b])=>a===''?1:b===''?-1:a.localeCompare(b));
+    return `<h2>Physical plating zones</h2><p class="operator-hint">Actual backend zones, independent of table/seat numbering. Panels group current assignments by ticket; unassigned does not mean empty or safe. Occupancy is not food identity or doneness. Camera status is adapter-reported, not a browser live-feed claim.</p><div class="operator-zone-panels">${entries.map(([orderId,zones])=>{
+      const order=ctx.state.orders[orderId];
+      const matching=zone=>{const dish=ctx.state.dishes[zone.dish_id];return dish&&dish.order_id===zone.order_id&&dish.zone_id===zone.id?dish:null;};
+      const assigned=zones.map(matching).filter(Boolean), ready=zones.filter(zone=>matching(zone)?.stage==='ready'&&!zone.needs_review).length;
+      const review=zones.filter(z=>z.needs_review || (z.dish_id&&!matching(z))).length;
+      return `<section class="zone-panel" data-zone-ticket="${e(orderId || 'unassigned')}"><header class="zone-panel-head"><h3 class="zone-panel-title">${order?`Table ${e(order.table_id)} · ticket ${e(order.id)}`:orderId?`Unknown ticket ${e(orderId)}`:'Unassigned physical zones'}</h3><p class="zone-panel-sub">${zones.length} physical zones · ${assigned.length} assigned units · ${ready} ready for pickup${review?` · ${review} require review`:''}</p></header><div class="zone-tiles">${zones.map(zone=>{
+        const dish=ctx.state.dishes[zone.dish_id],current=matching(zone),camera=ctx.state.cameras[zone.camera_id];
+        const status=zone.needs_review?'needs-review':current?.stage==='ready'?'ready':current?.stage==='started'?'cooking':'';
+        return `<article class="operator-zone-card" data-physical-zone="${e(zone.id)}"><div class="zone-tile ${status}"><h4 class="zt-num">Zone ${e(zone.id)}</h4><p class="zt-st">${zone.needs_review?'Review required':current?e(human(current.stage)):'No current unit'}</p></div><p>${e(zone.occupancy)} · assignment v${zone.assignment_version}</p><p>${dish?e(dish.item_name):'No assigned unit'}</p><p class="operator-label">${e(zone.order_id || '')} ${e(zone.dish_id || '')}</p>
+          ${zone.dish_id&&!current?'<strong class="operator-warning">Assignment mismatch — review in workbench</strong>':''}${zone.needs_review?'<strong class="operator-warning">Requires review before operational actions</strong>':''}
+          <p>Camera: ${e(camera?.status || 'unknown')} · ${e(camera?.mode || 'unknown')}</p><p class="operator-label">${e(camera?.reason || '')}</p>${zone.blocked_reason?`<p class="operator-warning">${e(zone.blocked_reason)}</p>`:''}</article>`;
+      }).join('')}</div></section>`;
+    }).join('') || '<p>No physical zones configured.</p>'}</div><p><a href="index.html">Open camera/zone reconciliation and ingredient observation controls in the workbench</a></p>`;
   }
   function ingredientsMarkup(ctx) {
     const expected=ctx.state.computed?.expected_consumption || {},balances=ctx.state.computed?.balances || {};

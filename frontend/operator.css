@@ -81,3 +81,20 @@ body[data-operator-page="kitchen"] .allday-bar {position:sticky;bottom:0;z-index
 .kitchen-summary {margin-top:22px;color:var(--label2)}
 .kitchen-summary>summary {cursor:pointer;min-height:44px;display:flex;align-items:center}
 @media(max-width:620px){body[data-operator-page="kitchen"] .operator-shell{padding:12px 14px 64px}.kds-tickets{display:grid;grid-template-columns:1fr;overflow:visible}.kds-tickets .ticket{width:100%;max-width:none}body[data-operator-page="kitchen"] .allday-bar{gap:14px;padding:12px}.allday-stat{flex-wrap:wrap}.kds-tickets .ticket-table{font-size:22px}}
+/* UI21cc4a5 surfaces: preserve contrast while canonical zone panels stay readable. */
+body[data-operator-page="kitchen"] {background:#0e0e10}
+body[data-operator-page="kitchen"] .operator-session,
+body[data-operator-page="kitchen"] .operator-card {background:#1c1c1e;border-color:rgba(255,255,255,.07);box-shadow:0 1px 3px rgba(0,0,0,.45)}
+.operator-zone-panels {display:flex;flex-direction:column;gap:14px}
+.operator-zone-panels .zone-panel-head {gap:16px;flex-wrap:wrap}
+.operator-zone-panels .zone-panel-title {margin:0;overflow-wrap:anywhere}
+.operator-zone-panels .zone-tiles {display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.operator-zone-card {min-width:0;padding:12px;border-radius:12px;background:#26262a;border:1px solid rgba(255,255,255,.06)}
+.operator-zone-card .zone-tile {width:100%;height:auto;min-height:72px;background:#2a2a2d}
+.operator-zone-card .zone-tile.ready {background:var(--green-bg)}
+.operator-zone-card .zone-tile.cooking {background:var(--orange-bg)}
+.operator-zone-card .zone-tile.needs-review {background:var(--red-bg);border-color:var(--red)}
+.operator-zone-card .zone-tile.needs-review .zt-st {color:var(--red)}
+.operator-zone-card p {margin-top:8px;font-size:14px;line-height:20px;overflow-wrap:anywhere}
+.operator-zone-card .operator-warning {display:block;font-size:14px;margin-top:8px;overflow-wrap:anywhere}
+@media(max-width:520px){.operator-zone-panels .zone-panel{padding:14px}.operator-zone-panels .zone-tiles{grid-template-columns:1fr}.operator-zone-panels .zone-panel-sub{font-size:13px;line-height:20px}}
