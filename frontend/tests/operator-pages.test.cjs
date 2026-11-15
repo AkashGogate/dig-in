@@ -182,3 +182,15 @@ test('zone panel never paints reviewed or mismatched ready units green and escap
  s.dishes={d:{id:'d',order_id:'<unknown>',zone_id:'A',line_id:'l',item_name:'Ready dish',stage:'ready',requests:'',modifier_names:[]}};s.cameras.cam.reason='<img onerror=bad>';
  const h=pageHarness('kitchen',s);await h.enter();await h.click('tab','zones');assert.doesNotMatch(h.html(),/class="zone-tile ready"/);assert.match(h.html(),/0 ready for pickup/);assert.match(h.html(),/Unknown ticket &lt;unknown&gt;/);assert.match(h.html(),/Assignment mismatch/);assert.match(h.html(),/&lt;img onerror=bad&gt;/);assert.doesNotMatch(h.html(),/<img onerror/);
 });
+
+test('menu card sections and quantity badges follow pinned canonical IDs, arbitrary categories and unknown prices',async()=>{
+ const s=snapshot();s.menus.old.items=[{id:'the_bulldozer',name:'Same name',category:'Imported <mains>',description:'Guest <description>',price_cents:null,modifiers:[]},{id:'second-id',name:'Same name',category:'Custom desserts',description:'Umami special',price_cents:275,modifiers:[]},{id:'unclassified',name:'Other dish',category:null,price_cents:null,modifiers:[]}];
+ const h=pageHarness('order',s);await h.enter();h.elements.get('newTable').value='1';await h.click('start');await h.click('add','the_bulldozer');await h.click('add','the_bulldozer');await h.click('add','second-id');
+ assert.match(h.html(),/Imported &lt;mains&gt;/);assert.match(h.html(),/Custom desserts/);assert.match(h.html(),/Other dishes/);assert.match(h.html(),/Guest &lt;description&gt;/);assert.match(h.html(),/Price unknown/);assert.match(h.html(),/\$2\.75/);
+ const first=h.html().match(/data-id="the_bulldozer"[\s\S]*?<\/button>/)[0],second=h.html().match(/data-id="second-id"[\s\S]*?<\/button>/)[0];assert.match(first,/2 physical units in draft/);assert.match(second,/1 physical units in draft/);
+});
+test('switching to another pinned menu clears a missing category instead of hiding imported dishes',async()=>{
+ const s=snapshot();s.menus.old.items[0].category='Old category';s.menus.replacement={name:'Replacement',items:[{id:'new-id',name:'New imported dish',category:'New category',modifiers:[]}]};
+ const h=pageHarness('order',s);await h.enter();h.elements.get('newTable').value='1';await h.click('start');const category=h.elements.get('operatorCategory');category.value='Old category';h.elements.get('operatorMain').listeners.change({target:category});
+ s.orders.other={id:'other',owner:'server-1',table_id:'1',revision:1,status:'draft',menu_revision:'replacement',capture_mode:'manual',lines:[],flags:[]};await h.intervals[0]();await h.settle();const picker=h.elements.get('draftPicker');picker.value='other';h.elements.get('operatorMain').listeners.change({target:picker});assert.match(h.html(),/New imported dish/);assert.doesNotMatch(h.html(),/No matching dishes|Old category/);
+});

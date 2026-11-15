@@ -45,6 +45,14 @@ by this session; use an account with deployment access to the existing apps.
 
 ## Verification and known gaps
 
+After PR #1 merged to main `35d6d08`, the production frontend gate began returning
+503 with `Demo access is not configured.` Set both matching frontend platform
+secrets and redeploy; keep the gate fail-closed. Backend still returns health404
+and unprotected state/OpenAPI200. The frontend proxy now returns200but its older
+snapshot lacks menu_revision; voice-status200is insufficient release evidence.
+The updated read-only probe reports these failures without crashing. Publish
+the reviewed backend too, then rerun the full release checks below.
+
 Before release, production backend state returned200withoutlogin and health404;
 production frontend root200withoutlogin and /api/v2/state404. The integration
 preview built successfully but redirects to VercelSSO, so app-level hosted login,

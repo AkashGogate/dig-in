@@ -14,6 +14,31 @@ import os
 import httpx
 
 
+def valid_state(response):
+    """An older v2 snapshot is not proof of this release's menu integration."""
+    data = response.json()
+    return (
+        isinstance(data, dict)
+        and data.get("schema_version") == 2
+        and isinstance(data.get("menu_revision"), str)
+        and bool(data["menu_revision"])
+    )
+
+
+def valid_voice(response, require_live):
+    data = response.json()
+    return (
+        isinstance(data, dict)
+        and isinstance(data.get("mode"), str)
+        and data["mode"]
+        in (
+            {"deepgram_stream"}
+            if require_live
+            else {"mock_transcript", "deepgram_stream"}
+        )
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -76,13 +101,13 @@ def main():
             "backend_login",
             back + "/api/v2/state",
             auth=auth,
-            validate=lambda r: r.json()["schema_version"] == 2,
+            validate=valid_state,
         )
         proxy = check(
             "frontend_proxy",
             front + "/api/v2/state",
             auth=auth,
-            validate=lambda r: r.json()["schema_version"] == 2,
+            validate=valid_state,
         )
         if state is not None and proxy is not None:
             results.append(
@@ -96,11 +121,7 @@ def main():
             "voice_mode",
             front + "/api/v2/voice/status",
             auth=auth,
-            validate=lambda r: (
-                r.json().get("mode") == "deepgram_stream"
-                if args.require_live_voice
-                else r.json().get("mode") in {"mock_transcript", "deepgram_stream"}
-            ),
+            validate=lambda r: valid_voice(r, args.require_live_voice),
         )
     else:
         results.append(

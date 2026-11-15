@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Take Order</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script defer src="server-alert.js"></script>
+<!-- Inline SVG icons (SF Symbols style) -->
+<script>
+const ICONS = {
+  search: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  mic: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+  plus: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  triangle: `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+};
+// No-op so code that calls createIcons() doesn't crash
+const lucide = { createIcons() {} };
+</script>
+<style>
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--sys-grouped); }
+
+.app { display: flex; flex-direction: column; height: 100%; }
+
+/* Top nav */
+.top-nav {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 20px 10px;
+  background: var(--bar-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--bar-border);
+  flex-shrink: 0; z-index: 10;
+}
+.nav-table-label {
+  font: 400 15px/20px var(--font);
+  color: var(--label2);
+}
+.nav-table-num {
+  font: 700 22px/28px var(--font);
+  color: var(--label);
+  flex: 1;
+}
+.btn-change {
+  font: 400 17px/22px var(--font);
+  color: var(--blue);
+  padding: 6px 12px; border-radius: var(--r-sm);
+  min-height: 36px;
+}
+.btn-change:hover { background: var(--blue-bg); }
+
+/* iPad split */
+@media (min-width: 768px) {
+  .split { display: flex; flex: 1; overflow: hidden; }
+  .menu-panel {
+    display: flex; flex-direction: column;
+    width: 55%; border-right: 1px solid var(--sep-opaque);
+    overflow: hidden;
+  }
+  .order-panel {
+    display: flex; flex-direction: column;
+    width: 45%; overflow: hidden;
+  }
+  .menu-panel-scroll { flex: 1; overflow-y: auto; }
+  .order-panel-scroll { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+  .order-footer { flex-shrink: 0; padding: 12px 16px 20px; border-top: 1px solid var(--sep); }
+  .menu-fab { display: none; }
+  .order-seat-nav { display: none; }
+}
+
+/* iPhone stacked */
+@media (max-width: 767px) {
+  .split { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .menu-panel { display: none; }
+  .order-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .order-panel-scroll { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+  .order-footer { flex-shrink: 0; padding: 12px 16px; border-top: 1px solid var(--sep); background: var(--sys-grouped); }
+  .menu-fab {
+    position: fixed; bottom: calc(100px + env(safe-area-inset-bottom)); right: 20px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--blue); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,122,255,.40);
+    font-size: 24px; z-index: 10;
+  }
+  .order-seat-nav {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 16px; border-bottom: 1px solid var(--sep);
+    background: var(--sys-grouped);
+  }
+  .btn-seat-nav {
+    padding: 7px 14px; border-radius: var(--r-pill);
+    background: var(--fill3); color: var(--label2);
+    font: 600 14px/18px var(--font);
+    min-height: 34px;
+  }
+  .btn-seat-nav:hover { background: var(--fill2); }
+}
+
+/* ── Menu panel internals ─────────────────────────────────────────────────── */
+.menu-header {
+  padding: 16px 16px 8px;
+  font: 700 28px/34px var(--font);
+  color: var(--label);
+}
+.menu-subhead {
+  padding: 0 16px 2px;
+  font: 400 15px/20px var(--font);
+  color: var(--label2);
+}
+
+/* ── Menu grid ────────────────────────────────────────────────────────────── */
+/* uses .menu-grid + .item-card from style.css */
+@media (min-width: 1024px) {
+  .menu-grid-inner { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+}
+
+/* ── Order section header ─────────────────────────────────────────────────── */
+.order-section-header {
+  font: 400 13px/18px var(--font);
+  color: var(--label2);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 20px 32px 6px;
+}
+.order-section-header:first-child { padding-top: 12px; }
+
+/* ── Seat control row (iPad) ──────────────────────────────────────────────── */
+.order-panel-toprow {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px 0;
+}
+.order-panel-title { font: 700 22px/28px var(--font); }
+.btn-add-seat {
+  font: 600 15px/20px var(--font); color: var(--blue);
+  padding: 6px 12px; border-radius: var(--r-sm);
+  min-height: 36px;
+}
+.btn-add-seat:hover { background: var(--blue-bg); }
+
+/* ── Delivery segmented control ───────────────────────────────────────────── */
+.delivery-label {
+  font: 400 15px/20px var(--font);
+  color: var(--label2); padding: 0 2px 6px;
+}
+.delivery-wrap { padding: 12px 16px 8px; }
+
+/* ── Validation message ───────────────────────────────────────────────────── */
+.validation-msg {
+  font: 400 13px/18px var(--font);
+  color: var(--label3); text-align: center;
+  padding: 6px 0 0;
+  min-height: 20px;
+}
+
+/* ── Sheet internals (iPhone menu) ───────────────────────────────────────── */
+.sheet-menu { max-height: 85vh; }
+.sheet-search { margin: 0 16px 8px; }
+
+/* ── Add item count badge on item card ────────────────────────────────────── */
+.item-card-wrap { position: relative; }
+
+/* ── Table picker modal ───────────────────────────────────────────────────── */
+.modal-sheet { display: none; }
+.modal-sheet.open { display: flex; flex-direction: column; }
+.table-grid-picker {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 8px; padding: 0 16px 16px;
+}
+.btn-table-pick {
+  height: 48px; border-radius: var(--r);
+  background: var(--fill3); color: var(--label);
+  font: 600 17px/22px var(--font);
+  border: 1.5px solid transparent;
+}
+.btn-table-pick:hover { background: var(--fill2); }
+.btn-table-pick.selected {
+  background: var(--blue-bg); color: var(--blue);
+  border-color: var(--blue);
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Top nav bar ──────────────────────────────────────────────────────── -->
+  <div class="top-nav">
+    <div class="flex-col">
+      <div class="nav-table-label">New order · Draft</div>
+      <div class="nav-table-num" id="navTableNum">Table 12</div>
+    </div>
+    <div style="flex:1"></div>
+    <button class="status-pill listening" id="micPill" title="Tap to toggle voice"></button>
+    <button class="icon-btn" id="themeToggle" title="Toggle light / dark"></button>
+    <button class="btn-change" id="openTableBtn">Change table</button>
+  </div>
+
+  <div class="split">
+
+    <!-- ── Menu panel (iPad left / iPhone bottom sheet) ───────────────────── -->
+    <div class="menu-panel">
+      <div class="menu-panel-scroll">
+        <div class="menu-header">Menu</div>
+
+        <!-- Search -->
+        <div class="search-field">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="menuSearch" placeholder="Search items…" autocomplete="off">
+        </div>
+
+        <!-- Category tiles -->
+        <div class="category-row" id="categoryRow" role="tablist"></div>
+
+        <!-- Item grid -->
+        <div class="menu-grid" id="menuGrid"></div>
+      </div>
+    </div>
+
+    <!-- ── Order panel ───────────────────────────────────────────────────── -->
+    <div class="order-panel">
+
+      <!-- iPhone: seat navigation -->
+      <div class="order-seat-nav">
+        <button class="btn-seat-nav" id="prevSeatBtn">← Prev seat</button>
+        <div style="flex:1;text-align:center;font:600 15px/20px var(--font);color:var(--label2)" id="seatNavLabel">Seat 1 of 3</div>
+        <button class="btn-seat-nav" id="nextSeatBtn">Next seat →</button>
+      </div>
+
+      <div class="order-panel-scroll" id="orderScroll">
+        <div class="order-panel-toprow">
+          <div class="order-panel-title">Order</div>
+          <button class="btn-add-seat" id="addSeatBtn">+ Seat</button>
+        </div>
+
+        <!-- Voice banner -->
+        <div class="voice-banner" id="voiceBanner" style="margin-top:10px">
+          <div class="voice-dot"></div>
+          <div class="voice-banner-text">Listening · filling order from voice</div>
+          <button class="btn-voice-action" id="pauseVoiceBtn">Pause</button>
+        </div>
+
+        <!-- Live transcript line -->
+        <div class="transcript-line" id="transcriptLine">
+          <span class="tx-label">Heard</span>
+          <span class="tx-text" id="transcriptText"></span>
+        </div>
+
+        <!-- Dish count subhead -->
+        <div style="font:400 13px/18px var(--font);color:var(--label2);padding:8px 32px 0" id="dishCountLabel">
+          3 dishes · each gets its own kitchen zone
+        </div>
+
+        <!-- Order list (rendered by JS) -->
+        <div id="orderList"></div>
+      </div>
+
+      <!-- Footer -->
+      <div class="order-footer">
+        <div class="delivery-wrap">
+          <div class="delivery-label">How should food come out?</div>
+          <div class="seg" id="deliverySeg" role="group" style="width:100%">
+            <button class="seg-item active" data-mode="all_together" id="segAllTogether">All together</button>
+            <button class="seg-item" data-mode="as_ready" id="segAsReady">As each is ready</button>
+          </div>
+        </div>
+        <button class="primary-btn" id="confirmBtn">Confirm and send to kitchen</button>
+        <div class="validation-msg" id="validationMsg"></div>
+      </div>
+    </div>
+
+  </div><!-- .split -->
+</div><!-- .app -->
+
+<!-- iPhone menu FAB -->
+<button class="menu-fab" id="menuFab" aria-label="Open menu">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<!-- iPhone menu sheet -->
+<div class="sheet-backdrop" id="menuBackdrop"></div>
+<div class="sheet sheet-menu" id="menuSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Menu</div>
+  <div class="search-field sheet-search">
+    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="search" id="sheetSearch" placeholder="Search items…" autocomplete="off">
+  </div>
+  <div class="category-row" id="sheetCategoryRow"></div>
+  <div class="menu-grid" id="sheetMenuGrid"></div>
+</div>
+
+<!-- Table picker sheet -->
+<div class="sheet-backdrop" id="tableBackdrop"></div>
+<div class="sheet" id="tableSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Select table</div>
+  <div class="table-grid-picker" id="tableGrid"></div>
+  <div style="padding:0 16px 20px">
+    <button class="primary-btn" id="tableCancel" style="background:var(--fill2);color:var(--label2);box-shadow:none">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ── Init Lucide icons ──────────────────────────────────────────────────────
+lucide.createIcons();
+
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  table: 12,
+  delivery_mode: 'all_together',
+  listening: true,
+  activeSeat: 1,
+  seats: [1, 2, 3],
+  dishes: [
+    { id: 1, name: 'The Bulldozer',    seat: 1, modifiers: 'No onion', allergy: '', confirmed: true  },
+    { id: 2, name: 'Cement Mixer Mac', seat: 2, modifiers: '',         allergy: 'Nut allergy', confirmed: true },
+    { id: 3, name: 'The Bulldozer',    seat: 3, modifiers: 'Medium',   allergy: '', confirmed: true  },
+  ],
+  heard: [
+    { id: 'h1', raw: '"and another bulldozer for her"', question: 'Which seat gets the 4th Bulldozer?', name: 'The Bulldozer', seat: null },
+  ],
+  // Voice-added items awaiting the server's Accept (dashed blue → solid)
+  voiceItems: [
+    { id: 'v1', name: 'The Backhoe', seat: 1, qty: 2, modifiers: '' },
+  ],
+  nextId: 10,
+  menuItems: [],
+  activeCategory: 'All',
+  searchQuery: '',
+};
+
+// ── Menu rendering ─────────────────────────────────────────────────────────
+const CATEGORIES = ['All', 'Appetizers', 'Mains', 'Desserts'];
+// Brand section names (from the Dig In menu) shown as headers in the "All" view
+const SECTIONS = { Appetizers: 'Groundwork', Mains: 'Heavy Lifting', Desserts: 'Finishing Touches' };
+
+function countInOrder(itemName) {
+  return state.dishes.filter(d => d.name === itemName).length;
+}
+
+function itemCardHTML(m) {
+  const count = countInOrder(m.name);
+  return `
+    <button class="item-card ${count > 0 ? 'in-order' : ''}" data-item="${m.id}" data-name="${m.name}" data-price="${m.price}">
+      <div class="item-card-top">
+        <div class="item-name">${m.name}</div>
+        ${count > 0 ? `<div class="item-badge">${count}</div>` : ''}
+      </div>
+      ${m.desc ? `<div class="item-desc">${m.desc}</div>` : ''}
+      <div class="item-price">$${m.price.toFixed(2)}</div>
+    </button>`;
+}
+
+function renderCategories(rowEl, gridEl) {
+  rowEl.innerHTML = CATEGORIES.map(cat => `
+    <button class="category-tile ${cat === state.activeCategory ? 'active' : ''}" data-cat="${cat}" role="tab">${cat}</button>`).join('');
+
+  rowEl.querySelectorAll('[data-cat]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.activeCategory = btn.dataset.cat;
+      renderCategories(rowEl, gridEl);
+    });
+  });
+
+  renderMenuGrid(gridEl);
+}
+
+function renderMenuGrid(gridEl) {
+  const q = state.searchQuery.toLowerCase();
+  const match = m => (!q || m.name.toLowerCase().includes(q) || (m.desc || '').toLowerCase().includes(q))
+                  && (state.activeCategory === 'All' || m.category === state.activeCategory);
+  const items = state.menuItems.filter(match);
+
+  if (state.activeCategory === 'All' && !q) {
+    // Grouped by section with brand headers, like a real menu
+    gridEl.innerHTML = ['Appetizers', 'Mains', 'Desserts'].map(cat => {
+      const list = items.filter(m => m.category === cat);
+      if (!list.length) return '';
+      return `<div class="menu-section-header">${SECTIONS[cat]}<span class="sec-cat">${cat}</span></div>
+        <div class="menu-grid-inner">${list.map(itemCardHTML).join('')}</div>`;
+    }).join('');
+  } else {
+    gridEl.innerHTML = items.length
+      ? `<div class="menu-grid-inner">${items.map(itemCardHTML).join('')}</div>`
+      : `<div style="padding:24px 2px;color:var(--label3);font:400 15px/20px var(--font)">No items match.</div>`;
+  }
+
+  gridEl.querySelectorAll('[data-item]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const seat = state.activeSeat || 1;
+      state.dishes.push({ id: state.nextId++, name: btn.dataset.name, seat, modifiers: '', allergy: '', confirmed: true });
+      if (!state.seats.includes(seat)) state.seats.push(seat);
+      renderAll();
+      // Close sheet on iPhone
+      closeMenuSheet();
+    });
+  });
+}
+
+// ── Order rendering ────────────────────────────────────────────────────────
+function renderOrder() {
+  const list = document.getElementById('orderList');
+  const allSeats = [...new Set(state.dishes.map(d => d.seat))].sort((a,b) => a-b);
+  const dishCount = state.dishes.length + state.heard.filter(h => h.seat !== null).length;
+
+  document.getElementById('dishCountLabel').textContent =
+    `${dishCount} dish${dishCount !== 1 ? 'es' : ''} · each gets its own kitchen zone`;
+
+  document.getElementById('seatNavLabel').textContent =
+    `Seat ${state.activeSeat} of ${Math.max(...state.seats, state.activeSeat)}`;
+
+  let html = '';
+
+  for (const seat of allSeats) {
+    const seatDishes = state.dishes.filter(d => d.seat === seat);
+    if (!seatDishes.length) continue;
+
+    html += `<div class="order-section-header">Seat ${seat}</div>
+      <div class="list-inset">`;
+    for (const d of seatDishes) {
+      html += `
+        <div class="list-row" data-dish-id="${d.id}">
+          <div class="list-row-content flex-1 min-w-0">
+            <div class="list-row-title">${d.name}</div>
+            ${d.modifiers ? `<div class="list-row-sub">${d.modifiers}</div>` : ''}
+            ${d.allergy ? `<div><span class="allergy-pill"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>${d.allergy}</span></div>` : ''}
+          </div>
+          <div class="flex-row row-gap-8" style="flex-shrink:0">
+            <div class="list-row-value">$${getPriceFor(d.name).toFixed(2)}</div>
+            <button class="btn-seat-remove" data-remove="${d.id}" style="font-size:13px;padding:4px 8px;min-height:28px">✕</button>
+          </div>
+        </div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Heard/unconfirmed items
+  for (const h of state.heard) {
+    html += `
+      <div class="order-section-header" style="color:var(--blue)">Voice · unconfirmed</div>
+      <div class="list-inset unconfirmed spring-in">
+        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div class="unconfirmed-label">Heard</div>
+          <div class="list-row-title">${h.raw}</div>
+          <div class="list-row-sub">${h.question}</div>
+          <div class="seat-actions">
+            ${state.seats.map(s => `<button class="btn-seat ${h.seat === s ? 'selected' : ''}" data-heard="${h.id}" data-seat="${s}">Seat ${s}</button>`).join('')}
+            <button class="btn-seat-remove" data-remove-heard="${h.id}">Remove</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Voice-added items awaiting Accept (dashed blue until confirmed)
+  for (const v of state.voiceItems) {
+    html += `
+      <div class="order-section-header" style="color:var(--blue)">Added by voice · tap Accept</div>
+      <div class="list-inset unconfirmed spring-in">
+        <div class="list-row">
+          <div class="list-row-content flex-1 min-w-0">
+            <div class="unconfirmed-label">Heard</div>
+            <div class="list-row-title">${v.qty > 1 ? v.qty + '× ' : ''}${v.name}</div>
+            <div class="list-row-sub">Seat ${v.seat}${v.modifiers ? ' · ' + v.modifiers : ''}</div>
+          </div>
+          <div class="flex-row row-gap-8" style="flex-shrink:0">
+            <button class="btn-accept-voice" data-accept-voice="${v.id}">Accept</button>
+            <button class="btn-seat-remove" data-remove-voice="${v.id}">✕</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if (!allSeats.length && !state.heard.length && !state.voiceItems.length) {
+    html = `<div style="text-align:center;color:var(--label3);padding:40px 16px;font:400 17px/22px var(--font)">
+      Tap menu items to add to order</div>`;
+  }
+
+  list.innerHTML = html;
+  lucide.createIcons();
+
+  // Bind voice-item accept / remove
+  list.querySelectorAll('[data-accept-voice]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = state.voiceItems.find(x => x.id === btn.dataset.acceptVoice);
+      if (!v) return;
+      for (let i = 0; i < (v.qty || 1); i++) {
+        state.dishes.push({ id: state.nextId++, name: v.name, seat: v.seat, modifiers: v.modifiers || '', allergy: '', confirmed: true });
+      }
+      if (!state.seats.includes(v.seat)) state.seats.push(v.seat);
+      state.voiceItems = state.voiceItems.filter(x => x.id !== v.id);
+      api.acceptVoiceItem(v);
+      renderAll();
+    });
+  });
+  list.querySelectorAll('[data-remove-voice]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.voiceItems = state.voiceItems.filter(x => x.id !== btn.dataset.removeVoice);
+      renderAll();
+    });
+  });
+
+  // Bind remove dish
+  list.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.dishes = state.dishes.filter(d => d.id !== parseInt(btn.dataset.remove));
+      renderAll();
+    });
+  });
+
+  // Bind seat assignment for heard items
+  list.querySelectorAll('[data-heard]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const h = state.heard.find(x => x.id === btn.dataset.heard);
+      if (h) { h.seat = parseInt(btn.dataset.seat); renderAll(); }
+    });
+  });
+  list.querySelectorAll('[data-remove-heard]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.heard = state.heard.filter(h => h.id !== btn.dataset.removeHeard);
+      renderAll();
+    });
+  });
+
+  // Validation
+  const unassigned = state.heard.filter(h => h.seat === null).length;
+  const btn = document.getElementById('confirmBtn');
+  const totalDishes = state.dishes.length + state.heard.filter(h => h.seat !== null).length;
+  btn.disabled = unassigned > 0 || totalDishes === 0;
+  document.getElementById('validationMsg').textContent =
+    unassigned > 0 ? `${unassigned} voice item${unassigned > 1 ? 's' : ''} still need a seat` :
+    totalDishes === 0 ? 'Add at least one dish' : '';
+}
+
+function getPriceFor(name) {
+  const item = state.menuItems.find(m => m.name === name);
+  return item ? item.price : 0;
+}
+
+// ── Delivery segmented control ─────────────────────────────────────────────
+document.getElementById('deliverySeg').querySelectorAll('.seg-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    state.delivery_mode = btn.dataset.mode;
+    document.querySelectorAll('#deliverySeg .seg-item').forEach(b => b.classList.toggle('active', b.dataset.mode === state.delivery_mode));
+  });
+});
+
+// ── Mic status (Listening · Paused · Processing · Offline) ──────────────────
+const MIC_UI = {
+  listening:  { pill: 'Listening',  banner: 'Listening · filling order from voice', pillCls: 'listening',  bannerCls: '' },
+  paused:     { pill: 'Paused',     banner: 'Voice paused',                          pillCls: 'paused',     bannerCls: '' },
+  processing: { pill: 'Processing', banner: 'Processing…',                           pillCls: 'processing', bannerCls: 'processing' },
+  offline:    { pill: 'Offline',    banner: 'Voice offline, tap to add items',       pillCls: 'offline',    bannerCls: 'offline' },
+};
+const MIC_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+const MIC_OFF_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/></svg>`;
+
+function applyMicStatus(status) {
+  const ui = MIC_UI[status] || MIC_UI.listening;
+  const banner = document.getElementById('voiceBanner');
+  const pill = document.getElementById('micPill');
+  const pauseBtn = document.getElementById('pauseVoiceBtn');
+  const txLine = document.getElementById('transcriptLine');
+
+  pill.className = 'status-pill ' + ui.pillCls;
+  pill.innerHTML = `${status === 'offline' ? MIC_OFF_ICON : '<span class="pill-dot"></span>'}${ui.pill}`;
+
+  banner.className = 'voice-banner' + (ui.bannerCls ? ' ' + ui.bannerCls : '');
+  banner.querySelector('.voice-banner-text').textContent = ui.banner;
+  pauseBtn.textContent = status === 'paused' ? 'Resume' : 'Pause';
+  pauseBtn.style.display = (status === 'offline' || status === 'processing') ? 'none' : '';
+
+  txLine.classList.toggle('offline', status === 'offline');
+  document.getElementById('transcriptText').textContent =
+    status === 'offline' ? 'Tap the + button to add items by hand' : (api.getTranscript() || '');
+}
+
+// Pause button toggles Listening ⇄ Paused through the shared bus
+document.getElementById('pauseVoiceBtn').addEventListener('click', () => {
+  api._bus.micStatus(api.getMicStatus() === 'paused' ? 'listening' : 'paused');
+});
+
+// Mic pill toggles Listening ⇄ Offline (so the offline state is reachable)
+document.getElementById('micPill').addEventListener('click', () => {
+  api._bus.micStatus(api.getMicStatus() === 'offline' ? 'listening' : 'offline');
+});
+
+// Tapping the banner while offline opens the add-items menu
+document.getElementById('voiceBanner').addEventListener('click', () => {
+  if (api.getMicStatus() === 'offline') openMenuSheet();
+});
+
+// React to mic status + transcript + voice items from the shared data layer
+on('mic_status', applyMicStatus);
+on('voice_transcript', ({ text }) => {
+  document.getElementById('transcriptText').textContent = text;
+  // brief "Processing…" flash, then settle back to listening
+  if (api.getMicStatus() !== 'offline' && api.getMicStatus() !== 'paused') {
+    api._bus.micStatus('processing');
+    setTimeout(() => { if (api.getMicStatus() === 'processing') api._bus.micStatus('listening'); }, 900);
+  }
+});
+on('voice_item', (item) => {
+  state.voiceItems.push({ id: 'v' + Date.now(), name: item.name, seat: item.seat || state.activeSeat || 1, qty: item.qty || 1, modifiers: item.modifiers || '' });
+  renderOrder();
+});
+
+// ── Add seat ───────────────────────────────────────────────────────────────
+document.getElementById('addSeatBtn').addEventListener('click', () => {
+  const next = Math.max(...state.seats) + 1;
+  state.seats.push(next);
+  state.activeSeat = next;
+  renderAll();
+});
+
+// ── Seat nav (iPhone) ──────────────────────────────────────────────────────
+document.getElementById('prevSeatBtn').addEventListener('click', () => {
+  const idx = state.seats.indexOf(state.activeSeat);
+  if (idx > 0) { state.activeSeat = state.seats[idx - 1]; renderAll(); }
+});
+document.getElementById('nextSeatBtn').addEventListener('click', () => {
+  const idx = state.seats.indexOf(state.activeSeat);
+  if (idx < state.seats.length - 1) { state.activeSeat = state.seats[idx + 1]; renderAll(); }
+});
+
+// ── Menu sheet (iPhone) ───────────────────────────────────────────────────
+function openMenuSheet() {
+  document.getElementById('menuBackdrop').classList.add('open');
+  document.getElementById('menuSheet').classList.add('open');
+  renderCategories(
+    document.getElementById('sheetCategoryRow'),
+    document.getElementById('sheetMenuGrid')
+  );
+  lucide.createIcons();
+}
+function closeMenuSheet() {
+  document.getElementById('menuBackdrop').classList.remove('open');
+  document.getElementById('menuSheet').classList.remove('open');
+}
+document.getElementById('menuFab').addEventListener('click', openMenuSheet);
+document.getElementById('menuBackdrop').addEventListener('click', closeMenuSheet);
+
+// Search in sheet
+document.getElementById('sheetSearch').addEventListener('input', e => {
+  state.searchQuery = e.target.value;
+  renderMenuGrid(document.getElementById('sheetMenuGrid'));
+});
+document.getElementById('menuSearch').addEventListener('input', e => {
+  state.searchQuery = e.target.value;
+  renderMenuGrid(document.getElementById('menuGrid'));
+});
+
+// ── Table picker ───────────────────────────────────────────────────────────
+function openTableSheet() {
+  const grid = document.getElementById('tableGrid');
+  grid.innerHTML = Array.from({length: 20}, (_, i) => i + 1)
+    .map(n => `<button class="btn-table-pick ${n === state.table ? 'selected' : ''}" data-t="${n}">${n}</button>`)
+    .join('');
+  grid.querySelectorAll('[data-t]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.table = parseInt(btn.dataset.t);
+      document.getElementById('navTableNum').textContent = `Table ${state.table}`;
+      closeTableSheet();
+    });
+  });
+  document.getElementById('tableBackdrop').classList.add('open');
+  document.getElementById('tableSheet').classList.add('open');
+}
+function closeTableSheet() {
+  document.getElementById('tableBackdrop').classList.remove('open');
+  document.getElementById('tableSheet').classList.remove('open');
+}
+document.getElementById('openTableBtn').addEventListener('click', openTableSheet);
+document.getElementById('tableBackdrop').addEventListener('click', closeTableSheet);
+document.getElementById('tableCancel').addEventListener('click', closeTableSheet);
+
+// ── Confirm ────────────────────────────────────────────────────────────────
+document.getElementById('confirmBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  const allDishes = [
+    ...state.dishes.map(d => ({ name: d.name, seat: d.seat, modifiers: d.modifiers, allergy_note: d.allergy, station: state.menuItems.find(m => m.name === d.name)?.station || '?' })),
+    ...state.heard.filter(h => h.seat).map(h => ({ name: h.name, seat: h.seat, modifiers: '', allergy_note: '', station: '?' })),
+  ];
+  await api.submitOrder({ table: state.table, server_id: api.getServer().id, delivery_mode: state.delivery_mode, dishes: allDishes });
+  state.dishes = []; state.heard = []; state.seats = [1]; state.activeSeat = 1;
+  btn.textContent = 'Sent to kitchen';
+  setTimeout(() => { btn.disabled = false; btn.textContent = 'Confirm and send to kitchen'; renderAll(); }, 2000);
+});
+
+// ── Render all ─────────────────────────────────────────────────────────────
+function renderAll() {
+  renderCategories(document.getElementById('categoryRow'), document.getElementById('menuGrid'));
+  renderOrder();
+  lucide.createIcons();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+api.getMenu().then(menu => {
+  state.menuItems = menu;
+  renderAll();
+  applyMicStatus(api.getMicStatus());
+  document.getElementById('transcriptText').textContent = api.getTranscript() || '';
+});
+</script>
+</body>
+</html>
