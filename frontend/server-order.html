@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Take Order</title>
 <link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
 <script src="config.js"></script>
 <script src="data.js"></script>
 <script defer src="server-alert.js"></script>
@@ -116,7 +117,7 @@ body { background: var(--sys-grouped); }
 /* ── Menu grid ────────────────────────────────────────────────────────────── */
 /* uses .menu-grid + .item-card from style.css */
 @media (min-width: 1024px) {
-  .menu-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .menu-grid-inner { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
 }
 
 /* ── Order section header ─────────────────────────────────────────────────── */
@@ -195,6 +196,7 @@ body { background: var(--sys-grouped); }
     </div>
     <div style="flex:1"></div>
     <button class="status-pill listening" id="micPill" title="Tap to toggle voice"></button>
+    <button class="icon-btn" id="themeToggle" title="Toggle light / dark"></button>
     <button class="btn-change" id="openTableBtn">Change table</button>
   </div>
 
@@ -315,16 +317,16 @@ const state = {
   activeSeat: 1,
   seats: [1, 2, 3],
   dishes: [
-    { id: 1, name: 'Burger',       seat: 1, modifiers: 'No onion', allergy: '', confirmed: true  },
-    { id: 2, name: 'Chicken bowl', seat: 2, modifiers: '',         allergy: 'Peanut allergy', confirmed: true },
-    { id: 3, name: 'Burger',       seat: 3, modifiers: 'Medium',   allergy: '', confirmed: true  },
+    { id: 1, name: 'The Bulldozer',    seat: 1, modifiers: 'No onion', allergy: '', confirmed: true  },
+    { id: 2, name: 'Cement Mixer Mac', seat: 2, modifiers: '',         allergy: 'Nut allergy', confirmed: true },
+    { id: 3, name: 'The Bulldozer',    seat: 3, modifiers: 'Medium',   allergy: '', confirmed: true  },
   ],
   heard: [
-    { id: 'h1', raw: '"and another burger for her"', question: 'Which seat gets the 4th burger?', name: 'Burger', seat: null },
+    { id: 'h1', raw: '"and another bulldozer for her"', question: 'Which seat gets the 4th Bulldozer?', name: 'The Bulldozer', seat: null },
   ],
   // Voice-added items awaiting the server's Accept (dashed blue → solid)
   voiceItems: [
-    { id: 'v1', name: 'Salmon', seat: 1, qty: 4, modifiers: '' },
+    { id: 'v1', name: 'The Backhoe', seat: 1, qty: 2, modifiers: '' },
   ],
   nextId: 10,
   menuItems: [],
@@ -333,11 +335,25 @@ const state = {
 };
 
 // ── Menu rendering ─────────────────────────────────────────────────────────
-const CATEGORIES = ['All', 'Burgers', 'Bowls', 'Mains', 'Sides', 'Drinks'];
-const CAT_MAP    = { Burger:'Burgers', 'Chicken bowl':'Bowls', Salmon:'Mains', Risotto:'Mains', Salad:'Sides', Fries:'Sides' };
+const CATEGORIES = ['All', 'Appetizers', 'Mains', 'Desserts'];
+// Brand section names (from the Dig In menu) shown as headers in the "All" view
+const SECTIONS = { Appetizers: 'Groundwork', Mains: 'Heavy Lifting', Desserts: 'Finishing Touches' };
 
 function countInOrder(itemName) {
   return state.dishes.filter(d => d.name === itemName).length;
+}
+
+function itemCardHTML(m) {
+  const count = countInOrder(m.name);
+  return `
+    <button class="item-card ${count > 0 ? 'in-order' : ''}" data-item="${m.id}" data-name="${m.name}" data-price="${m.price}">
+      <div class="item-card-top">
+        <div class="item-name">${m.name}</div>
+        ${count > 0 ? `<div class="item-badge">${count}</div>` : ''}
+      </div>
+      ${m.desc ? `<div class="item-desc">${m.desc}</div>` : ''}
+      <div class="item-price">$${m.price.toFixed(2)}</div>
+    </button>`;
 }
 
 function renderCategories(rowEl, gridEl) {
@@ -356,21 +372,23 @@ function renderCategories(rowEl, gridEl) {
 
 function renderMenuGrid(gridEl) {
   const q = state.searchQuery.toLowerCase();
-  const filtered = state.menuItems.filter(m => {
-    const matchSearch = !q || m.name.toLowerCase().includes(q);
-    const matchCat = state.activeCategory === 'All' || CAT_MAP[m.name] === state.activeCategory;
-    return matchSearch && matchCat;
-  });
+  const match = m => (!q || m.name.toLowerCase().includes(q) || (m.desc || '').toLowerCase().includes(q))
+                  && (state.activeCategory === 'All' || m.category === state.activeCategory);
+  const items = state.menuItems.filter(match);
 
-  gridEl.innerHTML = filtered.map(m => {
-    const count = countInOrder(m.name);
-    return `
-      <button class="item-card ${count > 0 ? 'in-order' : ''}" data-item="${m.id}" data-name="${m.name}" data-price="${m.price}">
-        <div class="item-name">${m.name}</div>
-        <div class="item-price">$${m.price.toFixed(2)}</div>
-        ${count > 0 ? `<div class="item-badge">${count}</div>` : ''}
-      </button>`;
-  }).join('');
+  if (state.activeCategory === 'All' && !q) {
+    // Grouped by section with brand headers, like a real menu
+    gridEl.innerHTML = ['Appetizers', 'Mains', 'Desserts'].map(cat => {
+      const list = items.filter(m => m.category === cat);
+      if (!list.length) return '';
+      return `<div class="menu-section-header">${SECTIONS[cat]}<span class="sec-cat">${cat}</span></div>
+        <div class="menu-grid-inner">${list.map(itemCardHTML).join('')}</div>`;
+    }).join('');
+  } else {
+    gridEl.innerHTML = items.length
+      ? `<div class="menu-grid-inner">${items.map(itemCardHTML).join('')}</div>`
+      : `<div style="padding:24px 2px;color:var(--label3);font:400 15px/20px var(--font)">No items match.</div>`;
+  }
 
   gridEl.querySelectorAll('[data-item]').forEach(btn => {
     btn.addEventListener('click', () => {

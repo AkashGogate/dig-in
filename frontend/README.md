@@ -21,7 +21,8 @@ wire the real backend.
 | `index.html` | Original voice-pipeline demo page (live-mic + test-scenario + log). | Pre-existing; not part of the three operator screens. |
 | `data.js` | **The data layer.** Mock state, `api.*` methods, the event bus (`on`/`_emit`), and the `bus.*` appliers. One toggle (`USE_REAL_API`) flips mock → real. | Read [INTEGRATION.md](INTEGRATION.md) before wiring anything. |
 | `server-alert.js` | Shared ready-for-pickup banner (chime + `navigator.vibrate` + Picked up). | Included on both server screens; listens for `server_alert`. |
-| `style.css` | Apple-HIG design system: tokens, components, auto light/dark, `.force-dark`. | All visual styling lives here. |
+| `theme.js` | Light/dark theme for the server screens: applies `.theme-dark` on `<html>`, wires the `#themeToggle` button, persists the choice. | Runs in `<head>` (no flash); kitchen opts out and stays dark. |
+| `style.css` | Apple-HIG design system: tokens, components, light/dark (`.theme-dark`), `.force-dark`. | All visual styling lives here. |
 | `config.js` | Sets `window.KITCHEN_COPILOT_API` (backend base URL). Defaults to `http://localhost:8000`. | |
 
 ---

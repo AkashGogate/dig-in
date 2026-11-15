@@ -21,7 +21,7 @@ const _mock = {
   camera_status: 'live',      // live | offline
 
   // Take-order live transcript line
-  transcript: 'four salmon for seat one',
+  transcript: 'two backhoes for seat one',
 
   // Kitchen "Last heard" strip — each voice command + its result
   last_heard: [
@@ -33,13 +33,19 @@ const _mock = {
     { id: 'clar-seed', zone: '9·2', kind: 'placed', text: 'Plate seen in Zone 9·2, which dish?' },
   ],
 
+  // Dig In — The Construction Kitchen menu
   menu: [
-    { id: 'burger',       name: 'Burger',       price: 12.00, station: 'Grill',        prep_seconds: 300 },
-    { id: 'chicken-bowl', name: 'Chicken bowl', price: 14.00, station: 'Bowl station', prep_seconds: 420 },
-    { id: 'salmon',       name: 'Salmon',       price: 22.00, station: 'Grill',        prep_seconds: 480 },
-    { id: 'risotto',      name: 'Risotto',      price: 18.00, station: 'Saute',        prep_seconds: 600 },
-    { id: 'salad',        name: 'Salad',        price: 10.00, station: 'Pantry',       prep_seconds: 180 },
-    { id: 'fries',        name: 'Fries',        price:  6.00, station: 'Fry',          prep_seconds: 240 },
+    // 01 / Groundwork — Appetizers
+    { id: 'tots',    name: 'Gravel Pit Tots',  price:  9.00, category: 'Appetizers', station: 'Fry',   prep_seconds: 300, desc: 'Crispy tots buried under queso, bacon, and scallions.' },
+    { id: 'beams',   name: 'Steel Beams',      price:  8.00, category: 'Appetizers', station: 'Fry',   prep_seconds: 240, desc: 'Golden mozzarella sticks with marinara for dipping.' },
+    { id: 'poppers', name: 'Dynamite Poppers', price: 10.00, category: 'Appetizers', station: 'Grill', prep_seconds: 360, desc: 'Bacon-wrapped jalapeños stuffed with cream cheese.' },
+    // 02 / Heavy Lifting — Mains
+    { id: 'bulldozer', name: 'The Bulldozer',    price: 16.00, category: 'Mains', station: 'Grill', prep_seconds: 480, desc: 'Double smash burger, cheddar, crispy onions, pickles, house sauce.' },
+    { id: 'backhoe',   name: 'The Backhoe',      price: 15.00, category: 'Mains', station: 'Grill', prep_seconds: 540, desc: 'BBQ pulled pork on a toasted bun with slaw and pickles.' },
+    { id: 'macmixer',  name: 'Cement Mixer Mac', price: 13.00, category: 'Mains', station: 'Saute', prep_seconds: 420, desc: 'Three-cheese macaroni with a crunchy breadcrumb topping.' },
+    // 03 / Finishing Touches — Desserts
+    { id: 'dirtsite', name: 'Dirt Site',            price: 8.00, category: 'Desserts', station: 'Pantry', prep_seconds: 180, desc: 'Chocolate pudding, Oreo soil, gummy worms, and a shovel spoon.' },
+    { id: 'brownie',  name: 'Wrecking Ball Brownie', price: 9.00, category: 'Desserts', station: 'Pantry', prep_seconds: 240, desc: 'Warm fudge brownie, chocolate ice cream, and caramel.' },
   ],
 
   orders: [
@@ -47,51 +53,51 @@ const _mock = {
       id: 'ord-t4', table: 4, server_id: 'srv-1', delivery_mode: 'as_ready',
       status: 'in_queue', elapsed_s: 405,
       dishes: [
-        { id: 'd4-1', k: 1, name: 'Burger',       seat: 1, modifiers: '', allergy: '', station: 'Grill',        zone: '4·1', status: 'ready',   est_min: null, source: 'camera', note: 'Server alerted 1:50 ago' },
-        { id: 'd4-2', k: 2, name: 'Chicken bowl', seat: 1, modifiers: '', allergy: '', station: 'Bowl station', zone: '4·2', status: 'cooking', est_min: 5,    source: null,     note: 'Started by bowl station'  },
+        { id: 'd4-1', k: 1, name: 'The Bulldozer',    seat: 1, modifiers: '', allergy: '', station: 'Grill', zone: '4·1', status: 'ready',   est_min: null, source: 'camera', note: 'Server alerted 1:50 ago' },
+        { id: 'd4-2', k: 2, name: 'Cement Mixer Mac', seat: 1, modifiers: '', allergy: '', station: 'Saute', zone: '4·2', status: 'cooking', est_min: 5,    source: null,     note: 'Started by saute'  },
       ],
     },
     {
       id: 'ord-t12', table: 12, server_id: 'srv-1', delivery_mode: 'all_together',
       status: 'partially_ready', elapsed_s: 500,
       dishes: [
-        { id: 'd12-1', k: 1, name: 'Burger',       seat: 1, modifiers: 'No onion', allergy: '',               station: 'Grill',        zone: '12·1', status: 'ready',   est_min: null, source: 'camera', note: '' },
-        { id: 'd12-2', k: 2, name: 'Chicken bowl', seat: 2, modifiers: '',         allergy: 'Peanut allergy', station: 'Bowl station', zone: '12·2', status: 'cooking', est_min: 3,    source: null,     note: '' },
-        { id: 'd12-3', k: 3, name: 'Burger',       seat: 3, modifiers: 'Medium',   allergy: '',               station: 'Grill',        zone: '12·3', status: 'ready',   est_min: null, source: 'tapped', note: '' },
-        { id: 'd12-4', k: 4, name: 'Burger',       seat: 2, modifiers: '',         allergy: '',               station: 'Grill',        zone: '12·4', status: 'ready',   est_min: null, source: 'camera', note: '' },
+        { id: 'd12-1', k: 1, name: 'The Bulldozer',    seat: 1, modifiers: 'No onion', allergy: '',            station: 'Grill', zone: '12·1', status: 'ready',   est_min: null, source: 'camera', note: '' },
+        { id: 'd12-2', k: 2, name: 'Cement Mixer Mac', seat: 2, modifiers: '',         allergy: 'Nut allergy', station: 'Saute', zone: '12·2', status: 'cooking', est_min: 3,    source: null,     note: '' },
+        { id: 'd12-3', k: 3, name: 'The Bulldozer',    seat: 3, modifiers: 'Medium',   allergy: '',            station: 'Grill', zone: '12·3', status: 'ready',   est_min: null, source: 'tapped', note: '' },
+        { id: 'd12-4', k: 4, name: 'The Backhoe',      seat: 2, modifiers: '',         allergy: '',            station: 'Grill', zone: '12·4', status: 'ready',   est_min: null, source: 'camera', note: '' },
       ],
     },
     {
       id: 'ord-t7', table: 7, server_id: 'srv-1', delivery_mode: 'all_together',
       status: 'submitted', elapsed_s: 60,
       dishes: [
-        { id: 'd7-1', k: 1, name: 'Burger',       seat: 1, modifiers: '', allergy: '', station: 'Grill',        zone: '7·1', status: 'queued', est_min: null, source: null, note: '' },
-        { id: 'd7-2', k: 2, name: 'Chicken bowl', seat: 2, modifiers: '', allergy: '', station: 'Bowl station', zone: '7·2', status: 'queued', est_min: null, source: null, note: '' },
+        { id: 'd7-1', k: 1, name: 'The Bulldozer',   seat: 1, modifiers: '', allergy: '', station: 'Grill', zone: '7·1', status: 'queued', est_min: null, source: null, note: '' },
+        { id: 'd7-2', k: 2, name: 'Gravel Pit Tots', seat: 2, modifiers: '', allergy: '', station: 'Fry',   zone: '7·2', status: 'queued', est_min: null, source: null, note: '' },
       ],
     },
     {
       id: 'ord-t9', table: 9, server_id: 'srv-2', delivery_mode: 'all_together',
       status: 'submitted', elapsed_s: 30,
       dishes: [
-        { id: 'd9-1', k: 1, name: 'Salmon',  seat: 1, modifiers: '', allergy: '', station: 'Grill',  zone: '9·1', status: 'queued', est_min: null, source: null, note: '' },
-        { id: 'd9-2', k: 2, name: 'Risotto', seat: 2, modifiers: '', allergy: '', station: 'Saute',  zone: '9·2', status: 'cooking', est_min: 4, source: null, note: '' },
-        { id: 'd9-3', k: 3, name: 'Salad',   seat: 3, modifiers: '', allergy: '', station: 'Pantry', zone: '9·3', status: 'queued', est_min: null, source: null, note: '' },
+        { id: 'd9-1', k: 1, name: 'The Backhoe',      seat: 1, modifiers: '', allergy: '', station: 'Grill', zone: '9·1', status: 'queued',  est_min: null, source: null, note: '' },
+        { id: 'd9-2', k: 2, name: 'Cement Mixer Mac', seat: 2, modifiers: '', allergy: '', station: 'Saute', zone: '9·2', status: 'cooking', est_min: 4,    source: null, note: '' },
+        { id: 'd9-3', k: 3, name: 'Dynamite Poppers', seat: 3, modifiers: '', allergy: '', station: 'Grill', zone: '9·3', status: 'queued',  est_min: null, source: null, note: '' },
       ],
     },
   ],
 
   // Orders heard by head chef voice but not yet line-confirmed
   heard_orders: [
-    { id: 'heard-t7', raw: 'Order table 7', table: 7, items: ['Burger', 'Chicken bowl'], delivery_mode: 'all_together' },
+    { id: 'heard-t7', raw: 'Order table 7', table: 7, items: ['The Bulldozer', 'Gravel Pit Tots'], delivery_mode: 'all_together' },
   ],
 
   // Per-ingredient camera counts: expected vs seen leaving the pass vs in stock
   ingredients: [
-    { name: 'Patties', expected: 5, seen: 4, stock: 18 },
-    { name: 'Chicken', expected: 3, seen: 2, stock: 12 },
-    { name: 'Buns',    expected: 5, seen: 4, stock: 22 },
-    { name: 'Salmon',  expected: 1, seen: 0, stock:  6 },
-    { name: 'Greens',  expected: 2, seen: 1, stock: 30 },
+    { name: 'Smash patties', expected: 5, seen: 4, stock: 18 },
+    { name: 'Pulled pork',   expected: 2, seen: 1, stock:  9 },
+    { name: 'Brioche buns',  expected: 5, seen: 4, stock: 22 },
+    { name: 'Mac & cheese',  expected: 2, seen: 1, stock: 14 },
+    { name: 'Tots',          expected: 3, seen: 3, stock: 30 },
   ],
 };
 
@@ -360,16 +366,16 @@ const api = {
   sim: {
     voiceHeard() {
       const lines = [
-        { text: 'four salmon for seat one', parsed: { name: 'Salmon', seat: 1, qty: 4 } },
-        { text: 'add a side of fries for seat two', parsed: { name: 'Fries', seat: 2, qty: 1 } },
-        { text: 'risotto for seat three, no cheese', parsed: { name: 'Risotto', seat: 3, qty: 1, modifiers: 'No cheese' } },
+        { text: 'two backhoes for seat one', parsed: { name: 'The Backhoe', seat: 1, qty: 2 } },
+        { text: 'add gravel pit tots for seat two', parsed: { name: 'Gravel Pit Tots', seat: 2, qty: 1 } },
+        { text: 'cement mixer mac for seat three, extra crispy', parsed: { name: 'Cement Mixer Mac', seat: 3, qty: 1, modifiers: 'Extra crispy' } },
       ];
       const pick = lines[Math.floor(Math.random() * lines.length)];
       bus.voiceHeard(pick.text, pick.parsed);
     },
     headChefCallout() {
       const n = 2 + Math.floor(Math.random() * 18);
-      bus.headChefCallout({ id: 'heard-' + Date.now(), raw: `Order table ${n}`, table: n, items: ['Burger', 'Salad'], delivery_mode: 'all_together' });
+      bus.headChefCallout({ id: 'heard-' + Date.now(), raw: `Order table ${n}`, table: n, items: ['The Bulldozer', 'Dirt Site'], delivery_mode: 'all_together' });
     },
     stationStarted() { const id = _nextDishByStatus('queued'); if (id) bus.stationStarted(id); },
     plateInZone()    { const id = _nextDishByStatus('cooking'); if (id) bus.plateReady(id, 'camera'); },

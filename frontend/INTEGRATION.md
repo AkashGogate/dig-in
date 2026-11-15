@@ -105,7 +105,10 @@ with `_emit`.) Screens never emit directly — they call `api.*`/`bus.*`.
 
 ```jsonc
 // MenuItem
-{ "id":"burger", "name":"Burger", "price":12.0, "station":"Grill", "prep_seconds":300 }
+{ "id":"bulldozer", "name":"The Bulldozer", "price":16.0,
+  "category":"Mains",                        // Appetizers | Mains | Desserts (menu sections)
+  "station":"Grill", "prep_seconds":480,
+  "desc":"Double smash burger, cheddar, crispy onions, pickles, house sauce." }
 
 // Order
 { "id":"ord-t12", "table":12, "server_id":"srv-1",

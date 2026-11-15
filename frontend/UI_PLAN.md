@@ -93,6 +93,18 @@ direction above:
   status line, soft tint, dashed empties.
 - Softer shadows, tighter large-title tracking, consistent radii/spacing.
 
+**Dig In menu + light/dark toggle + POS polish**
+- Loaded the real **Dig In — The Construction Kitchen** menu across all screens
+  (menu + mock orders/ingredients/voice lines in `data.js`): Groundwork (Appetizers),
+  Heavy Lifting (Mains), Finishing Touches (Desserts). Menu items now carry
+  `category` + `desc`.
+- Take Order menu is now grouped into brand sections with item descriptions and a
+  bolder price — a proper Square/Toast-style POS grid.
+- Fixed the item-card name/badge overlap (badge is now inline, not absolutely
+  positioned over the name).
+- Added a **light/dark toggle** (`theme.js`, `#themeToggle` in the nav) on both server
+  screens; choice persists in `localStorage`. The kitchen stays always-dark.
+
 **Kitchen Display rebuild** — the wall display was hard to read (oversized green
 checkmarks dominating the top, a heavy clarification column, every timer alarming red,
 tiny gray-on-gray dish info). Rebuilt for glanceability:
