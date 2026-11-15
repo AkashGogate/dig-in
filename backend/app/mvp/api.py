@@ -24,9 +24,49 @@ from app.mvp.menu_extraction import (
 from app.mvp.menu_import import MenuPrepareRequest, MenuSearchRequest
 from app.mvp.service_contracts import Audience, ServiceSummary
 from app.mvp.voice import adapter_status
+from app.mvp.voice_live import make_router as make_voice_router
 
 router = APIRouter(prefix="/api/v2", tags=["MVP v2"])
 restaurant = Restaurant()
+
+
+def pinned_voice_menu(body, session_id):
+    with restaurant.lock:
+        if session_id not in restaurant.sessions:
+            raise HTTPException(409, "Select a demo session before voice capture")
+        if body and body.order_id:
+            if session_id not in restaurant.sessions:
+                raise HTTPException(409, "Select a demo session before voice capture")
+            order = restaurant.state.orders.get(body.order_id)
+            if (
+                order is None
+                or order.status != "draft"
+                or order.owner != restaurant.sessions[session_id]
+            ):
+                raise HTTPException(
+                    409, "Capture must target your current editable draft"
+                )
+            if body.menu_revision != order.menu_revision:
+                raise HTTPException(
+                    409, "Draft menu revision changed; refresh before capture"
+                )
+            return restaurant.state.menus[order.menu_revision].model_copy(deep=True)
+        if body and body.menu_revision:
+            if session_id not in restaurant.sessions or restaurant.state.actors[
+                restaurant.sessions[session_id]
+            ].role not in ("cook", "lead"):
+                raise HTTPException(
+                    409, "Kitchen session required for menu-scoped capture"
+                )
+            if body.menu_revision not in restaurant.state.menus:
+                raise HTTPException(409, "Unknown menu revision")
+            return restaurant.state.menus[body.menu_revision].model_copy(deep=True)
+        return restaurant.state.menu.model_copy(deep=True)
+
+
+router.include_router(
+    make_voice_router(lambda: restaurant.state.menu, pinned_voice_menu)
+)
 
 
 def checked(fn):

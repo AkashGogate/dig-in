@@ -63,6 +63,8 @@ class DraftFlag(Model):
     message: str
     candidates: list[str] = Field(default_factory=list)
     spoken_table_id: str | None = None
+    line_id: str | None = None
+    request_text: str | None = Field(default=None, max_length=500)
 
 
 class Order(Model):
@@ -84,6 +86,9 @@ class Order(Model):
     flags: list[DraftFlag] = Field(default_factory=list)
     voice_baseline: list[Line] | None = None
     capture_mode: Literal["manual", "mock_voice", "live_voice"] = "manual"
+    dietary_check: Literal["not_asked", "none_reported", "requests_recorded"] = (
+        "not_asked"
+    )
     corrected_draft_lines: int = 0
     initial_voice_draft_line_count: int = 0
     zone_status: Literal["unassigned", "waiting", "assigned", "released"] = "unassigned"
@@ -208,15 +213,21 @@ class CaptureVoice(Model):
     order_id: str
     revision: int
     text: str = Field(min_length=1, max_length=2000)
+    capture_mode: Literal["mock_voice", "live_voice"] = "mock_voice"
 
 
 class ResolveFlag(Model):
+    line_id: str | None = None
     action: Literal["resolve_flag"]
     order_id: str
     revision: int
     flag_id: str
     resolution: Literal[
-        "keep_selected_table", "use_spoken_table", "reviewed_remove_unknown"
+        "keep_selected_table",
+        "use_spoken_table",
+        "reviewed_remove_unknown",
+        "asked_none_reported",
+        "reviewed_keep_note",
     ]
 
 

@@ -9,18 +9,17 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import secrets
 import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.call_parser import parse_call
 from app.log_store import init_db, make_session_factory, write_result
 from app.mismatch import check_mismatch
 from app.deepgram_live import stream_transcripts
+from app.demo_auth import require_demo_auth
 from app.session import KitchenSession, SessionLimitExceeded
 from app.ticket_queue import TicketQueue
 from app.coordination.api import router as coordination_router
@@ -62,21 +61,6 @@ def _client_ip(request_or_ws) -> str:
     return request_or_ws.client.host if request_or_ws.client else "unknown"
 
 
-_basic_auth = HTTPBasic()
-
-
-def require_demo_auth(credentials: HTTPBasicCredentials = Depends(_basic_auth)) -> None:
-    """Gates the one endpoint that creates a Deepgram-billable session, so
-    bot/bulk traffic can't reach the live-mic path without the demo password
-    (ARCHITECTURE.md #6 cost controls). No-op if DEMO_AUTH_USER/PASS aren't set."""
-    expected_user = os.environ.get("DEMO_AUTH_USER")
-    expected_pass = os.environ.get("DEMO_AUTH_PASS")
-    if not expected_user or not expected_pass:
-        return
-    user_ok = secrets.compare_digest(credentials.username, expected_user)
-    pass_ok = secrets.compare_digest(credentials.password, expected_pass)
-    if not (user_ok and pass_ok):
-        raise HTTPException(status_code=401, detail="Unauthorized", headers={"WWW-Authenticate": "Basic"})
 
 
 @app.post("/session/start", dependencies=[Depends(require_demo_auth)])

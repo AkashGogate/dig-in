@@ -10,9 +10,19 @@
       "category": "Appetizers",
       "aliases": [
         "tots",
-        "gravel tots"
+        "gravel tots",
+        "gravel pit tot"
       ],
-      "modifiers": []
+      "modifiers": [
+        {
+          "id": "no_bacon",
+          "name": "No bacon",
+          "aliases": [
+            "without bacon",
+            "hold the bacon"
+          ]
+        }
+      ]
     },
     {
       "id": "steel_beams",
@@ -20,9 +30,20 @@
       "description": "Golden mozzarella sticks with marinara for dipping.",
       "category": "Appetizers",
       "aliases": [
-        "mozzarella sticks"
+        "mozzarella sticks",
+        "steel beam",
+        "mozz sticks"
       ],
-      "modifiers": []
+      "modifiers": [
+        {
+          "id": "no_marinara",
+          "name": "No marinara",
+          "aliases": [
+            "without marinara",
+            "hold the marinara"
+          ]
+        }
+      ]
     },
     {
       "id": "dynamite_poppers",
@@ -31,7 +52,8 @@
       "category": "Appetizers",
       "aliases": [
         "poppers",
-        "jalapeno poppers"
+        "jalapeno poppers",
+        "dynamite popper"
       ],
       "modifiers": []
     },
@@ -42,9 +64,35 @@
       "category": "Mains",
       "aliases": [
         "bulldozer",
-        "smash burger"
+        "smash burger",
+        "bulldozers",
+        "smash burgers"
       ],
-      "modifiers": []
+      "modifiers": [
+        {
+          "id": "no_pickles",
+          "name": "No pickles",
+          "aliases": [
+            "without pickles",
+            "hold the pickles"
+          ]
+        },
+        {
+          "id": "no_onions",
+          "name": "No onions",
+          "aliases": [
+            "without onions",
+            "hold the onions"
+          ]
+        },
+        {
+          "id": "sauce_side",
+          "name": "Sauce on side",
+          "aliases": [
+            "sauce on the side"
+          ]
+        }
+      ]
     },
     {
       "id": "the_backhoe",
@@ -53,9 +101,28 @@
       "category": "Mains",
       "aliases": [
         "backhoe",
-        "pulled pork"
+        "pulled pork",
+        "backhoes",
+        "pulled pork sandwich"
       ],
-      "modifiers": []
+      "modifiers": [
+        {
+          "id": "no_slaw",
+          "name": "No slaw",
+          "aliases": [
+            "without slaw",
+            "hold the slaw"
+          ]
+        },
+        {
+          "id": "no_pickles",
+          "name": "No pickles",
+          "aliases": [
+            "without pickles",
+            "hold the pickles"
+          ]
+        }
+      ]
     },
     {
       "id": "cement_mixer_mac",
@@ -64,7 +131,8 @@
       "category": "Mains",
       "aliases": [
         "mac and cheese",
-        "cement mixer"
+        "cement mixer",
+        "cement mixers"
       ],
       "modifiers": []
     },
@@ -74,7 +142,8 @@
       "description": "Chocolate pudding, Oreo soil, gummy worms, and a shovel spoon.",
       "category": "Desserts",
       "aliases": [
-        "dirt pudding"
+        "dirt pudding",
+        "dirt sites"
       ],
       "modifiers": []
     },
@@ -85,7 +154,10 @@
       "category": "Desserts",
       "aliases": [
         "brownie",
-        "wrecking ball"
+        "wrecking ball",
+        "wrecking balls",
+        "wrecking ball brownies",
+        "brownies"
       ],
       "modifiers": []
     }

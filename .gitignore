@@ -46,3 +46,4 @@ service-account*.json
 captures/
 recordings/
 tmp/
+.vercel/
