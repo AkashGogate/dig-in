@@ -55,10 +55,14 @@
   --r-xl:  20px;
   --r-pill:999px;
 
-  /* Shadows — restrained; surfaces separate by tone, not float */
-  --shadow-sm: 0 0 0 0.5px rgba(0,0,0,.04);
-  --shadow:    0 1px 2px rgba(0,0,0,.04), 0 0 0 0.5px rgba(0,0,0,.04);
-  --shadow-lg: 0 10px 40px rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.05);
+  /* Hairline border + recessed canvas — carry depth in both light and dark */
+  --hairline: rgba(0,0,0,.08);
+  --canvas:   #e9e9ee;
+
+  /* Shadows — soft elevation in light; dark leans on the hairline */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04);
+  --shadow:    0 2px 8px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
 }
 
 /* Large titles carry Apple's slight optical tightening */
@@ -80,6 +84,9 @@
 
     --sep:             rgba(84,84,88,.65);
     --sep-opaque:      #38383a;
+
+    --hairline:        rgba(255,255,255,.09);
+    --canvas:          #121214;
 
     --fill:            rgba(120,120,128,.36);
     --fill2:           rgba(120,120,128,.32);
@@ -192,6 +199,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .list-inset {
   margin: 0 16px 8px;
   background: var(--sys-grouped2);
+  border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
@@ -360,9 +368,9 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   min-height: 92px;
   position: relative;
   transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
-  border: 1px solid transparent;
+  border: 1px solid var(--hairline);
 }
-.item-card:hover  { background: var(--sys-bg); box-shadow: var(--shadow); }
+.item-card:hover  { background: var(--sys-grouped3); box-shadow: var(--shadow); border-color: var(--label4); }
 .item-card:active { transform: scale(.98); }
 .item-card.in-order { border-color: var(--blue); background: var(--blue-bg); }
 
