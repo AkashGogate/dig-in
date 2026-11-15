@@ -11,6 +11,7 @@ Minimal fresh-agent path: [AGENTS](../AGENTS.md) → [PROJECT_SPEC](../PROJECT_S
 | Teammate integration workflow | [INTEGRATION_GUIDE](INTEGRATION_GUIDE.md) |
 | Incoming UI source/contracts | [Frontend integration](../frontend/INTEGRATION.md), [UI handoff](handoffs/2026-11-14-ui-application-integration.md) |
 | Fly/Vercel auth, routing, image and release checks | [DEPLOYMENT](DEPLOYMENT.md), [signed-in release handoff](DEPLOYMENT_HANDOFF.md) |
+| Current live failures and signed-in-machine recovery order | [Deployment debug](handoffs/2026-11-14-deployment-debug.md) |
 | Read-only checks after main pushes and manual release verification | [LIVE_MONITORING](LIVE_MONITORING.md) |
 | Actual CV producer into shared Core | [CV integration](../cv-service/V2_INTEGRATION.md) |
 | PDF/photo extraction and correction | [MENU_EXTRACTION](MENU_EXTRACTION.md) |

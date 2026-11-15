@@ -7,11 +7,11 @@ No passwords or tokens should be sent through chat.
 
 ## Source and tools
 
-Review PR https://github.com/AkashGogate/dig-in/pull/1, branch
-codex/application-integration. Fetch latest branch and read STATUS and
-DEPLOYMENT; verify the exact tip CI instead of using an old result. Preserve
-main/teammate branches and any local edits. The local shared workspace is already
-on the integration branch; the reviewed execution clone is under /private/tmp.
+PRs #1, #2 and #3 are merged. Pull latest `main`, then read STATUS and DEPLOYMENT;
+do not deploy the older codex/application-integration branch alone. The local
+workspace was on main30af7c3 during this debug checkpoint. Preserve teammate
+branches and any local edits; verify the latest source and CI on the deploying
+machine. See [current debug and recovery steps](handoffs/2026-11-14-deployment-debug.md).
 The user's backend/.env is ignored and owner-readable, with DEEPGRAM_API_KEY and
 DEMO_AUTH_USER/PASS. Read values locally without printing/committing them.
 

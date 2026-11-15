@@ -1,6 +1,8 @@
 # Fly / Vercel application deployment
 
-Integration branch: `codex/application-integration`. User-supplied domains:
+Release source: merged `main` (includes the application, UI and monitor PRs).
+Do not deploy the older `codex/application-integration` branch by itself.
+User-supplied domains:
 [frontend](https://www.frictionless-kitchen.akashgogate.com) and
 [backend](https://api.frictionless-kitchen.akashgogate.com). Source configuration
 does not establish what is deployed. STATUS records observed results.
@@ -57,6 +59,11 @@ Production HTTP uses the rewrite. For cross-origin development set
 DIG_IN_CORS_ORIGINS to exact allowed origins; never publish a key in config.js.
 
 ## Release checks
+
+For the current diagnosed failures and the signed-in-machine recovery sequence,
+start with [deployment debug handoff](handoffs/2026-11-14-deployment-debug.md).
+GitHub Actions secrets configure monitoring only; they do not configure either
+Fly or Vercel. Production demo credentials must be set on both platforms too.
 
 1. Inspect Git/worktrees and handoffs. Integrate reviewed refs in isolation. Run
    locked backend/CV/kitchen suites, Node tests, hygiene and secret scanning.

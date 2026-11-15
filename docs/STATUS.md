@@ -4,6 +4,14 @@
 
 ## Final integration snapshot — 2026-11-14
 
+Deployment debug reconfirmed frontend503with exact missing-demo-configuration
+body and an older public Fly route set: no health/menu prepare/extract/CV-context/
+voice-ticket routes. Both local platform CLIs are logged out, with no Fly/Vercel
+deployment tokens available, so platform secrets/releases could not be repaired
+here. GitHub Actions login secrets configure only monitoring. Release instructions
+now point at merged main, replacing stale integration-branch guidance. See the
+[signed-in recovery handoff](handoffs/2026-11-14-deployment-debug.md).
+
 Post-push live monitoring is implemented in a separate follow-up: main-push/manual
 main Actions job, bounded read-only retries, explicit missing-credential failure
 and sanitized check summaries. **282 backend tests passed**, including37focused
