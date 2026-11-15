@@ -17,6 +17,12 @@ class CameraConfig(BaseModel):
     fps_target: int = 15
     resolution: tuple[int, int] = (1280, 720)
     loop: bool = False  # loop video files (useful for replay/demo)
+    # webcams only: capture in a child process that is restarted after a USB dropout
+    # (needed on macOS, where a running process never sees a re-plugged camera)
+    capture_process: bool = True
+    # webcams only: match the camera by (part of) its name, e.g. "Brio" or "MacBook". Device
+    # indices change when cameras are re-plugged; the name is resolved on every (re)connect.
+    name: str | None = None
 
 
 class SlotGrid(BaseModel):
@@ -105,6 +111,8 @@ class HealthConfig(BaseModel):
     degraded_light_shift: float = 0.25
     degraded_focus_drop: float = 0.40
     recovery_wait_s: float = 2.0
+    degraded_hold_s: float = 3.0   # ok <-> degraded only after the new state holds this long
+    baseline_tau_s: float = 120.0  # lighting/focus baseline drifts to the current scene over ~this long
     rebaseline_s: float = 5.0  # view "blocked" but perfectly still this long => the scene was rearranged; accept it
     warmup_s: float = 2.0  # ignore the first seconds of frames (auto-exposure settling)
     heartbeat_s: float = 5.0

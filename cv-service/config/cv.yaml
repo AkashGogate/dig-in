@@ -1,8 +1,9 @@
 # dig-in CV service config (calibrated 2026-11-14 from snapshots: whiteboard cabinet + desk bays).
 # Re-run `python -m cvsvc.calibrate --camera <id>` if a camera moves.
 cameras:
-  ingredient_cam: {source: 1, fps_target: 15, resolution: [1280, 720]}   # MacBook camera, straight on at the whiteboard "cabinet"
-  plating_cam:    {source: 0, fps_target: 15, resolution: [1280, 720]}   # Brio 105, bird's-eye over the desk bays
+  # `name` picks the camera by name on every (re)connect; `source` is only the fallback index
+  ingredient_cam: {name: MacBook, source: 1, fps_target: 15, resolution: [1280, 720]}   # straight on at the whiteboard "cabinet"
+  plating_cam:    {name: Brio, source: 0, fps_target: 15, resolution: [1280, 720]}      # bird's-eye over the bays
 
 ingredient:
   camera: ingredient_cam

@@ -44,6 +44,8 @@ class HealthMonitor:
         self.first_frame_ts: float | None = None
         self.prev: np.ndarray | None = None
         self.still_since: float | None = None
+        self._pending: tuple[str, float] | None = None
+        self._last_adapt: float | None = None
         self.big_change_since: float | None = None
         self.ref_lum: float | None = None
         self.ref_focus: float | None = None
@@ -126,11 +128,43 @@ class HealthMonitor:
             return self._set(ts, "obstructed", "view_blocked")
         if self.state == "obstructed" and self.reason == "view_blocked" and big:
             return None  # still blocked
+        self._adapt_baseline(ts, lum, focus)
         if self.ref_lum and abs(lum - self.ref_lum) / self.ref_lum > self.cfg.degraded_light_shift:
-            return self._set(ts, "degraded", "lighting_shift")
-        if self.ref_focus and focus < (1 - self.cfg.degraded_focus_drop) * self.ref_focus:
-            return self._set(ts, "degraded", "focus_drop")
-        return self._set(ts, "ok", None)
+            cand = ("degraded", "lighting_shift")
+        elif self.ref_focus and focus < (1 - self.cfg.degraded_focus_drop) * self.ref_focus:
+            cand = ("degraded", "focus_drop")
+        else:
+            cand = ("ok", None)
+        if self.state in ("obstructed", "lost"):
+            self._pending = None
+            return self._set(ts, *cand)  # recovery is immediate; the pipeline waits before reconciling
+        if cand[0] == self.state:
+            self._pending = None
+            if cand[1] != self.reason:
+                self._set(ts, *cand)  # same state, new reason: not a transition
+            return None
+        # ok <-> degraded: only after the new state has held for degraded_hold_s (no flicker)
+        if self._pending is None or self._pending[0] != cand[0]:
+            self._pending = (cand[0], ts)
+            return None
+        if ts - self._pending[1] < self.cfg.degraded_hold_s:
+            return None
+        self._pending = None
+        return self._set(ts, *cand)
+
+    def _adapt_baseline(self, ts: float, lum: float, focus: float) -> None:
+        """Let the reference brightness/sharpness drift slowly toward the current scene, so a
+        rearranged counter (plates vs none, a moved object) becomes the new normal instead of
+        reading as degraded forever. Sudden changes still trip the thresholds."""
+        if self._last_adapt is None:
+            self._last_adapt = ts
+            return
+        a = min(1.0, max(0.0, ts - self._last_adapt) / self.cfg.baseline_tau_s)
+        self._last_adapt = ts
+        if self.ref_lum is not None:
+            self.ref_lum += a * (lum - self.ref_lum)
+        if self.ref_focus is not None:
+            self.ref_focus += a * (focus - self.ref_focus)
 
     @property
     def frozen(self) -> bool:

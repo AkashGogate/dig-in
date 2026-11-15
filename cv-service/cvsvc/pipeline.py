@@ -25,7 +25,7 @@ from cvsvc.ingredient.zones import ZoneCounter
 from cvsvc.plating.bays import BayCounter, PlateCount
 from cvsvc.plating.circles import PlateFinder, assign_to_bays
 from cvsvc.plating.tracker import BayTracker
-from cvsvc.sources import FrameSource
+from cvsvc.sources import FrameSource, ProcessFrameSource, ReconnectingSource
 from cvsvc.vision import MotionDetector, PresenceDetector, mean_luminance
 
 log = logging.getLogger(__name__)
@@ -155,7 +155,22 @@ class CameraWorker:
 
     # ---- main loop ----
     def run(self) -> None:
-        src = FrameSource(self.ccfg.source, tuple(self.ccfg.resolution), self.ccfg.fps_target, self.ccfg.loop)
+        res = tuple(self.ccfg.resolution)
+        is_webcam = isinstance(self.ccfg.source, int) or str(self.ccfg.source).isdigit()
+        if is_webcam and self.ccfg.capture_process:
+            cam = int(self.ccfg.source)
+            name = self.ccfg.name
+            src = ReconnectingSource(lambda: ProcessFrameSource(cam, res, self.ccfg.fps_target, name))  # type: ignore[arg-type]
+        else:
+            def open_source() -> FrameSource:
+                return FrameSource(self.ccfg.source, res, self.ccfg.fps_target, self.ccfg.loop)  # type: ignore[arg-type]
+
+            first = open_source()
+            if first.finite:
+                src = first  # files and image folders: no reconnection
+            else:
+                handed = [first]  # reuse the already-open stream for the first "open"
+                src = ReconnectingSource(lambda: handed.pop() if handed else open_source())
         period = 1.0 / max(self.ccfg.fps_target, 1)
         last_hb = last_snap = 0.0
         fps_t, fps_n = time.time(), 0
@@ -174,11 +189,7 @@ class CameraWorker:
                     log.info("%s: source ended", self.id)
                     self.stop.wait(1.0)
                 else:
-                    self.stop.wait(0.5)
-                    if self.health.state == "lost":
-                        src.release()
-                        src = FrameSource(self.ccfg.source, tuple(self.ccfg.resolution), self.ccfg.fps_target,
-                                          self.ccfg.loop)
+                    self.stop.wait(0.1)  # ReconnectingSource handles reopen/backoff
             else:
                 if self.reference is None:
                     self._build(self._load_reference(frame))
