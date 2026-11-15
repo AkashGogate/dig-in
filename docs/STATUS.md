@@ -4,6 +4,21 @@
 
 ## Final integration snapshot — 2026-11-14
 
+Final pull follow-up integrates UI `21cc4a5` and `4d29098` through merges
+`ba4e510` and `d6255be`. Kitchen layered surfaces and ticket-grouped physical-zone
+panels preserve all configured zones, current assignment/review guards and
+unassigned/unknown status. Server depth/hairline tokens are retained; original
+upstream HTML is archived unloaded. **55 frontend tests passed** after both
+changes; Astra independently passed 25 operator cases and cleared the delta.
+Actual local browser verified Kitchen tickets/grouped zones plus Server ordering
+menu and My tables/targeted update. No console errors on the checked pages.
+The seeded ticket and eight-dish menu remain available. See
+[final pull audit](handoffs/2026-11-14-final-pull-audit.md).
+
+Fresh read-only production probe still shows backend health404, missing login
+challenge and frontend API proxy404. Hosted publication/verification remains
+assigned to the signed-in deployment owner, not completed by this branch.
+
 All currently requested/fetched workstreams are integrated: Menu/service9d3face,
 Voice9fcdd95, CV7133aaf and UI163d9e8. They are ancestors of the reviewed
 application code commit0c56900. PR: https://github.com/AkashGogate/dig-in/pull/1.

@@ -39,6 +39,14 @@ Recipients acknowledge then resolve using `{update_id,revision}` through `acknow
 
 ## UI state and future contributions
 
+The UI21cc4a5/4d29098 follow-up preserves upstream layered surfaces and shared
+depth tokens. Kitchen zone panels group exact current ticket IDs (including
+separate tickets at one table), followed by unassigned physical zones. They show
+every configured zone regardless of station filter. Ready styling/counts require
+matching current assignment and no review flag. The full incoming HTML sources
+are retained unloaded in `prototype-reference/`; canonical handlers remain in
+`operator-pages.js`.
+
 Local draft edits are unsaved UI proposals, not accepted restaurant state. Polls preserve dirty composer text and active controls. Staff-authored kitchen note/kind/open state is retained per ticket until accepted, explicitly discarded or session change. Unchanged polls advance elapsed labels without replacing controls; timers show elapsed/known typical time, never percentage cooked.
 
 Use the archive for visual/snippet reference only; all original source is retained byte-for-byte as `.txt`. Its simulated microphone/feed, fabricated staff, mock order mutation, undo and mock realtime generator must never be loaded into the integrated app. Root Git ancestry also preserves the original UI commit.
