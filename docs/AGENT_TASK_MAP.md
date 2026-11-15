@@ -20,11 +20,12 @@ never reset, overwrite or assume a clean checkpoint. Source, not prose, owns sha
 | Menu prepare, snapshot pinning, activation | mvp/domain.py | API/client/analytics; runtime + core tests |
 | Commands/state/operational schemas | mvp/contracts.py | Voice/CV/client; /api/v2/contracts; core tests |
 | API ingress/status/HTTP errors | mvp/api.py | all adapters; route tests + real HTTP smoke |
-| Voice transcription/parsing | mvp/voice.py; future speech adapters | Server/kitchen intents; menu_voice + core tests |
-| Camera observations | mvp/vision.py; device adapters | versioned Core commands; core tests |
+| Voice parsing/live relay | mvp/voice.py; voice_live.py; frontend/voice-audio.js | pinned drafts/tickets, PCM/budget/provider fakes; voice + core tests |
+| Actual CV ingress/heartbeat | mvp/cv_bridge.py; cv_api.py; cv-service/cvsvc/v2.py | owning schema, capture bindings, sampler + bridge tests |
 | Event identity/outcome/source time | analytics/events.py, domain emission | outbox/Databricks; analytics + core tests |
 | Cloud export/query/dashboard | analytics/, backend/app/analytics/ | canonical events only; analytics tests |
-| Run/configuration/CI | README, .env.example, Dockerfile, test.yml | locked tests + HTTP smoke |
+| Site access / deployment routing | app/demo_auth.py; frontend/middleware.ts; frontend/vercel.json; root Dockerfile/fly.toml | auth/composition tests; deployment smoke; docs/DEPLOYMENT |
+| Branch monitoring / CI | scripts/integration_watch.py; .github/workflows/test.yml | hash-only unchanged check; focused changed-ref integration |
 
 Paths in the table are relative to backend/app unless marked frontend/docs/root.
 Do not edit app/coordination or the old voice lab to implement v2 features. Those

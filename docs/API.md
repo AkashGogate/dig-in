@@ -94,3 +94,26 @@ update never changes cooking, zones or pickup state. Summary reads emit no event
 Summary/handling routing is role/session scoped, while existing global demo state
 and command response snapshots are not a confidentiality boundary. See
 [SERVICE_COORDINATION](SERVICE_COORDINATION.md) for both journeys and audio limits.
+
+
+## Application composition additions
+
+Full-server HTTP uses demo Basic authentication outside explicit local mode,
+including data, commands, contracts and adapter routes. `/healthz` is the sole
+minimal public health route. See DEPLOYMENT for matching Fly/Vercel secret config.
+Demo actor/device sessions remain required for commands and role-scoped summaries;
+shared snapshots are not a private per-role confidentiality boundary.
+
+Voice: `/api/v2/voice/ticket` requires authenticated demo session plus optional
+`{order_id,menu_revision}` (server) or `{menu_revision}` (kitchen). Ticket pins the
+server-held menu, expires, is single-use and requires matching WS session_id.
+`/api/v2/voice/stream` consumes paced mono PCM16 at16kHz; status/usage expose mode
+and bounded in-memory estimates. Provider errors leave text/manual fallback.
+
+CV: `/api/v2/cv/context` and `/api/v2/cv/observations` require cook/lead session
+inside the HTTP gate. Producer schema remains cv-service/cvsvc/events.py and
+schema/events.schema.json. Envelope `{event,run_id,simulated,binding?,evidence?}`
+requires capture-time unit/version correlation and measured stable/no-hand evidence
+for operational occupancy. Ingredient/legacy unbound evidence requires review,
+never recipe deduction. See cv-service/V2_INTEGRATION.md and executable models in
+cv_bridge.py for exact shapes/freshness/confidence/retry/recovery semantics.

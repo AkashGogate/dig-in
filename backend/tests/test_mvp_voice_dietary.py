@@ -285,3 +285,50 @@ def test_attaching_unattached_note_clears_opt_in_question(demo, gated):
     assert "dietary_check_required" not in codes(demo, key)
     assert draft(demo, key)["dietary_check"] == "requests_recorded"
     assert confirm(demo, key).status_code == 200
+
+
+@pytest.mark.parametrize("require_check", [False, True])
+def test_removing_unreviewed_dietary_dish_preserves_attachable_note(
+    demo, monkeypatch, require_check
+):
+    monkeypatch.setenv("DIG_IN_REQUIRE_DIETARY_CHECK", "1" if require_check else "0")
+    key = start(demo)
+    capture(demo, key, "Table 1: one salmon allergy to nuts and one risotto")
+    order = draft(demo, key)
+    remaining = order["lines"][1]
+    core.ok(
+        demo,
+        {
+            "action": "edit_draft",
+            "order_id": key,
+            "revision": order["revision"],
+            "table_id": "1",
+            "lines": [
+                {
+                    "id": remaining["id"],
+                    "menu_id": remaining["menu_id"],
+                    "quantity": remaining["quantity"],
+                }
+            ],
+        },
+    )
+    order = draft(demo, key)
+    flag = next(f for f in order["flags"] if f["code"] == "dietary_unattached")
+    assert flag["line_id"] is None and flag["request_text"] == "allergy to nuts"
+    assert confirm(demo, key).status_code == 409
+    response = core.send(
+        demo,
+        {
+            "action": "resolve_flag",
+            "order_id": key,
+            "revision": order["revision"],
+            "flag_id": flag["id"],
+            "resolution": "reviewed_keep_note",
+            "line_id": remaining["id"],
+        },
+    )
+    assert response.status_code == 200
+    assert draft(demo, key)["lines"][0]["requests"] == "allergy to nuts"
+    assert "dietary_check_required" not in codes(demo, key)
+    assert confirm(demo, key).status_code == 200
+    assert submitted_payload(demo, key)["dishes"][0]["requests"] == "allergy to nuts"

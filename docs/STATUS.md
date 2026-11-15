@@ -2,6 +2,57 @@
 
 [PROJECT_SPEC](../PROJECT_SPEC.md) owns intended behavior; this file owns execution evidence. [Normalized brief](MVP_TEAM_BRIEF.md) is portable team context. The Menu workstream **also owns Core/backend and integration**; personal names remain unassigned. STATUS is not a concurrency lock.
 
+## Current application integration — 2026-11-14
+
+The newest source is `codex/application-integration`, combining menu/service
+9d3face, Voice9af39dc and CV3b0d0a1 with real merge ancestry. Older sections below
+are historical local checkpoints, not the current deployment/access claim.
+
+- **207 canonical backend tests, 47 CV tests and 44 standalone kitchen tests
+  passed** in separate locked Python3.11 environments. **29 Node22 cases passed**,
+  including actual Vercel middleware entrypoint, host configuration and PCM helpers.
+  Ruff lint/format passed across54 scoped Python files. The inherited18-clip MOCK
+  evaluator passed18/18 in the Voice lane; it supplies ground truth, not live STT.
+- Full ASGI composition covers auth, runtime menu encoding/activation, old pinned
+  drafts, voice review, actual CV event schema/bridge, targeted role updates,
+  read-only summaries and pickup. Legacy binary paid audio is disabled. One
+  Starlette/httpx deprecation warning remains in the Python app/legacy suites.
+- Actual incoming CV modules are retained, with a strict opt-in canonical worker,
+  capture-time assignment/version binding, continuous monotonic stability,
+  confidence/real hand/calibration gates, heartbeat loss, recovery quarantine and
+  individual frozen retries. Synthetic pixel/replay/mock-producer tests passed;
+  no private frames, live camera, model download or physical rig were tested.
+  Two real incoming calibration PNGs are removed from the integration tip and
+  ignored locally; original branch history is preserved.
+- Full-server local HTTP MVP smoke passed. In-app browser passed table-first
+  simulated voice→editable quantity2 draft→human Confirm and send→Kitchen heard
+  acknowledgment→two zones→one deliberate start→stable simulated first plate→
+  requested Kitchen summary showing1of2 ready. No premature all-ready notification.
+  This is a desktop local browser check, not a physical mic/phone/noisy-room test.
+- Full HTTP demo Basic gate fails closed for partial/Fly config; Vercel static
+  gate/proxy and direct session-ticketed voice endpoint are implemented. Public
+  health is minimal; Docker/Fly configuration moved to root to package the exact
+  CV schema owner. One machine/worker and memory-only limits remain mandatory.
+  CI now includes all three suites, middleware tests and root container build/import.
+- Live read-only check of the supplied domains found backend `/api/v2/state`200
+  without login, backend `/healthz`404, frontend `/`200 without login and frontend
+  `/api/v2/state`404. Those deployments still need the reviewed source/configuration
+  and matching secret values. No actual hosted authentication/proxy/WS/upload
+  success, container build or paid provider call is claimed by this local result.
+- Local hourly branch heartbeat created: `watch-dig-in-integration-branches`. It
+  compares remote hashes and stops when unchanged; changed refs are reviewed in
+  isolation, preserving active work/main. No automated deployment or paid calls.
+  The local app/machine must be available for scheduled runs; this is not a cloud
+  availability monitor or a guarantee of zero integration conflicts.
+
+See [DEPLOYMENT](DEPLOYMENT.md), [CV integration](../cv-service/V2_INTEGRATION.md)
+and the [integration handoff](handoffs/2026-11-14-application-integration.md).
+Teammate changes can be integrated effectively at these documented seams; arbitrary
+snippets still need contract review and tests. Secrets belong in ignored `.env`
+or platform stores, never chat/Markdown. Source checks and hosted readiness differ.
+
+## Historical scaffold checkpoints
+
 | Capability | Status / practical limit |
 | --- | --- |
 | FastAPI/Python/uv/static stack | Implemented, retained; no new platform/framework |

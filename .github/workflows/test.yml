@@ -2,9 +2,9 @@ name: scaffold checks
 
 on:
   push:
-    paths: ["backend/**", "frontend/**", ".github/workflows/test.yml"]
+    paths: ["backend/**", "frontend/**", "cv-service/**", "kitchen-backend/**", "schema/**", "Dockerfile", "fly.toml", ".github/workflows/test.yml"]
   pull_request:
-    paths: ["backend/**", "frontend/**", ".github/workflows/test.yml"]
+    paths: ["backend/**", "frontend/**", "cv-service/**", "kitchen-backend/**", "schema/**", "Dockerfile", "fly.toml", ".github/workflows/test.yml"]
 
 jobs:
   check:
@@ -18,12 +18,32 @@ jobs:
         with:
           version: "0.13.8"
       - run: uv sync --locked --python 3.11
-      - run: uv run ruff check app/coordination app/mvp app/analytics scripts tests/test_coordination.py tests/test_mvp*.py
-      - run: uv run ruff format --check app/coordination app/mvp app/analytics scripts tests/test_coordination.py tests/test_mvp*.py
+      - run: uv run ruff check app/coordination app/mvp app/analytics app/demo_auth.py app/server.py scripts tests/test_coordination.py tests/test_mvp*.py tests/test_deployment_auth.py tests/test_application_integration.py
+      - run: uv run ruff format --check app/coordination app/mvp app/analytics app/demo_auth.py app/server.py scripts tests/test_coordination.py tests/test_mvp*.py tests/test_deployment_auth.py tests/test_application_integration.py
       - run: uv run python -m scripts.check_repository_hygiene
       - run: uv run pytest -q
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node --check ../frontend/app.js && node --check ../frontend/service-coordination.js && node --check ../frontend/menu-document.js && node --check ../frontend/menu-setup.js && node --check ../frontend/coordination-v1.js && node --check ../frontend/config.js
-      - run: node --test ../frontend/tests/menu-setup.test.cjs ../frontend/tests/service-coordination.test.cjs
+      - run: node --check ../frontend/voice-audio.js && node --check ../frontend/app.js && node --check ../frontend/service-coordination.js && node --check ../frontend/menu-document.js && node --check ../frontend/menu-setup.js && node --check ../frontend/coordination-v1.js && node --check ../frontend/config.js
+      - run: npm ci --ignore-scripts --prefix ../frontend
+      - run: node --test ../frontend/tests/*.test.cjs ../frontend/tests/*.test.mjs
+      - run: docker build --tag dig-in-ci ..
+      - name: Verify container imports the canonical app and CV contract
+        run: docker run --rm --entrypoint .venv/bin/python dig-in-ci -c "from app.server import app; assert any(r.path == '/api/v2/cv/observations' for r in app.routes)"
+
+  cv-regressions:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        directory: [cv-service, kitchen-backend]
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.8"
+      - run: uv sync --locked --python 3.11
+      - run: uv run pytest -q

@@ -18,8 +18,11 @@
 ## Map and checks
 
 - `backend/app/mvp/`: v2 contracts/domain/fixtures/API, canonical menu and deterministic voice. `menu.py` owns menu shape; `contracts.py` owns operational shapes.
+- `backend/app/mvp/cv_api.py`, `cv_bridge.py`, `cv-service/cvsvc/v2.py`: actual producer ingress and sampled, versioned evidence; read `cv-service/V2_INTEGRATION.md`. Standalone `kitchen-backend/` is isolated legacy, never a second app writer.
 - `backend/app/analytics/events.py`: canonical event source. Outbox/adapters/analyzer plus `analytics/` SQL and simulated fixtures support Databricks work without cloud credentials.
 - `frontend/index.html`, `app.js`, `mvp.css`: two-screen MVP; read `frontend/AGENTS.md`. `coordination-v1.html` and `/api/v1` preserve the broader scaffold; `legacy.html` preserves the older voice lab. These have separate state.
 - `backend/tests/`, `backend/fixtures/`, `docs/`: meaningful regressions, portable examples, current decisions/workflow/status/handoffs. `/api/v2/contracts` and `/openapi.json` expose executable contracts.
 
 Use [README](README.md) for setup/run, [TESTING](docs/TESTING.md) for checks, and STATUS for actual evidence. Default is a one-worker in-memory mock demo, not durable auth/cloud/CV/hardware. Update affected status/contracts and your handoff after changes. Do not push, publish or enable billable/live integrations without authorization.
+
+Deployment composition lives in root Dockerfile/fly.toml and frontend/vercel.json/middleware.ts. Read docs/DEPLOYMENT.md for demo auth, shared HTTP proxy, direct ticketed WS, secrets and actual release gates. Branch watcher compares hashes only when unchanged; see docs/INTEGRATION_GUIDE.md.

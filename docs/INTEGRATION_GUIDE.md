@@ -45,9 +45,26 @@ background retries. Existing manual taps remain available in all these cases.
 
 Separate clones do not share in-memory orders. Phones, kitchen, speech and CV
 must target one reachable backend with one worker. Backend restart loses demo
-state/candidates/pending outbox. Auth, persistence and distributed execution remain
-separate architectural work, not an adapter toggle. No automatic Git sync or
-remote publication is provided by Markdown documentation.
+state/candidates/pending outbox. Demo Basic access now wraps the app; durable
+identity, persistence and distributed execution remain separate work. Markdown
+does not synchronize code. DEPLOYMENT describes the concrete Fly/Vercel wiring.
+
+## Standing branch integration
+
+`codex/application-integration` combines the reviewed Menu/service, Voice and CV
+refs. Future UI/analytics branches enter through this same contract review path.
+`backend/scripts/integration_watch.py` makes one remote-head request and compares
+ignored outputs/integration-watch.json. Unchanged heads require no tests/builds
+or paid API calls. Missing cache establishes a baseline, not integration proof.
+Use --record only after triage. The app's hourly heartbeat is a local scheduled
+check, not a continuously running cloud daemon; it needs this machine available.
+
+Changed refs trigger scoped inspection in an isolated clone/worktree. Respect any
+active integrator; do not race a pending merge. Preserve commit ancestry, validate
+shared contracts and both journeys, run relevant suites then required checks,
+and commit/push only the reviewed integration branch within authorization. Never
+reset/force-push/main-overwrite. Monitoring does not automatically deploy or run
+billable models. Record exact base/tip/test evidence in a unique handoff.
 
 ## Preserving both user journeys
 

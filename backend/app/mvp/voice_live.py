@@ -84,7 +84,7 @@ def listen_url(menu: MenuDocument) -> str:
         ("smart_format", "true"),
         ("interim_results", "true"),
         ("mip_opt_out", "true"),
-        ("redact_usage", "true"),  # opt out of Deepgram's model-improvement retention
+        ("redact_usage", "true"),  # redact keyterm text in provider usage metadata
         *(("keyterm", term) for term in keyterms(menu)),
     ]
     return f"{DEEPGRAM_LISTEN}?{urlencode(params)}"

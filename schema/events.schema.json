@@ -1,0 +1,1312 @@
+{
+  "$defs": {
+    "Attribution": {
+      "additionalProperties": false,
+      "properties": {
+        "ticket_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ticket Id"
+        },
+        "method": {
+          "default": "none",
+          "enum": [
+            "active_ticket_context",
+            "bay_assignment",
+            "none"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "ambiguous": {
+          "default": false,
+          "title": "Ambiguous",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ticket_id",
+        "method",
+        "ambiguous"
+      ],
+      "title": "Attribution",
+      "type": "object"
+    },
+    "BayState": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "BAY_STATE",
+          "default": "BAY_STATE",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/BayStatePayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "BayState",
+      "type": "object"
+    },
+    "BayStatePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "plate_count": {
+          "title": "Plate Count",
+          "type": "integer"
+        },
+        "occupied": {
+          "title": "Occupied",
+          "type": "boolean"
+        },
+        "assigned_ticket_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Assigned Ticket Id"
+        },
+        "assigned_table": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Assigned Table"
+        },
+        "assigned_course": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Assigned Course"
+        },
+        "expected_plates": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Plates"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "plate_count",
+        "occupied",
+        "assigned_ticket_id",
+        "assigned_table",
+        "assigned_course",
+        "expected_plates",
+        "note"
+      ],
+      "title": "BayStatePayload",
+      "type": "object"
+    },
+    "CameraStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "CAMERA_STATUS",
+          "default": "CAMERA_STATUS",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/CameraStatusPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "CameraStatus",
+      "type": "object"
+    },
+    "CameraStatusPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "ok",
+            "degraded",
+            "obstructed",
+            "lost"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "since": {
+          "title": "Since",
+          "type": "string"
+        },
+        "heartbeat": {
+          "default": false,
+          "title": "Heartbeat",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "state",
+        "reason",
+        "since",
+        "heartbeat"
+      ],
+      "title": "CameraStatusPayload",
+      "type": "object"
+    },
+    "IngredientChangePending": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "const": "pending_review",
+          "default": "pending_review",
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "INGREDIENT_CHANGE_PENDING",
+          "default": "INGREDIENT_CHANGE_PENDING",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/IngredientChangePendingPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "IngredientChangePending",
+      "type": "object"
+    },
+    "IngredientChangePendingPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "ingredient": {
+          "title": "Ingredient",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "unstable_count",
+            "occlusion_timeout",
+            "unexpected_increase",
+            "large_delta",
+            "post_obstruction_mismatch"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "count_before": {
+          "title": "Count Before",
+          "type": "integer"
+        },
+        "count_after_estimate": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Count After Estimate"
+        }
+      },
+      "required": [
+        "ingredient",
+        "reason",
+        "count_before",
+        "count_after_estimate"
+      ],
+      "title": "IngredientChangePendingPayload",
+      "type": "object"
+    },
+    "IngredientPicked": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "INGREDIENT_PICKED",
+          "default": "INGREDIENT_PICKED",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/IngredientPickedPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "IngredientPicked",
+      "type": "object"
+    },
+    "IngredientPickedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "ingredient": {
+          "title": "Ingredient",
+          "type": "string"
+        },
+        "qty_delta": {
+          "exclusiveMaximum": 0,
+          "title": "Qty Delta",
+          "type": "integer"
+        },
+        "count_before": {
+          "title": "Count Before",
+          "type": "integer"
+        },
+        "count_after": {
+          "title": "Count After",
+          "type": "integer"
+        },
+        "unit": {
+          "const": "portion",
+          "default": "portion",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ingredient",
+        "qty_delta",
+        "count_before",
+        "count_after",
+        "unit"
+      ],
+      "title": "IngredientPickedPayload",
+      "type": "object"
+    },
+    "IngredientReturned": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "INGREDIENT_RETURNED",
+          "default": "INGREDIENT_RETURNED",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/IngredientReturnedPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "IngredientReturned",
+      "type": "object"
+    },
+    "IngredientReturnedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "ingredient": {
+          "title": "Ingredient",
+          "type": "string"
+        },
+        "qty_delta": {
+          "exclusiveMinimum": 0,
+          "title": "Qty Delta",
+          "type": "integer"
+        },
+        "count_before": {
+          "title": "Count Before",
+          "type": "integer"
+        },
+        "count_after": {
+          "title": "Count After",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ingredient",
+        "qty_delta",
+        "count_before",
+        "count_after"
+      ],
+      "title": "IngredientReturnedPayload",
+      "type": "object"
+    },
+    "IngredientTrip": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "INGREDIENT_TRIP",
+          "default": "INGREDIENT_TRIP",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/IngredientTripPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "IngredientTrip",
+      "type": "object"
+    },
+    "IngredientTripPayload": {
+      "additionalProperties": false,
+      "description": "A hand reached into the zone and left (trip mode). CV does not count portions;\nthe backend subtracts the recipe quantity per trip.",
+      "properties": {
+        "ingredient": {
+          "title": "Ingredient",
+          "type": "string"
+        },
+        "duration_s": {
+          "title": "Duration S",
+          "type": "number"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "multi_zone",
+                "long_occlusion"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "ingredient",
+        "duration_s",
+        "reason"
+      ],
+      "title": "IngredientTripPayload",
+      "type": "object"
+    },
+    "PlateArrived": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "PLATE_ARRIVED",
+          "default": "PLATE_ARRIVED",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PlateArrivedPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "PlateArrived",
+      "type": "object"
+    },
+    "PlateArrivedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "count_before": {
+          "title": "Count Before",
+          "type": "integer"
+        },
+        "count_after": {
+          "title": "Count After",
+          "type": "integer"
+        },
+        "delta": {
+          "exclusiveMinimum": 0,
+          "title": "Delta",
+          "type": "integer"
+        },
+        "expected_plates": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected Plates"
+        },
+        "count_matches_expected": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Count Matches Expected"
+        }
+      },
+      "required": [
+        "count_before",
+        "count_after",
+        "delta",
+        "expected_plates",
+        "count_matches_expected"
+      ],
+      "title": "PlateArrivedPayload",
+      "type": "object"
+    },
+    "PlateRemoved": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "PLATE_REMOVED",
+          "default": "PLATE_REMOVED",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PlateRemovedPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "PlateRemoved",
+      "type": "object"
+    },
+    "PlateRemovedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "count_before": {
+          "title": "Count Before",
+          "type": "integer"
+        },
+        "count_after": {
+          "title": "Count After",
+          "type": "integer"
+        },
+        "delta": {
+          "exclusiveMinimum": 0,
+          "title": "Delta",
+          "type": "integer"
+        },
+        "bay_now_empty": {
+          "title": "Bay Now Empty",
+          "type": "boolean"
+        },
+        "claimed_task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Claimed Task Id"
+        },
+        "claimed_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Claimed By"
+        },
+        "unclaimed": {
+          "title": "Unclaimed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "count_before",
+        "count_after",
+        "delta",
+        "bay_now_empty",
+        "claimed_task_id",
+        "claimed_by",
+        "unclaimed"
+      ],
+      "title": "PlateRemovedPayload",
+      "type": "object"
+    },
+    "ZoneSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "cv.ingredient",
+            "cv.plating"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "camera_id": {
+          "title": "Camera Id",
+          "type": "string"
+        },
+        "observed_at": {
+          "title": "Observed At",
+          "type": "string"
+        },
+        "zone_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zone Id"
+        },
+        "bay_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bay Id"
+        },
+        "confidence": {
+          "default": 1.0,
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "status": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "pending_review"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "attribution": {
+          "$ref": "#/$defs/Attribution"
+        },
+        "type": {
+          "const": "ZONE_SNAPSHOT",
+          "default": "ZONE_SNAPSHOT",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ZoneSnapshotPayload"
+        }
+      },
+      "required": [
+        "event_id",
+        "source",
+        "camera_id",
+        "observed_at",
+        "zone_id",
+        "bay_id",
+        "confidence",
+        "status",
+        "attribution",
+        "type",
+        "payload"
+      ],
+      "title": "ZoneSnapshot",
+      "type": "object"
+    },
+    "ZoneSnapshotPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "ingredient": {
+          "title": "Ingredient",
+          "type": "string"
+        },
+        "count": {
+          "title": "Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ingredient",
+        "count"
+      ],
+      "title": "ZoneSnapshotPayload",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "BAY_STATE": "#/$defs/BayState",
+      "CAMERA_STATUS": "#/$defs/CameraStatus",
+      "INGREDIENT_CHANGE_PENDING": "#/$defs/IngredientChangePending",
+      "INGREDIENT_PICKED": "#/$defs/IngredientPicked",
+      "INGREDIENT_RETURNED": "#/$defs/IngredientReturned",
+      "INGREDIENT_TRIP": "#/$defs/IngredientTrip",
+      "PLATE_ARRIVED": "#/$defs/PlateArrived",
+      "PLATE_REMOVED": "#/$defs/PlateRemoved",
+      "ZONE_SNAPSHOT": "#/$defs/ZoneSnapshot"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/IngredientPicked"
+    },
+    {
+      "$ref": "#/$defs/IngredientReturned"
+    },
+    {
+      "$ref": "#/$defs/IngredientChangePending"
+    },
+    {
+      "$ref": "#/$defs/IngredientTrip"
+    },
+    {
+      "$ref": "#/$defs/ZoneSnapshot"
+    },
+    {
+      "$ref": "#/$defs/PlateArrived"
+    },
+    {
+      "$ref": "#/$defs/PlateRemoved"
+    },
+    {
+      "$ref": "#/$defs/BayState"
+    },
+    {
+      "$ref": "#/$defs/CameraStatus"
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dig-in CV event",
+  "description": "CV -> backend observation event. Generated from cv-service/cvsvc/events.py; do not edit by hand."
+}

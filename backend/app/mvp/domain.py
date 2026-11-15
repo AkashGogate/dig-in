@@ -348,10 +348,24 @@ class Restaurant:
                 ),
                 "Seat is not at this table",
             )
+            previous_lines = {line.id: line for line in order.lines}
             order.table_id, order.lines = (
                 p.table_id,
                 [self._line(x, s.menus[order.menu_revision]) for x in p.lines],
             )
+            surviving_ids = {line.id for line in order.lines}
+            for flag in order.flags:
+                if flag.code == "dietary_review" and flag.line_id not in surviving_ids:
+                    # Deleting a dish must neither erase its unreviewed dietary
+                    # note nor leave an impossible review target. Reuse the
+                    # explicit attach-to-saved-line correction path instead.
+                    previous = previous_lines.get(flag.line_id)
+                    flag.request_text = flag.request_text or (
+                        previous.requests if previous else None
+                    )
+                    flag.code = "dietary_unattached"
+                    flag.line_id = None
+                    flag.message = f'Dietary note from a removed dish: "{flag.request_text or "unknown"}". Select the correct saved dish and attach the note before sending.'
             has_requests = any(x.requests.strip() for x in order.lines)
             if has_requests:
                 order.dietary_check = "requests_recorded"

@@ -1,0 +1,28 @@
+# Synthetic six-zone geometry matching v2 A-F. Mock mode opens no cameras.
+# Before --camera, calibrate ALL six physical zones and capture empty references.
+cameras:
+  plating_cam:
+    source: 1
+    resolution: [1280, 720]
+    fps_target: 15
+ingredient:
+  camera: ingredient_cam
+  mode: slots
+  zones: []
+plating:
+  camera: plating_cam
+  debounce_s: 1.5
+  max_plates_per_bay: 4  # preserve overflow evidence; Core still permits only one
+  bays:
+    - id: A
+      polygon: [[20,20],[410,20],[410,340],[20,340]]
+    - id: B
+      polygon: [[445,20],[835,20],[835,340],[445,340]]
+    - id: C
+      polygon: [[870,20],[1260,20],[1260,340],[870,340]]
+    - id: D
+      polygon: [[20,380],[410,380],[410,700],[20,700]]
+    - id: E
+      polygon: [[445,380],[835,380],[835,700],[445,700]]
+    - id: F
+      polygon: [[870,380],[1260,380],[1260,700],[870,700]]

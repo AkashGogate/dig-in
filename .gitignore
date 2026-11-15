@@ -47,3 +47,7 @@ captures/
 recordings/
 tmp/
 .vercel/
+/specs
+cv-service/logs/
+kitchen-backend/data/
+cv-service/models/

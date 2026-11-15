@@ -1,0 +1,44 @@
+# dig-in CV service config (calibrated 2026-11-14 from snapshots: whiteboard cabinet + desk bays).
+# Re-run `python -m cvsvc.calibrate --camera <id>` if a camera moves.
+cameras:
+  ingredient_cam: {source: 1, fps_target: 15, resolution: [1280, 720]}   # MacBook camera, straight on at the whiteboard "cabinet"
+  plating_cam:    {source: 0, fps_target: 15, resolution: [1280, 720]}   # Brio 105, bird's-eye over the desk bays
+
+ingredient:
+  camera: ingredient_cam
+  mode: trips                # trips: report reaches into a zone, backend owns counts | slots: count portions
+  trip_detector: hands       # hands: a hand must dwell in the box (MediaPipe) | motion: any motion in the box
+  hand_model_path: models/hand_landmarker.task
+  hand_dwell_s: 0.35
+  min_trip_s: 0.25
+  trip_settle_s: 0.6
+  occlusion_timeout_s: 6.0
+  active_ticket_ttl_s: 600   # 10 min for the demo
+  motion_min_area_px: 800
+  zones:                     # the 7 boxes drawn on the whiteboard
+    - {id: Z1, ingredient: bun,     polygon: [[330, 297], [474, 297], [474, 343], [330, 343]]}
+    - {id: Z2, ingredient: lettuce, polygon: [[495, 292], [656, 292], [656, 339], [495, 339]]}
+    - {id: Z3, ingredient: tomato,  polygon: [[695, 295], [823, 295], [823, 341], [695, 341]]}
+    - {id: Z4, ingredient: patty,   polygon: [[306, 373], [640, 373], [628, 555], [300, 548]]}
+    - {id: Z5, ingredient: cheese,  polygon: [[697, 382], [825, 382], [825, 440], [697, 440]]}
+    - {id: Z6, ingredient: onion,   polygon: [[700, 484], [824, 484], [824, 552], [700, 552]]}
+    - {id: Z7, ingredient: sauce,   polygon: [[290, 586], [805, 592], [805, 662], [288, 642]]}
+
+plating:
+  camera: plating_cam
+  debounce_s: 0.8
+  snapshot_interval_s: 10
+  max_plates_per_bay: 4
+  # detector: white = bright, low-saturation blobs (white paper plates on the wood desk)
+  bays:                      # three equal 400 x 675 rectangles, 40 px gaps (bottom edge clears the dongle)
+    - {id: A, polygon: [[0, 5], [400, 5], [400, 680], [0, 680]], min_plate_area_px: 8000, max_plate_area_px: 200000, detector: white}
+    - {id: B, polygon: [[440, 5], [840, 5], [840, 680], [440, 680]], min_plate_area_px: 8000, max_plate_area_px: 200000, detector: white}
+    - {id: C, polygon: [[880, 5], [1280, 5], [1280, 680], [880, 680]], min_plate_area_px: 8000, max_plate_area_px: 200000, detector: white}
+
+sinks:
+  stdout: false
+  backend_url: null          # e.g. http://localhost:8002/cv/events (or set BACKEND_URL / --backend-url)
+  outbox_path: logs/outbox.jsonl
+
+events_log_path: logs/events.jsonl
+calibration_dir: config/calibration

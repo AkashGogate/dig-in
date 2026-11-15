@@ -22,7 +22,7 @@ uv run python -m app.analytics.analyze fixtures/analytics/ten_scripted_orders.js
 uv run python -m app.analytics.export fixtures/analytics/ten_scripted_orders.jsonl --simulate-failures 1 --attempts 3
 ```
 
-No paid keys are required. CI runs the locked tests/scoped Python checks plus Node syntax checks; locally a Node VM/tool runtime may supply syntax validation if shell Node is unavailable. The dependency-free frontend suite runs with `node --test frontend/tests/*.test.cjs` from the repository root and is included in CI. No separate static typechecker or frontend build is configured; runtime Pydantic schemas validate inputs/outputs. Full server startup/HTTP smoke complements route-isolated TestClient checks.
+No paid keys are required. CI runs the locked tests/scoped Python checks plus Node syntax checks; locally a Node VM/tool runtime may supply syntax validation if shell Node is unavailable. The dependency-free frontend suite runs with `npm ci --ignore-scripts --prefix frontend` then `node --test frontend/tests/*.test.cjs frontend/tests/*.test.mjs` from the repository root and is included in CI. No separate static typechecker or frontend build is configured; runtime Pydantic schemas validate inputs/outputs. Full server startup/HTTP smoke complements route-isolated TestClient checks.
 
 ## Meaningful invariants
 
@@ -54,7 +54,7 @@ Fakes do not verify audible output, earpiece routing or physical printers.
 
 Exercise the default service screens and secondary Menu setup against one shared backend with multiple actor sessions, long/empty/error/unknown states, explicit flag resolution, capacity, status and tap recovery. Verify phone reflow, keyboard/focus, labels,200%zoom and screen reader as available; record precise coverage rather than claiming broad accessibility. STATUS records the current Chrome path and explicitly untested checks.
 
-Real STT requires deliberate capture/privacy review and noisy-room tests. The live Deepgram path (`backend/app/mvp/voice_live.py`) is unit-tested with a fake Deepgram (`tests/test_mvp_voice_live.py`, no key/cost); live runs are billable and need explicit approval per run, and so far cover synthetic `say` clips only; real CV requires calibrated overhead zones, stable interval/no-hand evidence, blocked/offline/returned plate scenarios and actual hardware timing. Cloud connector/SQL/dashboard work requires official capability verification and live workspace credentials. Synthetic fixture timings are not restaurant or staff benchmarks.
+Real STT requires deliberate capture/privacy review and noisy-room tests. The live Deepgram path (`backend/app/mvp/voice_live.py`) is unit-tested with a fake Deepgram (`tests/test_mvp_voice_live.py`, no key/cost); live runs are billable, require configured provider access and deliberate authorization, and the inherited scorecard covers synthetic `say` clips only; real CV requires calibrated overhead zones, stable interval/no-hand evidence, blocked/offline/returned plate scenarios and actual hardware timing. Cloud connector/SQL/dashboard work requires official capability verification and live workspace credentials. Synthetic fixture timings are not restaurant or staff benchmarks.
 
 ## Preserved regressions
 
@@ -78,4 +78,29 @@ uv run python -m eval.run_dig_in_eval --mode mock     # free: ground-truth text 
 uv run python -m eval.run_dig_in_eval --mode deepgram # BILLABLE: prints seconds/cost and refuses without --confirm-billable
 ```
 
-Live scoring uses the same nova-3/keyterm/`mip_opt_out` params as the live adapter. Run it only with explicit approval for that run, then add `--confirm-billable` (needs `DEEPGRAM_API_KEY`). The scorecard (`audio-samples/dig-in/scorecard.md`) states its mode; synthetic TTS is not a real kitchen.
+Live scoring uses the same nova-3/keyterm/`mip_opt_out` params as the live adapter. Run it only within explicit live-testing authorization, then add `--confirm-billable` (needs `DEEPGRAM_API_KEY`). The scorecard (`audio-samples/dig-in/scorecard.md`) states its mode; synthetic TTS is not a real kitchen.
+
+
+## Combined application and deployment checks
+
+Use separate locked environments; running pytest from the repository root mixes
+three different applications and import paths. From each of backend/, cv-service/
+and kitchen-backend/: `uv sync --locked --python 3.11`, then `uv run pytest -q`.
+The independent kitchen suite is legacy regression coverage, not active app state.
+Backend composition tests exercise the real app routers/middleware/lifespan,
+menu activation and old drafts, voice review, producer schema, recipient summaries
+and legacy paid-audio refusal. CV tests include actual synthetic pixel counting,
+replay and producer mock→canonical Core integration; no private frames/models/rig.
+
+Frontend requires Node22 and its pinned middleware dependency:
+`npm ci --ignore-scripts --prefix frontend`, then
+`node --test frontend/tests/*.test.cjs frontend/tests/*.test.mjs`.
+Check all frontend .js syntax, including voice-audio.js. CI additionally builds the
+root Docker image and verifies canonical app/CV contract imports; it does not
+publish the image or call providers. No broad cross-browser/physical device claim.
+
+`uv run python -m scripts.smoke_deployment` is a read-only hosted release check.
+Credentials come from environment only. `scripts.mvp_smoke` also accepts those
+environment values, but creates labeled simulated orders and needs a fresh menu
+with at least two dishes/free zones. See DEPLOYMENT for real hosted browser,
+large PDF/photo proxy uploads, paced synthetic STT and physical rig checks.

@@ -8,6 +8,8 @@ Minimal fresh-agent path: [AGENTS](../AGENTS.md) → [PROJECT_SPEC](../PROJECT_S
 | Submission scope/security/hygiene audit | [SUBMISSION_AUDIT](SUBMISSION_AUDIT.md) |
 | Agent entry points by task | [AGENT_TASK_MAP](AGENT_TASK_MAP.md) |
 | Teammate integration workflow | [INTEGRATION_GUIDE](INTEGRATION_GUIDE.md) |
+| Fly/Vercel auth, routing, image and release checks | [DEPLOYMENT](DEPLOYMENT.md) |
+| Actual CV producer into shared Core | [CV integration](../cv-service/V2_INTEGRATION.md) |
 | PDF/photo extraction and correction | [MENU_EXTRACTION](MENU_EXTRACTION.md) |
 | Current MVP intent | [PROJECT_SPEC](../PROJECT_SPEC.md) |
 | Supplied brief normalized for teammates | [MVP_TEAM_BRIEF](MVP_TEAM_BRIEF.md) |
