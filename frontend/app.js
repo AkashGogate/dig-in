@@ -232,12 +232,12 @@ function showView(name) {
   document.querySelectorAll("[data-view]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.view === name)));
   document.title = `Dig In · ${name}`;
 }
-async function captureText(captureMode = "mock_voice") {
+async function captureText(captureMode = "mock_voice", sttConfidence = null) {
   const order = state?.orders[draftId];
   if (!order) { feedback("Start an order before capturing a read-back.", true); return; }
   const text = $("transcript").value.trim();
   if (!text) { feedback("Enter a mock transcript first. No microphone is connected.", true); return; }
-  const data = await dispatch({action: "capture_voice", order_id: order.id, revision: order.revision, text, capture_mode: captureMode}, "voice");
+  const data = await dispatch({action: "capture_voice", order_id: order.id, revision: order.revision, text, capture_mode: captureMode, stt_confidence: sttConfidence}, "voice");
   if (data) $("transcript").value = "";
 }
 let voice = {live: false, authRequired: false, auth: null}, capture = null;
@@ -291,7 +291,7 @@ async function startLive(target) {
         if (message.type === "interim" || message.type === "final") ui.field.value = message.text;
         if (message.type === "limit" || message.type === "error") ui.status.textContent = message.message;
         if (message.type === "error") cap.error = message.message;
-        if (message.type === "done") { cap.text = message.text; resolve(); }
+        if (message.type === "done") { cap.text = message.text; cap.confidence = message.confidence ?? null; resolve(); }
       });
       ws.addEventListener("close", () => resolve());
     });
@@ -327,12 +327,12 @@ async function finishLive(cap) {
   if (!text) { cap.ui.status.textContent = cap.error || "Nothing was heard. Try again, type it, or use manual entry."; return; }
   cap.ui.field.value = text;
   if (cap.target === "kitchen") {
-    const data = await dispatch({action: "kitchen_voice", text}, "voice");
+    const data = await dispatch({action: "kitchen_voice", text, stt_confidence: cap.confidence}, "voice");
     if (data) cap.ui.field.value = "";
     cap.ui.status.textContent = "";
   } else {
     cap.ui.status.textContent = "Released. The draft still needs human review and Confirm and send.";
-    captureText("live_voice");
+    captureText("live_voice", cap.confidence);
   }
 }
 function beginHold(event, target = "order") {

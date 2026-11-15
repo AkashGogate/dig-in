@@ -38,6 +38,9 @@ log = logging.getLogger("dig_in.voice")
 DEEPGRAM_LISTEN = "wss://api.deepgram.com/v1/listen"
 GRAMMAR_TERMS = ["table", "heard", "start"]
 MAX_KEYTERMS = 100  # Deepgram caps keyterm prompting; keep well under its token limit.
+LOW_CONFIDENCE_BELOW = (
+    0.6  # calibration knob: flag for review below this Deepgram word-confidence average
+)
 TICKET_TTL_SECONDS = 30
 deepgram_connect = websockets.connect  # swapped in tests
 
@@ -216,6 +219,7 @@ async def relay(ws: WebSocket, menu: MenuDocument, allowed_seconds: float) -> fl
     """Pipe browser audio to Deepgram; return billed audio seconds."""
     started = time.monotonic()
     finals: list[str] = []
+    word_confidences: list[float] = []
     billed: float | None = None
     headers = {"Authorization": f"Token {os.environ['DEEPGRAM_API_KEY']}"}
     async with deepgram_connect(listen_url(menu), additional_headers=headers) as dg:
@@ -262,14 +266,16 @@ async def relay(ws: WebSocket, menu: MenuDocument, allowed_seconds: float) -> fl
                         billed = float(event.get("duration") or 0)
                     if event.get("type") != "Results":
                         continue
-                    text = (
-                        event.get("channel", {})
-                        .get("alternatives", [{}])[0]
-                        .get("transcript", "")
-                    )
+                    alt = event.get("channel", {}).get("alternatives", [{}])[0]
+                    text = alt.get("transcript", "")
                     if event.get("is_final"):
                         if text:
                             finals.append(text)
+                            word_confidences += [
+                                w["confidence"]
+                                for w in alt.get("words", [])
+                                if "confidence" in w
+                            ]
                         await _send(ws, {"type": "final", "text": " ".join(finals)})
                     elif text:
                         await _send(
@@ -277,7 +283,12 @@ async def relay(ws: WebSocket, menu: MenuDocument, allowed_seconds: float) -> fl
                         )
         finally:
             pump_task.cancel()
-    await _send(ws, {"type": "done", "text": " ".join(finals)})
+    confidence = (
+        sum(word_confidences) / len(word_confidences) if word_confidences else None
+    )
+    await _send(
+        ws, {"type": "done", "text": " ".join(finals), "confidence": confidence}
+    )
     return billed if billed is not None else time.monotonic() - started
 
 

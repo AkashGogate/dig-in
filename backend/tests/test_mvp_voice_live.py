@@ -302,3 +302,71 @@ def test_per_device_limits_use_real_client_ip_behind_fly_proxy(live):
         "/api/v2/voice/ticket", headers={"Fly-Client-IP": "203.0.113.2"}
     )
     assert other.status_code == 200
+
+
+def test_relay_reports_average_word_confidence_in_done_message(live):
+    client = TestClient(app)
+    ticket = client.post("/api/v2/voice/ticket").json()["ticket"]
+    with client.websocket_connect(f"/api/v2/voice/stream?ticket={ticket}") as ws:
+        ws.send_bytes(b"opus-chunk")
+        ws.send_text(json.dumps({"type": "stop"}))
+        messages = []
+        while not messages or messages[-1]["type"] != "done":
+            messages.append(ws.receive_json())
+    done = messages[-1]
+    # FakeDeepgram's words carry no "confidence" key; done.confidence must stay None, not 0.
+    assert done["confidence"] is None
+
+
+def test_low_confidence_transcript_still_gets_flagged_even_on_an_exact_match(
+    demo, live
+):
+    """Confidence is a second safety net: an exact alias match that Deepgram was
+    unsure about (noisy audio) still needs a human tap, not auto-accept."""
+    key = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    confident = core.send(
+        demo,
+        {
+            "action": "capture_voice",
+            "order_id": key,
+            "revision": 1,
+            "text": "Table 1: one salmon",
+            "stt_confidence": 0.95,
+        },
+        source="voice",
+    )
+    assert not confident.json()["result"]["flags"]
+    key2 = core.ok(demo, {"action": "start_order", "table_id": "1"})["result"][
+        "order_id"
+    ]
+    unsure = core.send(
+        demo,
+        {
+            "action": "capture_voice",
+            "order_id": key2,
+            "revision": 1,
+            "text": "Table 1: one salmon",
+            "stt_confidence": 0.3,
+        },
+        source="voice",
+    )
+    assert any(f["code"] == "low_confidence" for f in unsure.json()["result"]["flags"])
+
+
+def test_low_confidence_kitchen_callout_asks_for_a_tap_instead_of_acting(demo):
+    key = core.order(demo, table="1")
+    core.ack(demo, key)
+    unsure = core.ok(
+        demo,
+        {
+            "action": "kitchen_voice",
+            "text": "Start table one salmon",
+            "stt_confidence": 0.2,
+        },
+        actor="cook-1",
+        source="voice",
+    )
+    assert unsure["result"]["flags"]
+    assert core.units(demo, key)[0]["started_at"] is None

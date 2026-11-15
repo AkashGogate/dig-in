@@ -194,6 +194,7 @@ class CaptureVoice(Model):
     revision: int
     text: str = Field(min_length=1, max_length=2000)
     capture_mode: Literal["mock_voice", "live_voice"] = "mock_voice"
+    stt_confidence: float | None = Field(default=None, ge=0, le=1)
 
 
 class ResolveFlag(Model):
@@ -255,6 +256,7 @@ class ReconcileZone(Model):
 class KitchenVoice(Model):
     action: Literal["kitchen_voice"]
     text: str = Field(min_length=1, max_length=1000)
+    stt_confidence: float | None = Field(default=None, ge=0, le=1)
 
 
 class StockObservation(Model):

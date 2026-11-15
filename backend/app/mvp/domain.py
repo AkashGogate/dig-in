@@ -18,7 +18,7 @@ from app.coordination.rules import Conflict, require
 from app.mvp import contracts as c
 from app.mvp.fixtures import seed
 from app.mvp.voice import parse_kitchen, parse_order, suggest_items
-from app.mvp.voice_live import live_enabled
+from app.mvp.voice_live import LOW_CONFIDENCE_BELOW, live_enabled
 
 
 class Restaurant:
@@ -245,6 +245,9 @@ class Restaurant:
             require(
                 e.source == "voice", "Capture must be an explicit voice-adapter action"
             )
+            low_confidence = (
+                p.stt_confidence is not None and p.stt_confidence < LOW_CONFIDENCE_BELOW
+            )
             order = self._draft(p)
             parsed = parse_order(s.menu, p.text, order.table_id)
             seats = s.tables[order.table_id].seats
@@ -297,12 +300,21 @@ class Restaurant:
                     )
                 )
             self._dietary_flag(order)
+            if low_confidence:
+                order.flags.append(
+                    c.DraftFlag(
+                        id=f"{e.event_id}:flag:low_confidence",
+                        code="low_confidence",
+                        message="Speech recognition was unsure about this; double-check before sending.",
+                    )
+                )
             order.revision += 1
             self._emit(
                 "draft.updated",
                 order.id,
                 payload={
                     "capture_mode": order.capture_mode,
+                    "stt_confidence": p.stt_confidence,
                     "initial_voice_draft_line_count": len(order.lines),
                     "flag_codes": [f.code for f in order.flags],
                     "revision": order.revision,
@@ -463,6 +475,9 @@ class Restaurant:
             require(e.source == "voice", "Kitchen voice requires voice source")
             parsed = parse_kitchen(s.menu, p.text)
             flags = parsed.get("flags", [])
+            low_confidence = (
+                p.stt_confidence is not None and p.stt_confidence < LOW_CONFIDENCE_BELOW
+            )
             candidates = [
                 o
                 for o in s.orders.values()
@@ -474,7 +489,7 @@ class Restaurant:
                     and o.status not in ("picked_up", "delivered")
                 )
             ]
-            if flags or len(candidates) != 1:
+            if flags or low_confidence or len(candidates) != 1:
                 # Exact table key narrows a misheard dish to that ticket's queued
                 # dishes; similarity only suggests, a tap still starts the dish.
                 suggested = (
@@ -503,13 +518,23 @@ class Restaurant:
                     outcome="observed",
                 )
                 dish_names = ", ".join(s.menu.item(m).name for m in suggested)
+                message = (
+                    f"Did you mean {dish_names}? Tap that dish on the ticket to start it."
+                    if suggested
+                    else "Select one eligible order by tap; table/phrase is ambiguous."
+                )
+                if (
+                    not flags
+                    and not suggested
+                    and low_confidence
+                    and len(candidates) == 1
+                ):
+                    message = "Speech recognition was unsure about this; confirm by tap before it's actioned."
                 return {
                     "flags": [
                         {
                             "code": "clarification",
-                            "message": f"Did you mean {dish_names}? Tap that dish on the ticket to start it."
-                            if suggested
-                            else "Select one eligible order by tap; table/phrase is ambiguous.",
+                            "message": message,
                             "candidates": suggested,
                         }
                     ]
