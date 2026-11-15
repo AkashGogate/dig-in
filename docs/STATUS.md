@@ -4,6 +4,18 @@
 
 ## Final integration snapshot — 2026-11-14
 
+Final pre-main Deepgram recheck on application source `5b956b1` used four actual
+provider streams with synthetic speech: correct Server draft, Kitchen start and
+successful clearer Kitchen acknowledgment. The first short acknowledgment
+required clarification and preserved food state; tap recovery passed. Total
+audio 6.5969375s (usage6.6s), estimated USD0.0008. Initial three-clip script passed
+30 assertions including auth, single-use tickets and human-only Confirm.
+Focused voice/Core/application/auth regression suite: **96 passed**. Full push
+and PR CI on `5b956b1` also passed (365 Python, **55 frontend**, container smoke).
+Hygiene passed286indexed paths; 44 locally reachable commits scanned with no
+Gitleaks findings. Astra found no must-fix source issue. See
+[final Deepgram validation](handoffs/2026-11-14-final-deepgram-validation.md).
+
 Final pull follow-up integrates UI `21cc4a5` and `4d29098` through merges
 `ba4e510` and `d6255be`. Kitchen layered surfaces and ticket-grouped physical-zone
 panels preserve all configured zones, current assignment/review guards and
