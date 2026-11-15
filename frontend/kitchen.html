@@ -8,172 +8,231 @@
 <script src="config.js"></script>
 <script src="data.js"></script>
 <style>
-/* ── Force dark regardless of system ──────────────────────────────────────── */
 html, body { height: 100%; overflow: hidden; background: var(--sys-bg); }
 body { display: flex; flex-direction: column; }
 
 /* ── Top bar ──────────────────────────────────────────────────────────────── */
 .kds-bar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 20px;
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 24px;
   background: var(--bar-bg);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid var(--bar-border);
   flex-shrink: 0; z-index: 10;
 }
-.kds-title { font: 700 20px/26px var(--font); color: var(--label); margin-right: 4px; }
-.all-day { font: 600 15px/20px var(--font); color: var(--label2); flex: 1; }
-.all-day span { color: var(--label); font-weight: 700; }
+.kds-title { font: 700 22px/26px var(--font); letter-spacing: -.02em; color: var(--label); }
+.kds-spacer { flex: 1; }
 .kds-devices { display: flex; gap: 8px; align-items: center; }
 .station-filter { display: flex; gap: 6px; align-items: center; }
 .station-pill {
-  padding: 6px 14px; border-radius: var(--r-pill);
-  font: 600 13px/18px var(--font);
+  padding: 7px 15px; border-radius: var(--r-pill);
+  font: 590 13px/18px var(--font);
   background: var(--fill3); color: var(--label2);
   transition: background .15s, color .15s;
-  min-height: 32px;
 }
-.station-pill.active { background: var(--blue); color: #fff; }
+.station-pill.active { background: var(--label); color: var(--sys-bg); }
 
-/* ── Main scroll area ─────────────────────────────────────────────────────── */
+/* ── Last-heard strip (slim) ──────────────────────────────────────────────── */
+.lh-strip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--sep);
+  overflow-x: auto; flex-shrink: 0; scrollbar-width: none;
+}
+.lh-strip::-webkit-scrollbar { display: none; }
+.lh-label {
+  font: 600 11px/14px var(--font); color: var(--label3);
+  text-transform: uppercase; letter-spacing: .07em;
+  flex-shrink: 0; margin-right: 2px;
+}
+.lh-chip {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--sys-grouped2); border: 1px solid var(--sep);
+  border-radius: var(--r-pill);
+  padding: 6px 6px 6px 14px; flex-shrink: 0;
+}
+.lh-chip .lh-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.lh-chip .lh-cmd { font: 600 13px/16px var(--font); color: var(--label); }
+.lh-chip .lh-res { font: 400 13px/16px var(--font); color: var(--label2); }
+.lh-chip .lh-undo {
+  font: 590 13px/16px var(--font); color: var(--blue);
+  background: var(--fill3); border-radius: var(--r-pill);
+  padding: 5px 13px; min-height: 30px;
+}
+.lh-chip .lh-undo:hover { background: var(--fill2); }
+.lh-empty { font: 400 13px/16px var(--font); color: var(--label3); }
+
+/* ── Body ─────────────────────────────────────────────────────────────────── */
 .kds-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 
-/* ── Ticket column layout ─────────────────────────────────────────────────── */
 #ticketView {
   flex: 1; overflow-x: auto; overflow-y: hidden;
-  display: flex; gap: 12px;
-  padding: 14px 16px;
-  align-items: flex-start;
+  display: flex; gap: 16px; padding: 20px 24px; align-items: flex-start;
 }
-#ticketView::-webkit-scrollbar { height: 6px; }
-#ticketView::-webkit-scrollbar-track { background: transparent; }
-#ticketView::-webkit-scrollbar-thumb { background: var(--fill2); border-radius: 3px; }
+#ticketView::-webkit-scrollbar { height: 8px; }
+#ticketView::-webkit-scrollbar-thumb { background: var(--fill2); border-radius: 4px; }
 
 /* ── Ticket card ──────────────────────────────────────────────────────────── */
-.ticket-card {
-  flex-shrink: 0; width: 272px;
+.ticket {
+  flex-shrink: 0; width: 300px;
   background: var(--sys-grouped2);
+  border: 1px solid var(--sep);
   border-radius: var(--r-xl);
   overflow: hidden;
   display: flex; flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0,0,0,.35);
-  transition: box-shadow .2s;
 }
-.ticket-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.55); }
+.ticket.allready { border-color: var(--green-border); }
+.ticket.allready .ticket-head { box-shadow: inset 3px 0 0 var(--green); }
 
-/* Heard/unconfirmed: dashed blue */
-.ticket-card.unconfirmed {
-  background: transparent;
-  border: 2px dashed var(--blue-border);
-  box-shadow: 0 0 0 1px var(--blue-border), inset 0 0 0 100px var(--blue-bg);
+.ticket-head { padding: 16px 18px 14px; }
+.ticket-head-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ticket-table { font: 700 21px/24px var(--font); letter-spacing: -.02em; color: var(--label); }
+.ticket-timer { font: 600 17px/22px var(--font); font-variant-numeric: tabular-nums; color: var(--label2); }
+.ticket-timer.warn { color: var(--orange); }
+.ticket-timer.crit { color: var(--red); }
+.ticket-head-sub { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.ticket-mode { font: 400 14px/18px var(--font); color: var(--label2); }
+.ticket-ready-pill {
+  font: 600 12px/16px var(--font); color: var(--label2);
+  padding: 3px 10px; border-radius: var(--r-pill); background: var(--fill3);
 }
-/* Confirmed: solid green accent top bar */
-.ticket-card.confirmed { border-top: 3px solid var(--green); }
+.ticket-ready-pill.done { color: var(--green); background: var(--green-bg); }
 
-.ticket-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--sep);
+/* ── Dish rows ────────────────────────────────────────────────────────────── */
+.ticket-dishes { padding: 2px 18px 8px; }
+.dish {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 13px 0; border-top: 1px solid var(--sep);
 }
-.ticket-table-num {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: var(--fill); color: var(--label);
-  display: flex; align-items: center; justify-content: center;
-  font: 700 18px/1 var(--font); flex-shrink: 0;
+.dish-main { flex: 1; min-width: 0; }
+.dish-name {
+  font: 600 17px/21px var(--font); color: var(--label);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
-.ticket-header-info { flex: 1; min-width: 0; }
-.ticket-table-label { font: 700 17px/22px var(--font); color: var(--label); }
-.ticket-meta { font: 400 13px/18px var(--font); color: var(--label2); }
+.dish-meta { font: 400 13px/18px var(--font); color: var(--label2); margin-top: 3px; }
+.dish-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 
-/* Timer badge */
-.ticket-timer {
-  font: 700 15px/20px var(--font);
-  padding: 4px 10px; border-radius: var(--r-pill);
-  background: var(--fill3); color: var(--label2);
-  flex-shrink: 0;
-  transition: background .4s, color .4s;
-}
-.ticket-timer.warn  { background: rgba(255,149,0,.18); color: var(--orange); }
-.ticket-timer.crit  { background: rgba(255,59,48,.18);  color: var(--red);    }
+.d-status { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/16px var(--font); white-space: nowrap; }
+.d-status .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.d-status.ready   { color: var(--green); }
+.d-status.cooking { color: var(--orange); }
+.d-status.queued  { color: var(--label3); }
+.d-status .src { display: inline-flex; margin-left: 1px; opacity: .85; }
+.d-status .src svg { width: 15px; height: 15px; }
 
-/* Dish rows */
-.ticket-dishes { padding: 8px 14px 4px; }
-.ticket-seat-group { margin-bottom: 10px; }
-.ticket-seat-label { font: 600 12px/16px var(--font); color: var(--label3); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
-.ticket-dish-row { padding: 6px 0; border-bottom: 1px solid var(--sep); display: flex; align-items: flex-start; gap: 8px; }
-.ticket-dish-row:last-child { border-bottom: none; }
-.ticket-dish-main { flex: 1; min-width: 0; }
-.ticket-dish-name { font: 600 16px/21px var(--font); color: var(--label); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.ticket-dish-mod  { font: 400 13px/18px var(--font); color: var(--label2); margin-top: 1px; }
-.ticket-dish-zone { font: 400 12px/16px var(--font); color: var(--label3); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+.btn-mark-ready {
+  font: 600 13px/16px var(--font);
+  color: var(--orange); background: var(--orange-bg);
+  border: 1px solid rgba(255,149,0,.35);
+  padding: 7px 12px; border-radius: var(--r); min-height: 34px;
+}
+.btn-mark-ready:hover { filter: brightness(1.08); }
 
-/* Delivery mode chip */
-.delivery-chip {
-  margin: 0 14px 10px;
-  display: inline-flex; align-items: center;
-  padding: 4px 10px; border-radius: var(--r-pill);
-  font: 400 12px/16px var(--font); color: var(--label2);
-  background: var(--fill3);
-  gap: 4px;
+/* ── Clarification card (lighter, action-focused) ─────────────────────────── */
+.clarify {
+  flex-shrink: 0; width: 300px; align-self: flex-start;
+  background: rgba(0,122,255,.05);
+  border: 1.5px dashed var(--blue-border);
+  border-radius: var(--r-xl);
+  padding: 16px 18px;
 }
+.clarify-head {
+  display: flex; align-items: center; gap: 7px;
+  font: 600 12px/15px var(--font); color: var(--blue);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px;
+}
+.clarify-head svg { width: 16px; height: 16px; }
+.clarify-q { font: 600 17px/22px var(--font); color: var(--label); margin-bottom: 12px; }
+.clarify-opts { display: flex; flex-direction: column; gap: 7px; }
+.btn-clarify {
+  text-align: left; font: 590 15px/20px var(--font);
+  color: var(--label); background: var(--sys-grouped2);
+  border: 1px solid var(--sep);
+  padding: 11px 14px; border-radius: var(--r); min-height: 44px;
+}
+.btn-clarify:hover { border-color: var(--blue-border); background: var(--blue-bg); }
+.btn-clarify .z { color: var(--label3); font-weight: 400; }
+.btn-clarify.dismiss { color: var(--label2); }
 
-/* ── Zone grid view ───────────────────────────────────────────────────────── */
-#zoneView {
-  flex: 1; overflow-y: auto;
-  padding: 14px 16px;
-  display: flex; flex-direction: column; gap: 2px;
+/* ── Head-chef callout (dashed-blue, awaiting confirm) ────────────────────── */
+.callout {
+  flex-shrink: 0; width: 300px; align-self: flex-start;
+  background: rgba(0,122,255,.05);
+  border: 1.5px dashed var(--blue-border);
+  border-radius: var(--r-xl);
+  padding: 16px 18px;
 }
-#zoneView::-webkit-scrollbar { width: 6px; }
-#zoneView::-webkit-scrollbar-thumb { background: var(--fill2); border-radius: 3px; }
-.zone-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px;
-  background: var(--sys-grouped2);
-  border-radius: var(--r-lg);
+.callout-head {
+  display: flex; align-items: center; gap: 7px;
+  font: 600 12px/15px var(--font); color: var(--blue);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px;
 }
-.zone-row-label { font: 700 16px/20px var(--font); color: var(--label); width: 90px; flex-shrink: 0; }
-.zone-tiles { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
+.callout-head svg { width: 16px; height: 16px; }
+.callout-table { font: 700 20px/24px var(--font); color: var(--label); }
+.callout-raw { font: 400 14px/18px var(--font); color: var(--label2); margin: 2px 0 12px; }
+.callout-items { font: 500 15px/22px var(--font); color: var(--label); margin-bottom: 14px; }
+.btn-confirm {
+  width: 100%; padding: 13px; border-radius: var(--r);
+  background: var(--blue); color: #fff; font: 600 15px/20px var(--font); min-height: 46px;
+}
+.btn-confirm:hover { filter: brightness(1.06); }
+
+/* ── Zones view ───────────────────────────────────────────────────────────── */
+#zoneView { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; }
+.zone-row { display: flex; align-items: center; gap: 14px; }
+.zone-row-label { font: 600 16px/20px var(--font); color: var(--label); width: 92px; flex-shrink: 0; }
+.zone-tiles { display: flex; flex-wrap: wrap; gap: 8px; }
 .zone-tile {
-  position: relative;
-  width: 84px; height: 62px;
-  border-radius: var(--r);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 2px; font: 600 12px/16px var(--font);
+  position: relative; width: 92px; height: 66px; border-radius: var(--r);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  background: var(--sys-grouped2); border: 1px solid var(--sep);
 }
-.zone-tile.ready    { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
-.zone-tile.cooking  { background: var(--orange-bg); color: var(--orange); border: 1px solid rgba(255,149,0,.3); }
-.zone-tile.queued   { background: var(--fill3); color: var(--label3); border: 1px solid var(--sep); }
-.zone-tile-num { font: 700 20px/24px var(--font); }
-.zone-tile-status { font: 600 10px/13px var(--font); text-transform: uppercase; letter-spacing: .05em; }
-.zone-tile .src-badge { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; }
-.zone-tile .src-badge svg { width: 12px; height: 12px; }
+.zone-tile .zt-num { font: 650 18px/22px var(--font); color: var(--label); }
+.zone-tile .zt-st { font: 600 10px/13px var(--font); text-transform: uppercase; letter-spacing: .04em; color: var(--label2); }
+.zone-tile.ready   { background: var(--green-bg); border-color: var(--green-border); }
+.zone-tile.ready   .zt-st { color: var(--green); }
+.zone-tile.cooking { background: var(--orange-bg); border-color: rgba(255,149,0,.35); }
+.zone-tile.cooking .zt-st { color: var(--orange); }
 
-/* ── All-day summary bar (bottom) ─────────────────────────────────────────── */
+/* ── Ingredients view ─────────────────────────────────────────────────────── */
+#ingredientsView { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
+.ing-note { font: 400 14px/20px var(--font); color: var(--label2); margin-bottom: 2px; }
+.ing-row {
+  display: flex; align-items: center; gap: 16px;
+  background: var(--sys-grouped2); border: 1px solid var(--sep);
+  border-radius: var(--r-lg); padding: 16px 20px;
+}
+.ing-name { font: 600 18px/22px var(--font); color: var(--label); flex: 1; }
+.ing-stat { text-align: center; min-width: 88px; }
+.ing-num { font: 650 24px/28px var(--font); font-variant-numeric: tabular-nums; color: var(--label); }
+.ing-num.good { color: var(--green); } .ing-num.warn { color: var(--orange); } .ing-num.info { color: var(--label); }
+.ing-lbl { font: 400 11px/14px var(--font); color: var(--label3); text-transform: uppercase; letter-spacing: .04em; }
+
+/* ── Bottom summary bar ───────────────────────────────────────────────────── */
 .allday-bar {
-  display: flex; gap: 20px; align-items: center;
-  padding: 8px 20px;
+  display: flex; gap: 28px; align-items: center;
+  padding: 10px 24px;
   background: var(--bar-bg);
   backdrop-filter: blur(20px) saturate(180%);
-  border-top: 1px solid var(--bar-border);
-  flex-shrink: 0;
+  border-top: 1px solid var(--bar-border); flex-shrink: 0;
 }
-.allday-stat { text-align: center; }
-.allday-num  { font: 700 22px/28px var(--font); color: var(--label); }
-.allday-lbl  { font: 400 11px/14px var(--font); color: var(--label3); }
-.allday-sep  { width: 1px; height: 32px; background: var(--sep-opaque); }
+.allday-stat { display: flex; align-items: baseline; gap: 7px; }
+.allday-num { font: 700 20px/24px var(--font); font-variant-numeric: tabular-nums; }
+.allday-lbl { font: 400 13px/16px var(--font); color: var(--label3); }
+.empty-note { color: var(--label3); font: 400 17px/22px var(--font); padding: 48px; text-align: center; width: 100%; }
 </style>
 </head>
 <body>
-<!-- ── Top bar ──────────────────────────────────────────────────────────────── -->
+
 <div class="kds-bar">
   <div class="kds-title">Kitchen</div>
-  <div class="seg" id="viewSeg">
+  <div class="seg" id="viewSeg" style="width:300px">
     <button class="seg-item active" data-view="tickets">Tickets</button>
     <button class="seg-item" data-view="zones">Zones</button>
     <button class="seg-item" data-view="ingredients">Ingredients</button>
   </div>
-  <div class="all-day" id="allDaySummary"></div>
+  <div class="kds-spacer"></div>
   <div class="kds-devices">
     <div class="status-pill listening" id="micPill"></div>
     <button class="status-pill live tappable" id="cameraPill" title="Tap to toggle camera"></button>
@@ -181,298 +240,236 @@ body { display: flex; flex-direction: column; }
   <div class="station-filter" id="stationFilter"></div>
 </div>
 
-<!-- ── Last heard strip ──────────────────────────────────────────────────────── -->
-<div class="lastheard-strip" id="lastHeardStrip"></div>
+<div class="lh-strip" id="lhStrip"></div>
 
-<!-- ── Body ────────────────────────────────────────────────────────────────── -->
 <div class="kds-body">
   <div id="ticketView"></div>
   <div id="zoneView" style="display:none"></div>
-  <div class="ingredients-wrap" id="ingredientsView" style="display:none"></div>
+  <div id="ingredientsView" style="display:none"></div>
 </div>
 
-<!-- ── All-day bar ─────────────────────────────────────────────────────────── -->
 <div class="allday-bar" id="alldayBar"></div>
 
 <script>
-// ── SF-Symbols-style inline icons ───────────────────────────────────────────
 const SVG = {
-  mic:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
-  micOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/></svg>`,
-  camera: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`,
-  camOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16 16H3a2 2 0 0 1-2-2V6M8 2h7a2 2 0 0 1 2 2v2l4-3v12"/></svg>`,
-  hand:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>`,
-  undo:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>`,
-  check:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
-  help:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  mic:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`,
+  micOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7"/><path d="M17 17A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.1 1.2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>`,
+  camera: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2.5"/></svg>`,
+  camOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M16 16H3a2 2 0 0 1-2-2V6M8 3h7a2 2 0 0 1 2 2v2l4-3v12"/></svg>`,
+  hand:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.3l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></svg>`,
+  undo:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/></svg>`,
+  help:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
 };
 
 const STATIONS = ['All', 'Grill', 'Bowl station', 'Saute', 'Fry', 'Pantry'];
 let activeStation = 'All';
 let activeView = 'tickets';
 
-// ── Station filter pills ────────────────────────────────────────────────────
+// Station filter
 const filterEl = document.getElementById('stationFilter');
-filterEl.innerHTML = STATIONS.map(s =>
-  `<button class="station-pill${s === activeStation ? ' active' : ''}" data-station="${s}">${s}</button>`
-).join('');
-filterEl.querySelectorAll('.station-pill').forEach(btn => {
-  btn.addEventListener('click', () => {
-    activeStation = btn.dataset.station;
-    filterEl.querySelectorAll('.station-pill').forEach(b => b.classList.toggle('active', b === btn));
-    refresh();
-  });
-});
+filterEl.innerHTML = STATIONS.map(s => `<button class="station-pill${s===activeStation?' active':''}" data-station="${s}">${s}</button>`).join('');
+filterEl.querySelectorAll('.station-pill').forEach(btn => btn.addEventListener('click', () => {
+  activeStation = btn.dataset.station;
+  filterEl.querySelectorAll('.station-pill').forEach(b => b.classList.toggle('active', b===btn));
+  refresh();
+}));
 
-// ── View toggle ─────────────────────────────────────────────────────────────
-document.getElementById('viewSeg').querySelectorAll('.seg-item').forEach(btn => {
-  btn.addEventListener('click', () => {
-    activeView = btn.dataset.view;
-    document.querySelectorAll('#viewSeg .seg-item').forEach(b => b.classList.toggle('active', b === btn));
-    document.getElementById('ticketView').style.display      = activeView === 'tickets'     ? 'flex' : 'none';
-    document.getElementById('zoneView').style.display        = activeView === 'zones'       ? 'flex' : 'none';
-    document.getElementById('ingredientsView').style.display = activeView === 'ingredients' ? 'flex' : 'none';
-    filterEl.style.display = activeView === 'ingredients' ? 'none' : 'flex';
-    refresh();
-  });
-});
+// View toggle
+document.getElementById('viewSeg').querySelectorAll('.seg-item').forEach(btn => btn.addEventListener('click', () => {
+  activeView = btn.dataset.view;
+  document.querySelectorAll('#viewSeg .seg-item').forEach(b => b.classList.toggle('active', b===btn));
+  document.getElementById('ticketView').style.display      = activeView==='tickets'     ? 'flex' : 'none';
+  document.getElementById('zoneView').style.display        = activeView==='zones'       ? 'flex' : 'none';
+  document.getElementById('ingredientsView').style.display = activeView==='ingredients' ? 'flex' : 'none';
+  filterEl.style.display = activeView==='ingredients' ? 'none' : 'flex';
+  refresh();
+}));
 
-// ── Device status pills ─────────────────────────────────────────────────────
+// Device pills
 function renderDevicePills() {
-  const mic = api.getMicStatus();
-  const cam = api.getCameraStatus();
-  const micPill = document.getElementById('micPill');
-  const camPill = document.getElementById('cameraPill');
-
-  const micLabel = { listening: 'Mic live', processing: 'Processing', paused: 'Mic paused', offline: 'Mic offline' }[mic] || mic;
-  micPill.className = 'status-pill ' + (mic === 'listening' || mic === 'processing' ? mic : mic === 'offline' ? 'offline' : 'paused');
-  micPill.innerHTML = `${mic === 'offline' ? SVG.micOff : SVG.mic}${micLabel}`;
-
-  camPill.className = 'status-pill tappable ' + (cam === 'live' ? 'live' : 'offline');
-  camPill.innerHTML = `${cam === 'live' ? SVG.camera : SVG.camOff}Camera ${cam === 'live' ? 'live' : 'offline'}`;
+  const mic = api.getMicStatus(), cam = api.getCameraStatus();
+  const micPill = document.getElementById('micPill'), camPill = document.getElementById('cameraPill');
+  const micLabel = { listening:'Mic live', processing:'Processing', paused:'Mic paused', offline:'Mic offline' }[mic] || mic;
+  micPill.className = 'status-pill ' + (mic==='listening'||mic==='processing' ? mic : mic==='offline' ? 'offline' : 'paused');
+  micPill.innerHTML = `${mic==='offline'?SVG.micOff:SVG.mic}${micLabel}`;
+  camPill.className = 'status-pill tappable ' + (cam==='live' ? 'live' : 'offline');
+  camPill.innerHTML = `${cam==='live'?SVG.camera:SVG.camOff}Camera ${cam==='live'?'live':'offline'}`;
 }
-document.getElementById('cameraPill').addEventListener('click', () => {
-  api._bus.cameraStatus(api.getCameraStatus() === 'offline' ? 'live' : 'offline');
-});
+document.getElementById('cameraPill').addEventListener('click', () => api._bus.cameraStatus(api.getCameraStatus()==='offline'?'live':'offline'));
 
-// ── Last heard strip ────────────────────────────────────────────────────────
+// Last-heard strip
 function renderLastHeard() {
-  const strip = document.getElementById('lastHeardStrip');
+  const strip = document.getElementById('lhStrip');
   const entries = api.getLastHeard();
-  strip.innerHTML =
-    `<div class="lastheard-title">${SVG.mic}Last<br>heard</div>` +
-    (entries.length ? entries.map(e => `
-      <div class="lastheard-card">
-        <div class="lh-body">
-          <div class="lh-cmd">“${e.cmd}”</div>
-          <div class="lh-result">${SVG.check}${e.result}</div>
-        </div>
-        <button class="btn-undo" data-undo="${e.id}">${SVG.undo} Undo</button>
+  strip.innerHTML = `<div class="lh-label">Last heard</div>` + (entries.length
+    ? entries.map(e => `
+      <div class="lh-chip">
+        <div class="lh-dot"></div>
+        <span class="lh-cmd">${e.cmd}</span>
+        <span class="lh-res">${e.result}</span>
+        <button class="lh-undo" data-undo="${e.id}">Undo</button>
       </div>`).join('')
-    : `<div style="display:flex;align-items:center;color:var(--label3);font:400 15px/20px var(--font);padding:0 8px">No recent voice commands</div>`);
-
-  strip.querySelectorAll('[data-undo]').forEach(btn => {
-    btn.addEventListener('click', () => api.undoLastHeard(btn.dataset.undo));
-  });
+    : `<div class="lh-empty">No recent voice commands</div>`);
+  strip.querySelectorAll('[data-undo]').forEach(b => b.addEventListener('click', () => api.undoLastHeard(b.dataset.undo)));
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-function fmtTime(s) { const m = Math.floor(s/60), sc = s%60; return `${m}:${String(sc).padStart(2,'0')}`; }
-function timerClass(s) { if (s >= 600) return 'crit'; if (s >= 360) return 'warn'; return ''; }
-function groupBySeats(dishes) { const seats = {}; for (const d of dishes) { (seats[d.seat] ||= []).push(d); } return seats; }
-
-function srcBadge(d) {
-  if (d.status !== 'ready' || !d.source) return '';
-  if (d.source === 'camera') return `<span class="src-badge camera" title="Seen by camera">${SVG.camera}</span>`;
-  if (d.source === 'tapped') return `<span class="src-badge tapped" title="Marked by hand">${SVG.hand}</span>`;
+// Helpers
+function fmtTime(s){ const m=Math.floor(s/60), sc=s%60; return `${m}:${String(sc).padStart(2,'0')}`; }
+function timerClass(s){ if (s>=900) return 'crit'; if (s>=600) return 'warn'; return ''; }
+function srcIcon(d){
+  if (d.source==='camera') return `<span class="src" title="Seen by camera">${SVG.camera}</span>`;
+  if (d.source==='tapped') return `<span class="src" title="Marked by hand">${SVG.hand}</span>`;
   return '';
 }
+function statusWord(st){ return st==='ready'?'Ready':st==='cooking'?'Cooking':'Queued'; }
 
-// ── Render ticket ────────────────────────────────────────────────────────────
+// Dish row
+function dishRow(d, camOffline) {
+  const meta = [`Seat ${d.seat}`, d.zone, d.station, d.modifiers].filter(Boolean).join(' · ');
+  return `
+    <div class="dish">
+      <div class="dish-main">
+        <div class="dish-name">${d.name}${d.allergy?` <span class="allergy-pill">${d.allergy}</span>`:''}</div>
+        <div class="dish-meta">${meta}${d.status==='cooking'&&d.est_min?` · ~${d.est_min}m`:''}</div>
+      </div>
+      <div class="dish-right">
+        <span class="d-status ${d.status}"><span class="dot"></span>${statusWord(d.status)}${d.status==='ready'?srcIcon(d):''}</span>
+        ${camOffline && d.status==='cooking' ? `<button class="btn-mark-ready" data-ready="${d.id}">Mark ready</button>` : ''}
+      </div>
+    </div>`;
+}
+
+// Ticket
 function renderTicket(order) {
-  const dishes = activeStation === 'All' ? order.dishes : order.dishes.filter(d => d.station === activeStation);
+  const dishes = activeStation==='All' ? order.dishes : order.dishes.filter(d => d.station===activeStation);
   if (!dishes.length) return '';
-
+  const readyN = dishes.filter(d => d.status==='ready').length;
+  const allReady = readyN === dishes.length;
+  const camOffline = api.getCameraStatus()==='offline';
   const tc = timerClass(order.elapsed_s || 0);
-  const deliveryLabel = order.delivery_mode === 'all_together' ? 'All together' : 'As each is ready';
-  const camOffline = api.getCameraStatus() === 'offline';
-  const seats = groupBySeats(dishes);
-
-  const seatHtml = Object.entries(seats).map(([seat, ds]) => `
-    <div class="ticket-seat-group">
-      <div class="ticket-seat-label">Seat ${seat}</div>
-      ${ds.map(d => `
-        <div class="ticket-dish-row">
-          <div class="ticket-dish-main">
-            <div class="ticket-dish-name">${d.name}${d.allergy ? ` <span class="allergy-pill" style="font-size:11px;padding:2px 7px">${d.allergy}</span>` : ''}</div>
-            ${d.modifiers ? `<div class="ticket-dish-mod">${d.modifiers}</div>` : ''}
-            <div class="ticket-dish-zone">
-              ${srcBadge(d)}
-              <span>Zone ${d.zone} · ${d.station}${d.status === 'ready' ? ' · <span style="color:var(--green)">READY</span>' : d.est_min ? ` · ~${d.est_min}m` : ''}</span>
-            </div>
-          </div>
-          ${camOffline && d.status === 'cooking' ? `<button class="btn-mark-ready" data-ready="${d.id}">Mark ready</button>` : ''}
-        </div>`).join('')}
-    </div>`).join('');
+  const mode = order.delivery_mode==='all_together' ? 'All together' : 'As each is ready';
+  const readyPill = allReady
+    ? `<span class="ticket-ready-pill done">Ready</span>`
+    : `<span class="ticket-ready-pill">${readyN}/${dishes.length} ready</span>`;
 
   return `
-    <div class="ticket-card confirmed" data-order="${order.id}">
-      <div class="ticket-header">
-        <div class="ticket-table-num">${order.table}</div>
-        <div class="ticket-header-info">
-          <div class="ticket-table-label">Table ${order.table}</div>
-          <div class="ticket-meta">${dishes.length} dish${dishes.length !== 1 ? 'es' : ''} · ${dishes.filter(d=>d.status==='ready').length} ready</div>
+    <div class="ticket ${allReady?'allready':''}">
+      <div class="ticket-head">
+        <div class="ticket-head-top">
+          <span class="ticket-table">Table ${order.table}</span>
+          <span class="ticket-timer ${tc}">${fmtTime(order.elapsed_s||0)}</span>
         </div>
-        <div class="ticket-timer ${tc}">${fmtTime(order.elapsed_s || 0)}</div>
+        <div class="ticket-head-sub">
+          <span class="ticket-mode">${mode} · ${dishes.length} dish${dishes.length!==1?'es':''}</span>
+          ${readyPill}
+        </div>
       </div>
-      <div class="delivery-chip">${deliveryLabel}</div>
-      <div class="ticket-dishes">${seatHtml}</div>
+      <div class="ticket-dishes">${dishes.map(d => dishRow(d, camOffline)).join('')}</div>
     </div>`;
 }
 
-// ── Render heard/unconfirmed head-chef callout ──────────────────────────────
-function renderHeard(h) {
+// Head-chef callout
+function renderCallout(h) {
   return `
-    <div class="ticket-card unconfirmed" data-heard="${h.id}">
-      <div style="display:flex;align-items:center;gap:6px;padding:10px 14px 4px;font:600 13px/18px var(--font);color:var(--blue);text-transform:uppercase;letter-spacing:.06em">
-        ${SVG.mic} Head chef heard
-      </div>
-      <div class="ticket-header">
-        <div class="ticket-table-num" style="background:var(--blue-bg);color:var(--blue)">${h.table}</div>
-        <div class="ticket-header-info">
-          <div class="ticket-table-label">Table ${h.table}</div>
-          <div class="ticket-meta">“${h.raw}”</div>
-        </div>
-      </div>
-      <div class="ticket-dishes">
-        ${h.items.map(name => `<div class="ticket-dish-row"><div class="ticket-dish-main"><div class="ticket-dish-name">${name}</div></div></div>`).join('')}
-      </div>
-      <button class="btn-confirm-kitchen" data-confirm="${h.id}" style="margin:10px 14px 14px;width:calc(100% - 28px)">Confirm order</button>
+    <div class="callout">
+      <div class="callout-head">${SVG.mic} Head chef heard</div>
+      <div class="callout-table">Table ${h.table}</div>
+      <div class="callout-raw">“${h.raw}”</div>
+      <div class="callout-items">${h.items.join(' · ')}</div>
+      <button class="btn-confirm" data-confirm="${h.id}">Confirm order</button>
     </div>`;
 }
 
-// ── Render camera clarification card ────────────────────────────────────────
+// Clarification
 function renderClarification(c, orders) {
   const table = parseInt(c.zone.split('·')[0]);
-  const order = orders.find(o => o.table === table);
-  const options = order ? order.dishes : [];
+  const order = orders.find(o => o.table===table);
+  const opts = order ? order.dishes : [];
   return `
-    <div class="ticket-card clarify-card" data-clarify="${c.id}">
-      <div style="padding:12px 14px">
-        <div class="clarify-head">${SVG.help} Camera · needs confirm</div>
-        <div class="clarify-q">${c.text}</div>
-        <div class="clarify-options">
-          ${options.map(d => `<button class="btn-clarify" data-clarify-dish="${d.id}" data-clarify-id="${c.id}">${d.name} · Zone ${d.zone}</button>`).join('')}
-          <button class="btn-clarify dismiss" data-clarify-dismiss="${c.id}">Not one of ours</button>
-        </div>
+    <div class="clarify">
+      <div class="clarify-head">${SVG.help} Camera · needs confirm</div>
+      <div class="clarify-q">${c.text}</div>
+      <div class="clarify-opts">
+        ${opts.map(d => `<button class="btn-clarify" data-cd="${d.id}" data-ci="${c.id}">${d.name} <span class="z">Zone ${d.zone}</span></button>`).join('')}
+        <button class="btn-clarify dismiss" data-cdismiss="${c.id}">Not one of ours</button>
       </div>
     </div>`;
 }
 
-// ── Render zone view ─────────────────────────────────────────────────────────
+// Zones
 function renderZones(orders) {
-  const container = document.getElementById('zoneView');
-  if (!orders.length) { container.innerHTML = '<div style="color:var(--label3);padding:40px;text-align:center;font:400 17px/22px var(--font)">No active orders</div>'; return; }
-  container.innerHTML = orders.map(order => {
-    const dishes = activeStation === 'All' ? order.dishes : order.dishes.filter(d => d.station === activeStation);
+  const el = document.getElementById('zoneView');
+  if (!orders.length) { el.innerHTML = '<div class="empty-note">No active orders</div>'; return; }
+  el.innerHTML = orders.map(o => {
+    const dishes = activeStation==='All' ? o.dishes : o.dishes.filter(d => d.station===activeStation);
     if (!dishes.length) return '';
     const tiles = dishes.map(d => {
-      const cls = d.status === 'ready' ? 'ready' : d.status === 'cooking' ? 'cooking' : 'queued';
-      const statusTxt = d.status === 'ready' ? 'READY' : d.status === 'cooking' ? (d.est_min ? `~${d.est_min}m` : 'COOKING') : 'QUEUED';
-      return `<div class="zone-tile ${cls}">${srcBadge(d)}<div class="zone-tile-num">${d.zone}</div><div class="zone-tile-status">${statusTxt}</div></div>`;
+      const cls = d.status==='ready'?'ready':d.status==='cooking'?'cooking':'';
+      const st = d.status==='ready'?'Ready':d.status==='cooking'?(d.est_min?`~${d.est_min}m`:'Cooking'):'Queued';
+      return `<div class="zone-tile ${cls}"><div class="zt-num">${d.zone}</div><div class="zt-st">${st}</div></div>`;
     }).join('');
-    return `<div class="zone-row"><div class="zone-row-label">Table ${order.table}</div><div class="zone-tiles">${tiles}</div></div>`;
+    return `<div class="zone-row"><div class="zone-row-label">Table ${o.table}</div><div class="zone-tiles">${tiles}</div></div>`;
   }).filter(Boolean).join('');
 }
 
-// ── Render ingredients view ─────────────────────────────────────────────────
+// Ingredients
 async function renderIngredients() {
-  const container = document.getElementById('ingredientsView');
+  const el = document.getElementById('ingredientsView');
   const ings = await api.getIngredients();
-  container.innerHTML = `
-    <div style="font:400 14px/20px var(--font);color:var(--label2);padding:0 2px 4px">
-      Camera-tracked counts — expected for active tickets vs plates seen leaving the pass vs what's in stock.
-    </div>` +
-    ings.map(ing => {
-      const mismatch = ing.seen < ing.expected ? ' mismatch' : '';
-      return `<div class="ingredient-row">
-        <div class="ingredient-name"><span class="src-badge camera">${SVG.camera}</span>${ing.name}</div>
-        <div class="ing-stat expected"><div class="ing-stat-num">${ing.expected}</div><div class="ing-stat-lbl">Expected</div></div>
-        <div class="ing-divider"></div>
-        <div class="ing-stat seen${mismatch}"><div class="ing-stat-num">${ing.seen}</div><div class="ing-stat-lbl">Seen leaving</div></div>
-        <div class="ing-divider"></div>
-        <div class="ing-stat stock"><div class="ing-stat-num">${ing.stock}</div><div class="ing-stat-lbl">In stock</div></div>
+  el.innerHTML = `<div class="ing-note">Camera-tracked — expected for active tickets vs plates seen leaving the pass vs in stock.</div>` +
+    ings.map(i => {
+      const seenCls = i.seen < i.expected ? 'warn' : 'good';
+      return `<div class="ing-row">
+        <div class="ing-name">${i.name}</div>
+        <div class="ing-stat"><div class="ing-num info">${i.expected}</div><div class="ing-lbl">Expected</div></div>
+        <div class="ing-stat"><div class="ing-num ${seenCls}">${i.seen}</div><div class="ing-lbl">Seen leaving</div></div>
+        <div class="ing-stat"><div class="ing-num info">${i.stock}</div><div class="ing-lbl">In stock</div></div>
       </div>`;
     }).join('');
 }
 
-// ── All-day bar ──────────────────────────────────────────────────────────────
+// Bottom bar
 function renderAlldayBar(orders) {
-  const allDishes = orders.flatMap(o => activeStation === 'All' ? o.dishes : o.dishes.filter(d => d.station === activeStation));
-  const total = allDishes.length;
-  const ready = allDishes.filter(d => d.status === 'ready').length;
-  const cooking = allDishes.filter(d => d.status === 'cooking').length;
-  const queued = allDishes.filter(d => d.status === 'queued').length;
+  const all = orders.flatMap(o => activeStation==='All' ? o.dishes : o.dishes.filter(d => d.station===activeStation));
+  const r = all.filter(d=>d.status==='ready').length, c = all.filter(d=>d.status==='cooking').length, q = all.filter(d=>d.status==='queued').length;
   document.getElementById('alldayBar').innerHTML = `
-    <div class="allday-stat"><div class="allday-num">${total}</div><div class="allday-lbl">All day</div></div>
-    <div class="allday-sep"></div>
-    <div class="allday-stat"><div class="allday-num" style="color:var(--green)">${ready}</div><div class="allday-lbl">Ready</div></div>
-    <div class="allday-sep"></div>
-    <div class="allday-stat"><div class="allday-num" style="color:var(--orange)">${cooking}</div><div class="allday-lbl">Cooking</div></div>
-    <div class="allday-sep"></div>
-    <div class="allday-stat"><div class="allday-num" style="color:var(--label3)">${queued}</div><div class="allday-lbl">Queued</div></div>`;
-  document.getElementById('allDaySummary').innerHTML = `All day: <span>${total}</span> dishes`;
+    <div class="allday-stat"><span class="allday-num">${all.length}</span><span class="allday-lbl">All day</span></div>
+    <div class="allday-stat"><span class="allday-num" style="color:var(--green)">${r}</span><span class="allday-lbl">Ready</span></div>
+    <div class="allday-stat"><span class="allday-num" style="color:var(--orange)">${c}</span><span class="allday-lbl">Cooking</span></div>
+    <div class="allday-stat"><span class="allday-num" style="color:var(--label3)">${q}</span><span class="allday-lbl">Queued</span></div>`;
 }
 
-// ── Main render ──────────────────────────────────────────────────────────────
+// Main render
 async function refresh() {
   const [orders, heard] = await Promise.all([api.getKitchenQueue(), api.getHeardOrders()]);
-  const sorted = [...orders].sort((a, b) => (b.elapsed_s || 0) - (a.elapsed_s || 0));
-
+  const sorted = [...orders].sort((a,b) => (b.elapsed_s||0)-(a.elapsed_s||0));
   renderDevicePills();
   renderLastHeard();
 
-  if (activeView === 'tickets') {
+  if (activeView==='tickets') {
     const tv = document.getElementById('ticketView');
-    const clarifyHtml = api.getClarifications().map(c => renderClarification(c, orders)).join('');
-    const heardHtml = heard.map(renderHeard).join('');
-    const ticketHtml = sorted.map(renderTicket).join('');
-    tv.innerHTML = clarifyHtml + heardHtml + ticketHtml;
-
-    tv.querySelectorAll('[data-confirm]').forEach(btn => {
-      btn.addEventListener('click', async () => { btn.disabled = true; btn.textContent = 'Confirmed'; await api.confirmHeardOrder(btn.dataset.confirm); refresh(); });
-    });
-    tv.querySelectorAll('[data-ready]').forEach(btn => {
-      btn.addEventListener('click', () => api.markDishReady(btn.dataset.ready));
-    });
-    tv.querySelectorAll('[data-clarify-dish]').forEach(btn => {
-      btn.addEventListener('click', () => { api.markDishReady(btn.dataset.clarifyDish); api.resolveClarification(btn.dataset.clarifyId); });
-    });
-    tv.querySelectorAll('[data-clarify-dismiss]').forEach(btn => {
-      btn.addEventListener('click', () => api.resolveClarification(btn.dataset.clarifyDismiss));
-    });
-  } else if (activeView === 'zones') {
+    const clar = api.getClarifications().map(c => renderClarification(c, orders)).join('');
+    const call = heard.map(renderCallout).join('');
+    const tix  = sorted.map(renderTicket).join('');
+    tv.innerHTML = clar + call + tix;
+    tv.querySelectorAll('[data-confirm]').forEach(b => b.addEventListener('click', async () => { b.disabled=true; b.textContent='Confirmed'; await api.confirmHeardOrder(b.dataset.confirm); refresh(); }));
+    tv.querySelectorAll('[data-ready]').forEach(b => b.addEventListener('click', () => api.markDishReady(b.dataset.ready)));
+    tv.querySelectorAll('[data-cd]').forEach(b => b.addEventListener('click', () => { api.markDishReady(b.dataset.cd); api.resolveClarification(b.dataset.ci); }));
+    tv.querySelectorAll('[data-cdismiss]').forEach(b => b.addEventListener('click', () => api.resolveClarification(b.dataset.cdismiss)));
+  } else if (activeView==='zones') {
     renderZones(sorted);
   } else {
     renderIngredients();
   }
-
   renderAlldayBar(orders);
 }
 
-// ── Realtime events ──────────────────────────────────────────────────────────
-['dish_ready', 'dish_update', 'heard_order', 'heard_confirmed', 'last_heard',
- 'last_heard_undo', 'mic_status', 'camera_status', 'clarification', 'clarification_resolved'
-].forEach(ev => on(ev, () => refresh()));
+['dish_ready','dish_update','heard_order','heard_confirmed','last_heard','last_heard_undo','mic_status','camera_status','clarification','clarification_resolved']
+  .forEach(ev => on(ev, () => refresh()));
 
-// ── Init ─────────────────────────────────────────────────────────────────────
 refresh();
 startMockRealtime();
-
-setInterval(() => {
-  for (const o of api._mock.orders) o.elapsed_s = (o.elapsed_s || 0) + 1;
-  refresh();
-}, 1000);
+setInterval(() => { for (const o of api._mock.orders) o.elapsed_s = (o.elapsed_s||0)+1; refresh(); }, 1000);
 </script>
 </body>
 </html>
