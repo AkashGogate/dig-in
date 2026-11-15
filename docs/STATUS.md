@@ -4,6 +4,16 @@
 
 ## Final integration snapshot — 2026-11-14
 
+Post-push live monitoring is implemented in a separate follow-up: main-push/manual
+main Actions job, bounded read-only retries, explicit missing-credential failure
+and sanitized check summaries. **282 backend tests passed**, including37focused
+probe/monitor cases; independent Astra review cleared source/workflow. Two actual
+live GET attempts correctly failed for frontend503/backend health404/older state.
+This does not deploy the app or certify hosted readiness. Actions demo credentials
+were absent at the implementation checkpoint and have not been copied without
+approval. See [LIVE_MONITORING](LIVE_MONITORING.md) and its
+[handoff](handoffs/2026-11-14-live-deployment-monitor.md).
+
 PR #1 merged to main `35d6d08`; main CI passed. UI `dd6886e` arrived during the
 final check and is integrated in a follow-up: accessible guarded theme controls
 on Server screens, canonical pinned-menu sections/descriptions/quantity badges,

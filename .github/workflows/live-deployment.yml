@@ -1,0 +1,67 @@
+name: live deployment checks
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      require_live_voice:
+        description: Require Deepgram live mode (checks status only; no paid call)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    # Only main is eligible. No PR/deployment payload refs or URLs receive
+    # credentials. Rerun manually after an independently published Fly release.
+    if: github.ref == 'refs/heads/main'
+    concurrency:
+      group: live-production-readiness
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.8"
+      - run: uv sync --locked --python 3.11
+        working-directory: backend
+      - name: Check public and authenticated live readiness
+        working-directory: backend
+        env:
+          DEMO_AUTH_USER: ${{ secrets.DEMO_AUTH_USER }}
+          DEMO_AUTH_PASS: ${{ secrets.DEMO_AUTH_PASS }}
+          REQUIRE_LIVE_VOICE: ${{ inputs.require_live_voice && '1' || '0' }}
+        run: |
+          args=()
+          if [ "$REQUIRE_LIVE_VOICE" = "1" ]; then
+            args+=(--require-live-voice)
+          fi
+          uv run python -m scripts.monitor_deployment \
+            --attempts 3 --interval-seconds 30 \
+            --report-file "$RUNNER_TEMP/live-readiness.json" "${args[@]}"
+      - name: Publish sanitized readiness summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = Path(os.environ["RUNNER_TEMP"]) / "live-readiness.json"
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("## Live production readiness\n\n")
+              if not report.exists():
+                  summary.write("No probe result was produced; inspect setup steps.\n")
+              else:
+                  data = json.loads(report.read_text())
+                  summary.write("Result: " + ("PASS" if data["passed"] else "FAIL") + "\n\n")
+                  summary.write("```json\n" + json.dumps(data, indent=2) + "\n```\n")
+          PY

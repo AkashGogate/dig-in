@@ -39,16 +39,12 @@ def valid_voice(response, require_live):
     )
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--frontend", default="https://www.frictionless-kitchen.akashgogate.com"
-    )
-    parser.add_argument(
-        "--backend", default="https://api.frictionless-kitchen.akashgogate.com"
-    )
-    parser.add_argument("--require-live-voice", action="store_true")
-    args = parser.parse_args()
+DEFAULT_FRONTEND = "https://www.frictionless-kitchen.akashgogate.com"
+DEFAULT_BACKEND = "https://api.frictionless-kitchen.akashgogate.com"
+
+
+def probe(frontend, backend, require_live=False):
+    """Return sanitized read-only outcomes; never print response bodies or auth."""
     results = []
 
     def check(name, url, expected=200, *, auth=None, validate=None):
@@ -67,7 +63,7 @@ def main():
             )
             return None
 
-    front, back = args.frontend.rstrip("/"), args.backend.rstrip("/")
+    front, back = frontend.rstrip("/"), backend.rstrip("/")
     check(
         "public_minimal_health",
         back + "/healthz",
@@ -121,7 +117,7 @@ def main():
             "voice_mode",
             front + "/api/v2/voice/status",
             auth=auth,
-            validate=lambda r: valid_voice(r, args.require_live_voice),
+            validate=lambda r: valid_voice(r, require_live),
         )
     else:
         results.append(
@@ -131,12 +127,18 @@ def main():
                 "error": "credential_environment_unavailable",
             }
         )
-    print(
-        json.dumps(
-            {"passed": all(r["passed"] for r in results), "checks": results}, indent=2
-        )
-    )
-    return 0 if all(r["passed"] for r in results) else 1
+    return {"passed": all(r["passed"] for r in results), "checks": results}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--frontend", default=DEFAULT_FRONTEND)
+    parser.add_argument("--backend", default=DEFAULT_BACKEND)
+    parser.add_argument("--require-live-voice", action="store_true")
+    args = parser.parse_args()
+    report = probe(args.frontend, args.backend, args.require_live_voice)
+    print(json.dumps(report, indent=2))
+    return 0 if report["passed"] else 1
 
 
 if __name__ == "__main__":
