@@ -1,0 +1,53 @@
+/* Native UI branch tokens/components; these additions connect real v2 flows. */
+html,body {height:auto;min-height:100%;overflow:auto}
+body {display:block;background:var(--sys-grouped)}
+* {box-sizing:border-box}
+button,input,select,textarea {font:inherit}
+button,input,select {min-height:44px}
+button,a {touch-action:manipulation}
+a {color:var(--blue)}
+:focus-visible {outline:3px solid var(--blue);outline-offset:3px}
+[hidden] {display:none!important}
+.operator-header {position:sticky;top:0;z-index:5;background:var(--bar-bg);backdrop-filter:blur(20px);border-bottom:1px solid var(--sep);padding:14px max(18px,calc((100vw - 1360px)/2));display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.operator-header h1 {font-size:22px;margin:0 auto 0 0}
+.operator-header nav {display:flex;gap:18px;flex-wrap:wrap}
+.operator-header nav a[aria-current] {font-weight:700;color:var(--label)}
+.operator-shell {max-width:1360px;margin:auto;padding:20px 18px 80px}
+.operator-session {padding:16px;background:var(--sys-grouped2);border-radius:var(--r-lg);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.operator-session label {display:flex;gap:8px;align-items:center}
+.operator-session select,.operator-form select,.operator-form input,.operator-form textarea,.operator-controls select,.operator-controls input {border:1px solid var(--sep-opaque);border-radius:10px;padding:8px 10px;background:var(--sys-grouped2);color:var(--label);font-size:16px;max-width:100%}
+.operator-session button,.operator-action {border:0;border-radius:10px;padding:8px 14px;background:var(--blue);color:#fff;font-weight:600;cursor:pointer;min-height:44px}
+button:disabled {opacity:.45;cursor:default}
+.operator-feedback {min-height:32px;padding:12px 0;color:var(--label2)}
+.operator-feedback.error,.operator-warning {color:var(--red)}
+.operator-hint {color:var(--label2);font-size:14px;line-height:1.5;margin:8px 0 16px}
+.operator-layout {display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.operator-card {background:var(--sys-grouped2);border-radius:var(--r-xl);padding:18px;margin-bottom:16px;border:1px solid var(--sep)}
+.operator-card h2,.operator-card h3 {margin:0 0 12px}
+.operator-controls {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0}
+.operator-menu {display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.operator-menu .item-card {text-align:left;min-height:110px;padding:16px}
+.operator-form {display:grid;gap:14px}
+.operator-form label {display:grid;gap:6px}
+.operator-modifiers {display:flex;gap:12px;flex-wrap:wrap}
+.operator-modifiers label {display:flex;align-items:center;gap:5px}
+.operator-modifiers input {min-height:24px;width:24px}
+.operator-unit {padding:14px 0;border-top:1px solid var(--sep)}
+.operator-unit:first-child {border-top:0}
+.operator-unit p {margin:5px 0;font-size:14px;color:var(--label2)}
+.operator-unit strong {font-size:17px}
+.operator-tickets {display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;align-items:start}
+.operator-tickets .operator-card {margin:0}
+.operator-label {font-size:13px;color:var(--label2);overflow-wrap:anywhere}
+.operator-pill {padding:5px 10px;border-radius:20px;background:var(--fill3);display:inline-block;font-size:13px}
+.operator-notes {white-space:pre-wrap;color:var(--label);overflow-wrap:anywhere}
+.operator-summary {white-space:pre-wrap;line-height:1.6;font:inherit;background:var(--fill3);padding:16px;border-radius:12px}
+.operator-zones {display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.operator-zones .operator-card {margin:0}
+.operator-section {margin-top:24px}
+.operator-retry {padding:14px;border:2px solid var(--orange);border-radius:12px;margin:8px 0}
+.operator-flag {padding:14px;background:var(--blue-bg);border:1px dashed var(--blue);border-radius:12px;margin:12px 0}
+.operator-section table {width:100%;border-collapse:collapse}
+.operator-section td,.operator-section th {padding:10px;text-align:left;border-bottom:1px solid var(--sep)}
+@media(max-width:760px){.operator-layout{grid-template-columns:1fr}.operator-header{position:relative;gap:12px}.operator-header nav{gap:12px}.operator-shell{padding-top:12px}.operator-tickets{grid-template-columns:1fr}.operator-session{align-items:flex-start}.operator-session label{flex-direction:column;align-items:flex-start}.operator-form textarea{width:100%}}
+.operator-session input {border:1px solid var(--sep-opaque);border-radius:10px;padding:8px 10px;background:var(--sys-grouped2);color:var(--label);font-size:16px;max-width:100%}

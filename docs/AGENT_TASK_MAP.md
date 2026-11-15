@@ -16,6 +16,7 @@ never reset, overwrite or assume a clean checkpoint. Source, not prose, owns sha
 | Vector provider / similarity suggestions | mvp/menu_embeddings.py | menu prepare/search; runtime failure tests |
 | Upload and extracted-item correction | frontend/menu-document.js | menu-setup.js; browser correction flow |
 | Preview, review gates, stale/error/retry UI | frontend/menu-setup.js | app.js callbacks; tests/menu-setup.test.cjs |
+| Operator pages and canonical UI adapter | frontend/data.js; frontend/operator-pages.js; frontend/INTEGRATION.md | operator-pages.test.cjs; actual Server/Kitchen browser flow |
 | Shared request/session/exact command retry | frontend/app.js | all screens; browser outage/session flow |
 | Menu prepare, snapshot pinning, activation | mvp/domain.py | API/client/analytics; runtime + core tests |
 | Commands/state/operational schemas | mvp/contracts.py | Voice/CV/client; /api/v2/contracts; core tests |

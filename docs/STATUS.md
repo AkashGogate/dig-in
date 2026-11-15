@@ -2,7 +2,68 @@
 
 [PROJECT_SPEC](../PROJECT_SPEC.md) owns intended behavior; this file owns execution evidence. [Normalized brief](MVP_TEAM_BRIEF.md) is portable team context. The Menu workstream **also owns Core/backend and integration**; personal names remain unassigned. STATUS is not a concurrency lock.
 
-## Current application integration — 2026-11-14
+## Latest pushed workstreams integrated — 2026-11-14
+
+Source now includes Voice9fcdd95, CV7e13c16 and UIabe9fb1 on top of the Menu/service
+checkpoint, with real merge ancestry. Astra maximum reasoning supervised the
+incremental merge and the bounded evaluation work. The prior checkpoint below is
+historical and is superseded by these results.
+
+- **245 backend +55 CV +49 legacy kitchen tests passed;48 Node22 tests passed.**
+  Ruff lint/format passed across62 scoped Python files. Native middleware entrypoint,
+  shared-client/auth/retry tests and actual ASGI composition are included.
+- Real Deepgram v2 WebSocket probe:1.82s synthetic audio, expected dish matched,
+  conservative confidence0.8691406, editable draft only; estimatedUSD0.0002.
+  Full prerecorded matrix:102 audio cases across6 synthetic voice/noise personas,
+  exact246.518375s audio, estimatedUSD0.0316 at configuredrate. **66 matched
+  expected behavior,36 were safely flagged,0 silently wrong outcomes** under the
+  harness. Nine fixed controlled/historical cases yielded111total:67exact,
+  44flagged,0wrong, safetygatePASS. MOCK26:18exact/8flagged/0wrong, gatePASS.
+  This is scripted speech/noise stress testing, not real staff/room accuracy.
+- Shared final-word minimum confidence protects low critical words; any unknown
+  segment stays unknown. Known live low/unknown confidence requires whole-draft
+  Server review or Kitchen clarification. Threshold0.6 remains provisional.
+  Eval uses the same confidence path; exact sample-duration caps and invalid audio
+  checks precede paid calls. Historical reports remain unchanged/labeled; routine
+  raw synthetic reports/audio stay ignored locally.
+- Shape-based CV increment preserved with same-frame detector agreement,
+  ambiguous-footprint/hand/confidence gates and canonical rebaseline disabled.
+  Legacy active-ticket advancement remains isolated from canonical Restaurant.
+- New Take orders/My tables/Kitchen operator pages use canonical /api/v2 only.
+  Prototype snippets are retained as unloaded reference, never fallback state.
+  Pinned menus, exact retry, per-tab verified login, per-unit actions, recipient
+  updates and explicit summaries are connected. Full voice/OCR/activation,
+  reconciliation and device print/speech remain linked in the original workbench.
+- Browser on the final protected local app passed all3newpages:401→verified tab
+  login→Server draft/save r2→separate human Confirm→Kitchen acknowledgment and
+  distinct A/B units→one start/manual-ready→targeted pickup message→Server update
+  acknowledgment without food change→exact pickup/release→fresh summary with
+  1of2 cumulative ready,1picked up,0currentlyready. Authenticated HTTP smoke passed.
+- First remote Linux CI built the root container and passed test suites. Its final
+  route-introspection assertion failed on FastAPI's _IncludedRouter; replaced
+  with an actual HTTP health/CV-route probe plus owning producer-contract import.
+  Final CI result is recorded below when available.
+- Secret hygiene passed273indexed paths before final docs; staged and all-ref
+  history scans found no secrets. Actual credentials were read from ignored
+  backend/.env without displaying values; permissions restricted to owner access.
+  Main and teammate branches are preserved. Integration source is published only
+  on codex/application-integration; no production deployment is claimed.
+
+**Remaining live release gaps:** deployed frontend still has no login gate/API
+proxy, backend health404 and state200withoutlogin. Authenticated frontend API is
+also404. Local credentials work for the real provider, but no Fly/Vercel deployment
+credentials were supplied; deployment wiring/secrets and hosted browser/proxy/WS/
+8MiB upload checks remain. No physical CV rig/model/calibration, microphone/phone,
+headphone/real printer, live Databricks, durable state or multi-machine validation.
+The36flagged live audio cases require correction/review. A passed safety gate is
+not a guarantee of perfect recognition or a failure-free demo.
+
+See [deployment](DEPLOYMENT.md), [UI handoff](handoffs/2026-11-14-ui-application-integration.md),
+[Voice increment](handoffs/2026-11-14-voice-increment-integration.md),
+[CV increment](handoffs/2026-11-14-cv-increment-integration.md) and
+[eval provenance](../backend/eval/dig_in/runs/README.md).
+
+## Earlier application integration checkpoint — 2026-11-14
 
 The newest source is `codex/application-integration`, combining menu/service
 9d3face, Voice9af39dc and CV3b0d0a1 with real merge ancestry. Older sections below

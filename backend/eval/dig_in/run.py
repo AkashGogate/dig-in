@@ -11,8 +11,8 @@ deepgram  renders every case x persona with macOS `say` (free, cached), prints
           the billable audio seconds and estimated cost, then REFUSES unless
           --confirm-billable is passed and the total is under
           --max-audio-seconds. Same Deepgram params as the live mic adapter.
-`transcript` test sets (safety_regressions) are real STT text and always run
-from fixed text, never billed.
+`transcript` test sets (safety_regressions) use fixed historical provider text
+or explicitly controlled synthetic metadata; they never incur provider calls.
 Exit 1 if any simulation is `wrong`, a mock case misses its allowed outcome,
 or a regression against --baseline is found.
 """

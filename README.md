@@ -72,3 +72,10 @@ to supply shared menu revisions. [Agent task map](docs/AGENT_TASK_MAP.md) and
 [integration guide](docs/INTEGRATION_GUIDE.md) identify extension seams and reviews.
 
 Production URL, login secret names, release checks and current live gaps are documented in [DEPLOYMENT](docs/DEPLOYMENT.md) and [STATUS](docs/STATUS.md). Keep keys in ignored local `.env` or platform secret stores, never in chat or Markdown.
+
+The incoming UI screens are now connected: `server-order.html`,
+`server-tables.html` and `kitchen.html` use canonical /api/v2 through data.js.
+Navigate from the workbench or between operator pages. Sessions are selected per
+page; saved orders remain on the backend. Original prototypes remain unloaded
+reference. See [UI contracts](frontend/INTEGRATION.md) and the latest STATUS for
+real-provider results, reviewed uncertainties and deployment gaps.
