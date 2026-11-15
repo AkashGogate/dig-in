@@ -26,6 +26,10 @@ ingredient:
 
 plating:
   camera: plating_cam
+  detector: circles          # plates found by shape (any pattern, any counter); a plate belongs to the bay holding its centre
+  plate_min_radius_px: 90
+  plate_max_radius_px: 260
+  circle_quality: 0.75
   debounce_s: 0.8
   snapshot_interval_s: 10
   max_plates_per_bay: 4

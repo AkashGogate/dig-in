@@ -101,3 +101,24 @@ source context changes, no first-frame calibration fallback, native two-plate
 counts, individual-rejection queue preservation and the actual producer mock API
 → canonical Restaurant ready/pickup loop, including blocked→tap pickup recovery→
 new allocation→stable empty→new ready. No private frames or live rigs were run.
+
+## Incremental shape branch (7e13c16)
+
+The new `circles` detector and its synthetic pattern/texture tests are preserved.
+Canonical `config/v2.yaml` stays on calibrated `bays`; circles remains an explicit
+configuration choice, not a claimed live accuracy upgrade. In canonical circles
+mode, each frame is cross-checked against the calibrated per-bay counter. Only
+matching counts carry that counter's confidence; disagreement (including a false
+empty) is withheld. Circle footprints must be fully contained in one physical
+zone; overlap/boundary/gap ambiguity withholds every touched zone, including a
+neighbour whose centre-based circle count is zero. Plate overflow remains visible.
+Hough's quality threshold is a detector setting, not a calibrated probability.
+
+Incoming legacy health can accept a still rearranged scene after5s; canonical v2
+explicitly disables that rebaselining. A stationary obstruction/camera move never
+becomes a trusted empty calibration automatically. Existing reference, hand,
+continuous-dwell, confidence, quarantine, version and explicit recovery gates stay
+in place. Legacy kitchen auto-active-ticket advance is preserved/tested only in
+`kitchen-backend`; no new queued v2 order auto-start or recipe deduction is wired.
+
+Increment validation: full CV55passed, standalone kitchen49passed, canonical bridge12passed; physical rig remains untested.

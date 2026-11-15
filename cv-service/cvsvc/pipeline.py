@@ -22,7 +22,8 @@ from cvsvc.ingredient.tracker import ZoneTracker
 from cvsvc.ingredient.hands import HandTripTracker, zone_of
 from cvsvc.ingredient.trips import TripTracker
 from cvsvc.ingredient.zones import ZoneCounter
-from cvsvc.plating.bays import BayCounter
+from cvsvc.plating.bays import BayCounter, PlateCount
+from cvsvc.plating.circles import PlateFinder, assign_to_bays
 from cvsvc.plating.tracker import BayTracker
 from cvsvc.sources import FrameSource
 from cvsvc.vision import MotionDetector, PresenceDetector, mean_luminance
@@ -100,6 +101,9 @@ class CameraWorker:
         self.body_until = 0.0
         self.hand_detector = None
         self.hands: list = []
+        pc = self.cfg.plating
+        self.plate_finder = PlateFinder(pc.plate_min_radius_px, pc.plate_max_radius_px, pc.circle_quality) \
+            if self.has_plating and pc.detector == "circles" else None
         if self.has_ingredient and self.cfg.ingredient.mode == "trips" and self.cfg.ingredient.trip_detector == "hands":
             from cvsvc.ingredient.hands import HandDetector
             self.hand_detector = HandDetector(self.cfg.ingredient.hand_model_path)
@@ -253,8 +257,9 @@ class CameraWorker:
             if getattr(self.o, "v2_sampler", None) is not None and self.has_plating:
                 detector = getattr(self.o, "v2_hand_detector", None)
                 self.v2_hand_present = bool(detector.detect(frame, ts)) if detector is not None else None
+            per_bay = self._circle_counts(frame) if self.plate_finder is not None else None
             for bid, b in self.bays.items():
-                self._process_bay(ts, frame, gray, bid, b)
+                self._process_bay(ts, frame, gray, bid, b, per_bay[bid] if per_bay else None)
             self._render(frame)
 
     def _process_zone(self, ts, frame, gray, zid, z: _Zone) -> None:
@@ -319,9 +324,42 @@ class CameraWorker:
             attr = self.o.context.attribution(res.version_at_start)
             self.emit(self.o.emitter.trip(zid, z.cfg.ingredient, res.duration_s, res.confidence, attr, None, ts))
 
-    def _process_bay(self, ts, frame, gray, bid, b: _Bay) -> None:
+    def _circle_counts(self, frame) -> dict[str, PlateCount]:
+        assert self.plate_finder is not None
+        polys = {bid: np.array(b.cfg.polygon, np.int32) for bid, b in self.bays.items()}
+        plates = self.plate_finder.find(frame)
+        by_bay = assign_to_bays(plates, polys)
+        self.v2_circle_ambiguous = set()
+        if getattr(self.o, "v2_sampler", None) is not None:
+            # Centre assignment remains the teammate's legacy convention. In v2
+            # a footprint crossing a physical zone boundary cannot prove either
+            # one unit in that zone or empty space in its neighbour.
+            for plate in plates:
+                distances = {bid: cv2.pointPolygonTest(poly, (float(plate.x), float(plate.y)), True)
+                             for bid, poly in polys.items()}
+                touched = {bid for bid, distance in distances.items() if distance > -plate.r}
+                contained = {bid for bid, distance in distances.items() if distance >= plate.r}
+                if touched and (len(touched) > 1 or len(contained) != 1):
+                    self.v2_circle_ambiguous.update(touched)
+        cap = self.cfg.plating.max_plates_per_bay
+        return {bid: PlateCount(min(len(ps), cap), 1.0, [p.contour() for p in ps]) for bid, ps in by_bay.items()}
+
+    def _bay_count(self, frame, b: _Bay) -> PlateCount:
+        if self.plate_finder is not None:
+            return self._circle_counts(frame)[b.cfg.id]
+        return b.counter.count(frame)
+
+    def _process_bay(self, ts, frame, gray, bid, b: _Bay, precomputed: PlateCount | None = None) -> None:
         motion = b.motion.update(gray)
-        pc = b.counter.count(frame)
+        pc = precomputed if precomputed is not None else b.counter.count(frame)
+        if precomputed is not None and getattr(self.o, "v2_sampler", None) is not None:
+            # Hough ALT returns geometry, not calibrated probabilities. Reuse the
+            # same-frame calibrated counter's confidence only when counts agree.
+            calibrated = b.counter.count(frame)
+            reliable = (calibrated.count == pc.count
+                        and bid not in getattr(self, "v2_circle_ambiguous", set())
+                        and self.cfg.plating.max_plates_per_bay >= 2)
+            pc = PlateCount(pc.count, calibrated.confidence if reliable else 0.0, pc.contours)
         b.last = pc
         # Optional v2 bridge consumes per-frame evidence before legacy debounce.
         # It captures unit/version context at candidate start and measures its own
@@ -363,7 +401,7 @@ class CameraWorker:
                 self.emit(em.pending(zid, z.cfg.ingredient, "post_obstruction_mismatch", before, now_count, 0.5,
                                      self.o.context.attribution(), ts))
         for bid, b in self.bays.items():
-            now_count = b.counter.count(frame).count
+            now_count = self._bay_count(frame, b).count
             changed = now_count != b.tracker.stable_count
             b.tracker.stable_count = now_count
             b.tracker.candidate = None

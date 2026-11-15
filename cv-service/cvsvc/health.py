@@ -42,6 +42,8 @@ class HealthMonitor:
         self.last_frame_ts: float | None = None
         self.bg: np.ndarray | None = None
         self.first_frame_ts: float | None = None
+        self.prev: np.ndarray | None = None
+        self.still_since: float | None = None
         self.big_change_since: float | None = None
         self.ref_lum: float | None = None
         self.ref_focus: float | None = None
@@ -83,8 +85,17 @@ class HealthMonitor:
         big = False
         if self.first_frame_ts is None:
             self.first_frame_ts = ts
+        still = self.prev is not None and float((cv2.absdiff(g, self.prev) > 15).mean()) < 0.01
+        self.prev = g
         if self.bg is None or ts - self.first_frame_ts < self.cfg.warmup_s:
             self.bg = g.copy()  # camera auto-exposure settles during warm-up; don't judge yet
+        elif self.cfg.allow_rebaseline and self.big_change_since is not None and still and \
+                ts - (self.still_since or ts) >= self.cfg.rebaseline_s:
+            # "blocked" but nothing has moved for a while: the camera or scene was rearranged.
+            # Accept the new view instead of staying obstructed forever.
+            self.bg = g.copy()
+            self.big_change_since = None
+            self.still_since = None
         else:
             # match overall brightness first so an auto-exposure shift is not a "blocked view"
             g_n = g * (float(self.bg.mean()) / max(float(g.mean()), 1.0))
@@ -92,6 +103,10 @@ class HealthMonitor:
             big = frac > self.cfg.big_change_fraction
             if not big:
                 cv2.accumulateWeighted(g, self.bg, 0.05)  # don't learn the obstruction into the background
+        if still:
+            self.still_since = self.still_since or ts
+        else:
+            self.still_since = None
         if big and not any_zone_active:
             self.big_change_since = self.big_change_since or ts
         else:

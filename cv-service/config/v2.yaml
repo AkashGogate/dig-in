@@ -10,6 +10,7 @@ ingredient:
   mode: slots
   zones: []
 plating:
+  detector: bays  # circles is opt-in and additionally cross-checked in canonical v2
   camera: plating_cam
   debounce_s: 1.5
   max_plates_per_bay: 4  # preserve overflow evidence; Core still permits only one
@@ -26,3 +27,6 @@ plating:
       polygon: [[445,380],[835,380],[835,700],[445,700]]
     - id: F
       polygon: [[870,380],[1260,380],[1260,700],[870,700]]
+
+health:
+  allow_rebaseline: false  # a stationary obstruction is never a newly trusted empty scene

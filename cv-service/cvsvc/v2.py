@@ -327,6 +327,13 @@ def main():
     parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
     cfg = load_config(args.config)
+    # A motionless obstruction/camera move is not a newly trusted empty scene.
+    # Explicit staff calibration/reconciliation remains the canonical boundary.
+    cfg.health.allow_rebaseline = False
+    if cfg.plating.max_plates_per_bay < 2:
+        raise ValueError(
+            "Canonical detector must preserve multi-plate overflow (cap >=2)"
+        )
     # Canonical delivery owns its sink. Do not also POST legacy batched events
     # into the old independent kitchen service or a second operational backend.
     cfg.sinks.backend_url = None

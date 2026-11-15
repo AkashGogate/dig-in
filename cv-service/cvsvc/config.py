@@ -81,6 +81,13 @@ class BayConfig(BaseModel):
 
 class PlatingConfig(BaseModel):
     camera: str = "plating_cam"
+    # circles: plates found by shape (Hough circles) once per frame, assigned to the bay holding
+    #          their centre; independent of plate pattern and counter colour (recommended)
+    # bays:    per-bay foreground detector (each bay's `detector`: diff | white)
+    detector: Literal["circles", "bays"] = "bays"
+    plate_min_radius_px: int = 90
+    plate_max_radius_px: int = 260
+    circle_quality: float = 0.75
     debounce_s: float = 0.8
     snapshot_interval_s: float = 10
     max_plates_per_bay: int = 4
@@ -98,6 +105,8 @@ class HealthConfig(BaseModel):
     degraded_light_shift: float = 0.25
     degraded_focus_drop: float = 0.40
     recovery_wait_s: float = 2.0
+    allow_rebaseline: bool = True  # legacy only; canonical v2 disables automatic scene acceptance
+    rebaseline_s: float = 5.0  # view "blocked" but perfectly still this long => the scene was rearranged; accept it
     warmup_s: float = 2.0  # ignore the first seconds of frames (auto-exposure settling)
     heartbeat_s: float = 5.0
 
