@@ -36,6 +36,21 @@ voice/camera inputs. [Acceptance map](INTEGRATION_ACCEPTANCE.md) and
 [deployment handoff](DEPLOYMENT_HANDOFF.md) distinguish completed software from
 hosted release, physical rig/mic/phone/printer and cloud validation still needed.
 
+## Fresh local end-to-end acceptance — 2026-11-14
+
+All **24 real HTTP acceptance checks passed** across draft review/confirmation,
+retry protection, physical-unit allocation, CV evidence guards, partial/all-ready
+notifications, targeted staff updates, read-only summaries, pickup and delivery.
+The actual browser PDF flow passed extraction → correction → local encoding →
+explicit review → activation. Readable photo OCR returned HTTP 200. Replacement
+menu voice matching and pinned historical menu snapshots passed; the original
+eight-dish active menu and seeded demo ticket were preserved/restored.
+
+No blocking defect was found in these exercised local paths. This pass used
+simulated voice/CV and no additional paid services; hosted release and physical
+device checks remain assigned to the deployment owner. See the
+[end-to-end acceptance handoff](handoffs/2026-11-14-end-to-end-demo-acceptance.md).
+
 ## Earlier incremental evidence
 
 ## Latest pushed workstreams integrated — 2026-11-14
