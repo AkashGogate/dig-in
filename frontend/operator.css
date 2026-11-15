@@ -98,3 +98,13 @@ body[data-operator-page="kitchen"] .operator-card {background:#1c1c1e;border-col
 .operator-zone-card p {margin-top:8px;font-size:14px;line-height:20px;overflow-wrap:anywhere}
 .operator-zone-card .operator-warning {display:block;font-size:14px;margin-top:8px;overflow-wrap:anywhere}
 @media(max-width:520px){.operator-zone-panels .zone-panel{padding:14px}.operator-zone-panels .zone-tiles{grid-template-columns:1fr}.operator-zone-panels .zone-panel-sub{font-size:13px;line-height:20px}}
+/* Canonical menu sections use incoming card hierarchy with imported categories. */
+.operator-theme-toggle {width:auto;min-width:88px;min-height:44px;padding:8px 12px;font-size:14px;color:var(--label)}
+.operator-menu {display:block}
+.operator-menu .menu-grid-inner {grid-template-columns:repeat(auto-fill,minmax(min(190px,100%),1fr));gap:12px}
+.operator-menu .item-card {width:100%;min-height:130px;overflow-wrap:anywhere}
+.operator-menu .item-card-top {width:100%}
+.operator-menu .menu-section-header {margin:0;font-size:14px;color:var(--label);overflow-wrap:anywhere}
+.operator-menu .item-desc {color:var(--label2);text-align:left}
+.operator-menu .item-price {font-variant-numeric:tabular-nums}
+html.force-dark {color-scheme:dark}

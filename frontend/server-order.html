@@ -170,12 +170,13 @@ body { background: var(--sys-grouped); }
 }
 </style>
 <link rel="stylesheet" href="operator.css">
+<script src="theme.js"></script>
 <script src="config.js"></script>
 <script defer src="data.js"></script>
 <script defer src="operator-pages.js"></script>
 </head>
 <body data-operator-page="order">
-<header class="operator-header"><h1>New order</h1><nav aria-label="Operator screens"><a href="server-order.html" aria-current="page">New order</a><a href="server-tables.html">My tables</a><a href="kitchen.html">Kitchen</a><a href="index.html">Full workbench</a></nav></header>
+<header class="operator-header"><h1>New order</h1><button class="icon-btn operator-theme-toggle" id="themeToggle" type="button" aria-label="Switch color theme">Theme</button><nav aria-label="Operator screens"><a href="server-order.html" aria-current="page">New order</a><a href="server-tables.html">My tables</a><a href="kitchen.html">Kitchen</a><a href="index.html">Full workbench</a></nav></header>
 <main class="operator-shell">
   <form id="operatorLogin" class="operator-session" hidden>
     <p>Protected demo sign-in. Credentials stay in this tab’s memory. Browser sign-in is used automatically when available.</p>

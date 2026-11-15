@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: node --check ../frontend/data.js && node --check ../frontend/operator-pages.js && node --check ../frontend/server-alert.js && node --check ../frontend/voice-audio.js && node --check ../frontend/app.js && node --check ../frontend/service-coordination.js && node --check ../frontend/menu-document.js && node --check ../frontend/menu-setup.js && node --check ../frontend/coordination-v1.js && node --check ../frontend/config.js
+      - run: node --check ../frontend/data.js && node --check ../frontend/operator-pages.js && node --check ../frontend/server-alert.js && node --check ../frontend/voice-audio.js && node --check ../frontend/app.js && node --check ../frontend/service-coordination.js && node --check ../frontend/menu-document.js && node --check ../frontend/menu-setup.js && node --check ../frontend/coordination-v1.js && node --check ../frontend/config.js && node --check ../frontend/theme.js
       - run: npm ci --ignore-scripts --prefix ../frontend
       - run: node --test ../frontend/tests/*.test.cjs ../frontend/tests/*.test.mjs
       - run: docker build --tag dig-in-ci ..

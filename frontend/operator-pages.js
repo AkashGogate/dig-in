@@ -66,13 +66,20 @@
     selectedDraft=order.id;localDirty=false;
   }
   function menuMarkup(ctx) {
-    const menu = menuFor(ctx.state,editor), items = menu?.items || [];
-    const categories = [...new Set(items.map(i=>i.category).filter(Boolean))];
-    const filtered=items.filter(i=>(!search || i.name.toLowerCase().includes(search.toLowerCase())) && (!category || i.category===category));
-    return `<section class="operator-card"><h2>${e(menu?.name || 'Menu unavailable')}</h2>
-      <p class="operator-hint">${editor ? `Pinned menu ${e(editor.menu_revision)}. Imported menus apply to new drafts.` : 'Start or select a draft to add dishes.'} Prices and preparation times are unknown when not supplied.</p>
-      <div class="operator-controls"><label>Search <input id="operatorSearch" type="search" value="${e(search)}" autocomplete="off"></label><label>Category <select id="operatorCategory"><option value="">All</option>${categories.map(c=>`<option ${category===c?'selected':''} value="${e(c)}">${e(c)}</option>`).join('')}</select></label></div>
-      <div class="operator-menu">${filtered.map(i=>`<button class="item-card" data-action="add" data-id="${e(i.id)}" ${!editor?'data-disabled="true"':''}><div class="item-name">${e(i.name)}</div><div class="item-price">${i.price_cents==null?'Price unknown':`$${(i.price_cents/100).toFixed(2)}`}</div><p class="operator-label">${e(i.description || '')}</p></button>`).join('') || '<p>No matching dishes.</p>'}</div></section>`;
+    const menu=menuFor(ctx.state,editor),items=menu?.items || [];
+    const categories=[...new Set(items.map(item=>item.category).filter(Boolean))];
+    if(category&&!categories.includes(category))category='';
+    const filtered=items.filter(item=>(!search || `${item.name} ${item.description || ''}`.toLowerCase().includes(search.toLowerCase()))&&(!category||item.category===category));
+    const card=item=>{
+      const quantity=(editor?.lines || []).filter(line=>line.menu_id===item.id).reduce((sum,line)=>sum+line.quantity,0);
+      return `<button class="item-card ${quantity>0?'in-order':''}" data-action="add" data-id="${e(item.id)}" ${!editor?'data-disabled="true"':''}><div class="item-card-top"><div class="item-name">${e(item.name)}</div>${quantity?`<span class="item-badge" aria-label="${quantity} physical units in draft">${quantity}</span>`:''}</div>${item.description?`<p class="item-desc">${e(item.description)}</p>`:''}<div class="item-price">${item.price_cents==null?'Price unknown':`$${(item.price_cents/100).toFixed(2)}`}</div></button>`;
+    };
+    // Section names and order come only from the pinned menu, including arbitrary
+    // imported categories and missing-category dishes. Names never identify units.
+    const sections=[...new Set(filtered.map(item=>item.category || ''))];
+    const cards=(!search&&!category)?sections.map(section=>`<section class="operator-menu-section"><h3 class="menu-section-header">${e(section || 'Other dishes')}</h3><div class="menu-grid-inner">${filtered.filter(item=>(item.category || '')===section).map(card).join('')}</div></section>`).join(''):`<div class="menu-grid-inner">${filtered.map(card).join('')}</div>`;
+    return `<section class="operator-card"><h2>${e(menu?.name || 'Menu unavailable')}</h2><p class="operator-hint">${editor?`Pinned menu ${e(editor.menu_revision)}. Imported menus apply to new drafts.`:'Start or select a draft to add dishes.'} Prices and preparation times are unknown when not supplied.</p>
+      <div class="operator-controls"><label>Search <input id="operatorSearch" type="search" value="${e(search)}" autocomplete="off"></label><label>Category <select id="operatorCategory"><option value="">All</option>${categories.map(c=>`<option ${category===c?'selected':''} value="${e(c)}">${e(c)}</option>`).join('')}</select></label></div><div class="operator-menu">${filtered.length?cards:'<p>No matching dishes.</p>'}</div></section>`;
   }
   function flagsMarkup() {
     return editor.flags.map(flag=>`<div class="operator-flag"><strong>Review required: ${e(human(flag.code))}</strong><p>${e(flag.message)}</p>

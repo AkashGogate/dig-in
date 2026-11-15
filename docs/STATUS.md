@@ -4,6 +4,20 @@
 
 ## Final integration snapshot — 2026-11-14
 
+PR #1 merged to main `35d6d08`; main CI passed. UI `dd6886e` arrived during the
+final check and is integrated in a follow-up: accessible guarded theme controls
+on Server screens, canonical pinned-menu sections/descriptions/quantity badges,
+Kitchen forced-dark preserved and all nine upstream changed sources archived.
+Frontend **62 passed**. Fixed the release probe's older-snapshot/malformed-mode
+crash; **13 probe/auth tests passed**. Astra independently cleared both changes.
+See [follow-up handoff](handoffs/2026-11-14-final-ui-and-release-probe.md).
+
+Post-merge hosted probe now reports frontend503 (`Demo access is not configured.`),
+old backend health404 and state/OpenAPI200withoutlogin. Proxied state is200but
+lacks menu_revision; voice status200alone does not validate this release.
+Matching platform secrets and backend publication are still required by the
+signed-in deployment owner. Local software acceptance is not hosted readiness.
+
 Final pre-main Deepgram recheck on application source `5b956b1` used four actual
 provider streams with synthetic speech: correct Server draft, Kitchen start and
 successful clearer Kitchen acknowledgment. The first short acknowledgment

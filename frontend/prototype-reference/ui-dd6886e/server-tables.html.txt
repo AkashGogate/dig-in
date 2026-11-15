@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Tables</title>
+<link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script defer src="server-alert.js"></script>
+<style>
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--sys-grouped); }
+.app { display: flex; flex-direction: column; height: 100%; }
+
+/* ── Tab bar (iPhone) ─────────────────────────────────────────────────────── */
+.tab-bar {
+  display: none;
+  flex-shrink: 0;
+  background: var(--bar-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid var(--bar-border);
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+}
+.tab-bar-items { display: flex; justify-content: space-around; }
+.tab-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font: 400 10px/13px var(--font); color: var(--label3);
+  padding: 4px 16px; min-height: 44px; min-width: 44px;
+  position: relative;
+}
+.tab-item.active { color: var(--blue); }
+.tab-item-icon { font-size: 20px; height: 26px; display: flex; align-items: center; }
+.tab-item-icon svg { width: 25px; height: 25px; }
+.tab-badge {
+  position: absolute; top: 2px; right: 10px;
+  background: var(--red); color: #fff;
+  font: 700 10px/14px var(--font);
+  min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: var(--r-pill);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Top nav ──────────────────────────────────────────────────────────────── */
+.top-nav {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 20px 10px;
+  background: var(--bar-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--bar-border);
+  flex-shrink: 0; z-index: 10;
+}
+.nav-title { font: 700 17px/22px var(--font); flex: 1; }
+.nav-live {
+  display: flex; align-items: center; gap: 5px;
+  font: 600 13px/18px var(--font); color: var(--green);
+}
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: voice-pulse 2s ease-in-out infinite; }
+
+/* ── Main layout: sidebar + content ──────────────────────────────────────── */
+.main-area { display: flex; flex: 1; overflow: hidden; }
+
+/* Sidebar */
+.sidebar {
+  width: 300px; flex-shrink: 0;
+  border-right: 1px solid var(--sep-opaque);
+  overflow-y: auto;
+  background: var(--sys-grouped);
+}
+
+/* Floor / content */
+.floor-area {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+.floor-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sep);
+  flex-shrink: 0;
+}
+.floor-title { font: 700 28px/34px var(--font); flex:1; }
+.floor-canvas { flex: 1; position: relative; overflow: hidden; background: var(--canvas); box-shadow: inset 0 1px 3px rgba(0,0,0,.18); }
+
+/* iPhone overrides */
+@media (max-width: 767px) {
+  .sidebar { width: 100%; border-right: none; display: none; }
+  .floor-area { display: none; }
+  .sidebar.show-mobile { display: flex; flex-direction: column; }
+  .floor-area.show-mobile { display: flex; }
+  .tab-bar { display: block; }
+  .nav-map-btn { display: flex !important; }
+}
+.nav-map-btn { display: none; }
+
+/* ── Sidebar list styles ──────────────────────────────────────────────────── */
+.sidebar-section-header {
+  font: 600 13px/18px var(--font);
+  color: var(--label2);
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 20px 20px 8px;
+}
+.sidebar-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sep);
+  cursor: pointer;
+  min-height: 60px;
+  transition: background .12s;
+}
+.sidebar-row:hover { background: var(--fill4); }
+.sidebar-row:last-child { border-bottom: none; }
+
+.table-circle {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font: 700 18px/1 var(--font); color: #fff;
+  flex-shrink: 0;
+}
+.sidebar-row-info { flex: 1; min-width: 0; }
+.sidebar-row-title { font: 600 15px/20px var(--font); color: var(--label); }
+.sidebar-row-sub   { font: 400 13px/18px var(--font); color: var(--label2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-row-time  { font: 400 13px/18px var(--font); color: var(--label3); flex-shrink: 0; }
+
+/* Floor-table visuals live in style.css; see .floor-table status variants. */
+
+/* ── Sheet ────────────────────────────────────────────────────────────────── */
+.sheet-backdrop { display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:50;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px); }
+.sheet-backdrop.open { display:block; }
+.sheet { position:fixed;bottom:0;left:0;right:0;background:var(--sys-grouped);border-radius:20px 20px 0 0;z-index:51;max-height:92vh;overflow-y:auto;transform:translateY(100%);transition:transform .35s cubic-bezier(.4,.0,.2,1);box-shadow:0 -4px 32px rgba(0,0,0,.18); }
+.sheet.open { transform:translateY(0); }
+.sheet-handle { display:flex;justify-content:center;padding:12px 0 4px; }
+.sheet-handle::before { content:'';display:block;width:36px;height:5px;background:var(--fill2);border-radius:var(--r-pill); }
+.sheet-title { font:700 20px/26px var(--font);padding:4px 20px 12px; }
+.sheet-subtitle { font:400 15px/20px var(--font);color:var(--label2);padding:0 20px 12px; }
+
+/* ── Sheet dish rows ──────────────────────────────────────────────────────── */
+.sheet-dish-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--sep);
+  min-height: 56px;
+}
+.sheet-dish-row:last-child { border-bottom: none; }
+.zone-badge {
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: var(--r);
+  display: flex; align-items: center; justify-content: center;
+  font: 700 12px/16px var(--font);
+}
+.zone-badge.ready   { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.zone-badge.cooking { background: var(--orange-bg); color: var(--orange); border: 1px solid rgba(255,149,0,.3); }
+.zone-badge.queued  { background: var(--fill3); color: var(--label3); border: 1px solid var(--sep); }
+
+/* ── Action buttons in sheet ──────────────────────────────────────────────── */
+.sheet-actions { padding: 12px 20px 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-action {
+  flex: 1; min-width: 120px; padding: 14px;
+  border-radius: var(--r-lg);
+  font: 600 15px/20px var(--font);
+}
+.btn-primary   { background: var(--blue);  color: #fff; }
+.btn-secondary { background: var(--fill3); color: var(--label2); }
+.btn-green     { background: var(--green); color: #fff; }
+.btn-action:hover:not(:disabled) { opacity: .9; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Top nav -->
+  <div class="top-nav">
+    <div class="nav-title">My Tables</div>
+    <div class="nav-live"><div class="live-dot"></div> Live</div>
+    <button class="icon-btn" id="themeToggle" title="Toggle light / dark"></button>
+    <button class="nav-btn nav-map-btn" id="mapToggleBtn">Map</button>
+  </div>
+
+  <div class="main-area">
+
+    <!-- ── Sidebar ───────────────────────────────────────────────────────── -->
+    <div class="sidebar show-mobile" id="sidebar">
+      <div class="sidebar-section-header">My tables</div>
+      <div class="list-inset" style="margin:0 0 8px" id="myTablesList"></div>
+
+      <div class="sidebar-section-header">Other tables</div>
+      <div class="list-inset" style="margin:0 0 8px" id="otherTablesList"></div>
+    </div>
+
+    <!-- ── Floor area ────────────────────────────────────────────────────── -->
+    <div class="floor-area" id="floorArea">
+      <div class="floor-toolbar">
+        <div class="floor-title">Floor</div>
+        <div class="seg" id="sectionSeg" style="max-width:340px">
+          <button class="seg-item active" data-section="main">Main dining</button>
+          <button class="seg-item" data-section="bar">Bar</button>
+          <button class="seg-item" data-section="patio">Patio</button>
+        </div>
+        <button class="nav-btn" id="listToggleBtn" style="display:none">List</button>
+      </div>
+      <div class="floor-canvas" id="floorCanvas"></div>
+    </div>
+
+  </div>
+
+  <!-- Tab bar (iPhone) -->
+  <div class="tab-bar">
+    <div class="tab-bar-items">
+      <button class="tab-item active" id="tabTables">
+        <div class="tab-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>Tables</button>
+      <button class="tab-item" onclick="location.href='server-order.html'">
+        <div class="tab-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>New order</button>
+      <button class="tab-item" id="tabPickups">
+        <div class="tab-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>Pickups<div class="tab-badge" id="pickupBadge">1</div></button>
+      <button class="tab-item">
+        <div class="tab-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></div>More</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Detail sheet -->
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+<div class="sheet" id="detailSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="sheetTitle">Table 4</div>
+  <div class="sheet-subtitle" id="sheetSubtitle"></div>
+  <div class="list-inset" style="margin:0 16px" id="sheetDishes"></div>
+  <div class="sheet-actions" id="sheetActions"></div>
+</div>
+
+<script>
+const SERVER_ID = api.getServer().id;
+const _pickedUp  = new Set();
+const _dismissed = new Set();
+
+function statusColor(o) {
+  if (!o) return '#8e8e93';
+  const ready = o.dishes.filter(d => d.status === 'ready').length;
+  if (ready === o.dishes.length) return 'var(--green)';
+  if (ready > 0 || o.dishes.some(d => d.status === 'cooking')) return 'var(--orange)';
+  if (o.status === 'submitted') return 'var(--blue)';
+  return '#8e8e93';
+}
+
+// Floor-tile status class for the surface-tile styling in style.css
+function statusClass(o) {
+  if (!o) return 'empty';
+  const ready = readyCount(o);
+  if (ready === o.dishes.length) return 'ready';
+  if (ready > 0 || o.dishes.some(d => d.status === 'cooking')) return 'cooking';
+  if (o.status === 'submitted') return 'sent';
+  return 'cooking';
+}
+
+function fmtElapsed(s) {
+  const m = Math.floor(s/60), sec = s%60;
+  return `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+function readyCount(o) { return o.dishes.filter(d => d.status==='ready').length; }
+
+function tableStatusText(o) {
+  if (!o) return '';
+  const r = readyCount(o);
+  if (r === o.dishes.length) return 'Ready to pick up';
+  if (r > 0) return `${r} of ${o.dishes.length} ready`;
+  if (o.status === 'submitted') return 'Waiting for kitchen';
+  return `${o.dishes.length} dishes cooking`;
+}
+
+// Compact status for the floor tile (number + one short line)
+function tableStatusShort(o) {
+  if (!o) return '';
+  const r = readyCount(o);
+  if (r === o.dishes.length) return 'Ready';
+  if (r > 0) return `${r}/${o.dishes.length} ready`;
+  if (o.status === 'submitted') return 'Sent';
+  return 'Cooking';
+}
+
+// ── Floor map layout (fixed positions matching Toast screenshot inspiration) ─
+const FLOOR_TABLES = [
+  // rect tables (name, x%, y%, w, h, shape)
+  { n:1,  x:5,  y:10, w:70, h:60, shape:'rect' },
+  { n:2,  x:5,  y:30, w:70, h:60, shape:'rect' },
+  { n:3,  x:5,  y:50, w:70, h:60, shape:'rect' },
+  { n:4,  x:18, y:12, w:80, h:70, shape:'circle' },
+  { n:5,  x:38, y:8,  w:80, h:70, shape:'circle' },
+  { n:6,  x:55, y:8,  w:80, h:70, shape:'circle' },
+  { n:7,  x:72, y:8,  w:60, h:50, shape:'rect' },
+  { n:8,  x:72, y:30, w:60, h:50, shape:'rect' },
+  { n:9,  x:38, y:30, w:90, h:80, shape:'rect' },
+  { n:10, x:55, y:28, w:80, h:70, shape:'circle' },
+  { n:11, x:18, y:50, w:90, h:80, shape:'rect' },
+  { n:12, x:38, y:55, w:80, h:70, shape:'circle' },
+  { n:13, x:55, y:52, w:70, h:60, shape:'rect' },
+  { n:14, x:72, y:55, w:60, h:50, shape:'rect' },
+  { n:15, x:72, y:75, w:70, h:60, shape:'circle' },
+];
+
+function renderFloor(orders) {
+  const canvas = document.getElementById('floorCanvas');
+  const W = canvas.clientWidth || 800;
+  const H = canvas.clientHeight || 500;
+
+  const orderByTable = {};
+  for (const o of orders) orderByTable[o.table] = o;
+
+  canvas.innerHTML = FLOOR_TABLES.map(t => {
+    const o = orderByTable[t.n];
+    const cls = statusClass(o);
+    const isCircle = t.shape === 'circle';
+    const px = Math.round(t.x / 100 * (W - t.w));
+    const py = Math.round(t.y / 100 * (H - t.h));
+    const radius = isCircle ? '50%' : '18px';
+
+    const inner = o ? `
+      <div class="ft-num">${t.n}</div>
+      <div class="ft-status">${tableStatusShort(o)}</div>
+    ` : `<div class="ft-num">${t.n}</div>`;
+
+    return `<div class="floor-table ${cls}" data-table="${t.n}"
+      style="left:${px}px;top:${py}px;width:${t.w}px;height:${t.h}px;border-radius:${radius}"
+      >${inner}</div>`;
+  }).join('');
+
+  // Bind clicks
+  canvas.querySelectorAll('.floor-table').forEach(el => {
+    el.addEventListener('click', () => openTableSheet(parseInt(el.dataset.table), orders));
+  });
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+function renderSidebar(orders) {
+  const mine   = orders.filter(o => o.server_id === SERVER_ID);
+  const others = orders.filter(o => o.server_id !== SERVER_ID);
+  renderTableList(document.getElementById('myTablesList'), mine, orders);
+  renderTableList(document.getElementById('otherTablesList'), others, orders);
+
+  // Pickup badge
+  const readyCount2 = mine.reduce((n,o) => {
+    if (o.delivery_mode === 'as_ready') return n + o.dishes.filter(d => d.status==='ready' && !_pickedUp.has(d.id) && !_dismissed.has(d.id)).length;
+    if (o.dishes.every(d => d.status==='ready') && o.dishes.some(d => !_dismissed.has(d.id))) return n + 1;
+    return n;
+  }, 0);
+  const badge = document.getElementById('pickupBadge');
+  if (badge) { badge.textContent = readyCount2; badge.style.display = readyCount2 > 0 ? 'flex' : 'none'; }
+}
+
+function renderTableList(container, tableOrders, allOrders) {
+  if (!tableOrders.length) {
+    container.innerHTML = '<div style="padding:16px;font:400 15px/20px var(--font);color:var(--label3);text-align:center">None</div>';
+    return;
+  }
+  container.innerHTML = tableOrders.map(o => {
+    const color = statusColor(o);
+    const dishNames = o.dishes.map(d => d.name).join(', ');
+    return `
+      <div class="sidebar-row" data-table="${o.table}">
+        <div class="table-circle" style="background:${color}">${o.table}</div>
+        <div class="sidebar-row-info">
+          <div class="sidebar-row-title">Table ${o.table}</div>
+          <div class="sidebar-row-sub">${dishNames}</div>
+          <div class="sidebar-row-sub">${tableStatusText(o)}</div>
+        </div>
+        <div class="sidebar-row-time">${fmtElapsed(o.elapsed_s||0)}</div>
+      </div>`;
+  }).join('');
+  container.querySelectorAll('[data-table]').forEach(row => {
+    row.addEventListener('click', () => openTableSheet(parseInt(row.dataset.table), allOrders));
+  });
+}
+
+// ── Detail sheet ───────────────────────────────────────────────────────────
+function openTableSheet(tableNum, orders) {
+  const o = orders.find(x => x.table === tableNum);
+  document.getElementById('sheetTitle').textContent = `Table ${tableNum}`;
+  document.getElementById('sheetSubtitle').textContent = o
+    ? `${o.delivery_mode === 'all_together' ? 'All together' : 'As each is ready'} · ${tableStatusText(o)}`
+    : 'No active order';
+
+  const dishContainer = document.getElementById('sheetDishes');
+  if (!o) {
+    dishContainer.innerHTML = '<div style="padding:16px;color:var(--label3);font:400 15px/20px var(--font)">No active order</div>';
+  } else {
+    dishContainer.innerHTML = o.dishes.map(d => {
+      const cls = d.status === 'ready' ? 'ready' : d.status === 'cooking' ? 'cooking' : 'queued';
+      const statusTxt = d.status === 'ready' ? 'READY' : d.status === 'cooking' ? `~${d.est_min||'?'}m` : 'QUEUED';
+      return `
+        <div class="sheet-dish-row">
+          <div class="zone-badge ${cls}">${d.zone}<br>${statusTxt}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font:600 16px/20px var(--font)">${d.name}</div>
+            ${d.modifiers ? `<div style="font:400 14px/18px var(--font);color:var(--label2)">${d.modifiers}</div>` : ''}
+            ${d.allergy   ? `<span class="allergy-pill" style="margin-top:3px;display:inline-flex">${d.allergy}</span>` : ''}
+            <div style="font:400 13px/18px var(--font);color:var(--label3)">Seat ${d.seat} · Zone ${d.zone}</div>
+          </div>
+          ${d.status === 'ready' ? `<button class="btn-action btn-green" data-pickup="${d.id}" style="min-width:80px;padding:10px 12px;font-size:13px">Picked up</button>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  const actions = document.getElementById('sheetActions');
+  const hasReady = o && o.dishes.some(d => d.status === 'ready' && !_dismissed.has(d.id));
+  actions.innerHTML = `
+    ${hasReady ? `<button class="btn-action btn-green" id="sheetMarkServed" data-order="${o?.id}">Mark all served</button>` : ''}
+    <button class="btn-action btn-secondary" onclick="location.href='server-order.html'">New order</button>
+    <button class="btn-action btn-secondary" id="sheetClose">Done</button>
+  `;
+
+  dishContainer.querySelectorAll('[data-pickup]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = 'Done';
+      await api.markPickedUp(btn.dataset.pickup);
+      _pickedUp.add(btn.dataset.pickup);
+    });
+  });
+
+  document.getElementById('sheetClose').addEventListener('click', closeSheet);
+  document.getElementById('sheetMarkServed')?.addEventListener('click', async (e) => {
+    const orderId = e.target.dataset.order;
+    const ord = orders.find(x => x.id === orderId);
+    if (!ord) return;
+    for (const d of ord.dishes) {
+      if (!_dismissed.has(d.id)) { await api.markServed(d.id); _dismissed.add(d.id); }
+    }
+    closeSheet();
+    const fresh = await api.getMyOrders(SERVER_ID);
+    renderAll(fresh);
+  });
+
+  document.getElementById('sheetBackdrop').classList.add('open');
+  document.getElementById('detailSheet').classList.add('open');
+}
+
+function closeSheet() {
+  document.getElementById('sheetBackdrop').classList.remove('open');
+  document.getElementById('detailSheet').classList.remove('open');
+}
+document.getElementById('sheetBackdrop').addEventListener('click', closeSheet);
+
+// ── Section segmented control ──────────────────────────────────────────────
+document.getElementById('sectionSeg').querySelectorAll('.seg-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#sectionSeg .seg-item').forEach(b => b.classList.toggle('active', b===btn));
+  });
+});
+
+// ── iPhone map/list toggle ─────────────────────────────────────────────────
+document.getElementById('mapToggleBtn').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('show-mobile');
+  document.getElementById('floorArea').classList.add('show-mobile');
+  document.getElementById('listToggleBtn').style.display = 'flex';
+  document.getElementById('mapToggleBtn').style.display = 'none';
+});
+document.getElementById('listToggleBtn').addEventListener('click', () => {
+  document.getElementById('floorArea').classList.remove('show-mobile');
+  document.getElementById('sidebar').classList.add('show-mobile');
+  document.getElementById('listToggleBtn').style.display = 'none';
+  document.getElementById('mapToggleBtn').style.display = 'flex';
+});
+
+// ── Realtime ───────────────────────────────────────────────────────────────
+on('server_alert', async () => { const o = await api.getMyOrders(SERVER_ID); renderAll(o); });
+on('dish_update', async () => { const o = await api.getMyOrders(SERVER_ID); renderAll(o); });
+
+// ── Render all ─────────────────────────────────────────────────────────────
+async function renderAll(orders) {
+  renderSidebar(orders);
+  renderFloor(orders);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+api.getMyOrders(SERVER_ID).then(orders => {
+  renderAll(orders);
+  startMockRealtime();
+});
+
+// Tick timers
+setInterval(async () => {
+  for (const o of api._mock.orders) o.elapsed_s = (o.elapsed_s||0) + 1;
+  const orders = await api.getMyOrders(SERVER_ID);
+  renderAll(orders);
+}, 1000);
+
+// Resize: re-render floor
+window.addEventListener('resize', async () => {
+  const orders = await api.getMyOrders(SERVER_ID);
+  renderFloor(orders);
+});
+</script>
+</body>
+</html>
