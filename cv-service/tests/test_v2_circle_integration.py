@@ -130,6 +130,8 @@ def test_canonical_cli_disables_rebaseline_and_refuses_plate_clamp(monkeypatch):
     with pytest.raises(ValueError, match="overflow"):
         v2.main()
     assert cfg.health.allow_rebaseline is False
+    assert cfg.health.allow_baseline_adaptation is False
+    assert cfg.health.degraded_hold_s == 0
 
 
 def test_circle_centred_in_gap_with_one_overlapped_zone_cannot_certify_empty(tmp_path):

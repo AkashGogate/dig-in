@@ -30,3 +30,6 @@ plating:
 
 health:
   allow_rebaseline: false  # a stationary obstruction is never a newly trusted empty scene
+  allow_baseline_adaptation: false
+  degraded_hold_s: 0  # first unsafe frame withholds canonical evidence
+  big_change_hold_s: 0

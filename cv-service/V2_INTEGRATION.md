@@ -122,3 +122,29 @@ in place. Legacy kitchen auto-active-ticket advance is preserved/tested only in
 `kitchen-backend`; no new queued v2 order auto-start or recipe deduction is wired.
 
 Increment validation: full CV55passed, standalone kitchen49passed, canonical bridge12passed; physical rig remains untested.
+
+
+## Reconnect and freshness boundary (7133aaf integration)
+
+Named macOS cameras use AVFoundation's original sorted device indices and require
+one unique matching device identity. The name is resolved in each fresh child
+process. Missing/ambiguous matches never fall back to another camera; a changed
+identity is withheld until an explicit restart/calibration review. A configured
+name requires a numeric source and `capture_process: true`.
+
+The child sends capture-side wall/monotonic timestamps and sequence with each
+in-memory JPEG. Buffered frames older than350ms, repeated/reordered captures and
+captures predating the current assignment/reconciliation boundary cannot count as
+fresh stability. Evidence dwell uses capture monotonic time; ordinary empty polls
+within350ms do not reset it. A longer gap or reconnect closes health and quarantines
+until explicit staff recovery, then requires warmup and a new full dwell. These are
+software proof gates, not a claim that camera drivers expose sensor acquisition time.
+
+Canonical v2 forces immediate degraded/moved-view transitions and disables both
+reference-statistic/rolling-background adaptation and automatic rebaseline. Warmup
+withholds evidence and preserves the explicit calibrated background. The legacy
+runner retains the teammate's3s status debounce and adaptive health behavior.
+Darwin-only PyObjC dependencies are platform-marked in pyproject/uv.lock; other
+platforms do not install those native modules. No calibration/model/hardware was
+used to validate this change: tests use synthetic arrays, a generated video and
+fake device inventories. Keep live CV disabled until the physical rig is validated.

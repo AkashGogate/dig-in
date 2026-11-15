@@ -39,10 +39,25 @@ class EvidenceSampler:
         self.quarantined = {}
         self.history = {}
         self.await_empty = set()
+        self.binding_since = {}
 
     def set_context(self, context):
         with self.lock:
-            self.context, self.context_at = copy.deepcopy(context), self.clock()
+            now = self.clock()
+            old = (self.context or {}).get("zones", {})
+            for key, binding in context.get("zones", {}).items():
+                fields = (
+                    "assignment_version",
+                    "order_id",
+                    "dish_id",
+                    "reconciliation_id",
+                )
+                if key not in old or any(
+                    binding.get(f) != old[key].get(f) for f in fields
+                ):
+                    self.binding_since[key] = now
+                    self.candidates.pop(key, None)
+            self.context, self.context_at = copy.deepcopy(context), now
 
     def reset(self):
         with self.lock:
@@ -55,14 +70,31 @@ class EvidenceSampler:
                     self.quarantined[key] = binding.get("reconciliation_id")
             self.candidates.clear()
 
-    def sample(self, bay_id, ts, count, hand_present, camera_state, confidence=1.0):
+    def sample(
+        self,
+        bay_id,
+        ts,
+        count,
+        hand_present,
+        camera_state,
+        confidence=1.0,
+        *,
+        captured_monotonic=None,
+    ):
         with self.lock:
-            mono = self.clock()
-            if self.context is None or mono - self.context_at > 3:
+            now = self.clock()
+            mono = now if captured_monotonic is None else captured_monotonic
+            if not -0.01 <= now - mono <= 0.35:
+                self.candidates.pop(bay_id, None)
+                return
+            if self.context is None or now - self.context_at > 3:
                 self.candidates.pop(bay_id, None)
                 return
             binding = self.context["zones"].get(bay_id)
             if binding is None:
+                return
+            if mono < self.binding_since.get(bay_id, mono):
+                self.candidates.pop(bay_id, None)
                 return
             if bay_id in self.quarantined:
                 if binding.get("reconciliation_id") == self.quarantined[bay_id]:
@@ -86,7 +118,8 @@ class EvidenceSampler:
                 or previous["token"] != token
                 or previous["count"] != count
                 or mono - previous["last"] > 0.35
-                or ts < previous["last_ts"]
+                or mono <= previous["last"]
+                or not 0 <= ts - previous["last_ts"] <= 0.35
             ):
                 self.candidates[bay_id] = {
                     "token": token,
@@ -330,6 +363,9 @@ def main():
     # A motionless obstruction/camera move is not a newly trusted empty scene.
     # Explicit staff calibration/reconciliation remains the canonical boundary.
     cfg.health.allow_rebaseline = False
+    cfg.health.allow_baseline_adaptation = False
+    cfg.health.degraded_hold_s = 0
+    cfg.health.big_change_hold_s = 0
     if cfg.plating.max_plates_per_bay < 2:
         raise ValueError(
             "Canonical detector must preserve multi-plate overflow (cap >=2)"
@@ -359,6 +395,7 @@ def main():
     if args.camera:
         pipelines = rt.pipeline
         pipelines.v2_sampler = client.sampler.sample
+        pipelines.v2_quarantine = client.sampler.quarantine
         pipelines.v2_require_reference = True
         pipelines.v2_hand_detector = hand_detector
         rt.background = [pipelines.run]

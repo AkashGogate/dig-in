@@ -7,6 +7,7 @@ obstructed mean luminance < dark_threshold, OR Laplacian variance < min(blur_thr
 degraded   lighting shifted > 25% from calibration, or focus down > 40%
 ok         otherwise
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,7 +21,9 @@ _SMALL = (160, 90)
 
 
 def frame_stats(frame: np.ndarray) -> tuple[float, float, np.ndarray]:
-    gray = cv2.cvtColor(cv2.resize(frame, _SMALL, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(
+        cv2.resize(frame, _SMALL, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY
+    )
     lum = float(gray.mean())
     focus = float(cv2.Laplacian(gray, cv2.CV_64F).var())
     return lum, focus, gray
@@ -44,6 +47,8 @@ class HealthMonitor:
         self.first_frame_ts: float | None = None
         self.prev: np.ndarray | None = None
         self.still_since: float | None = None
+        self._pending: tuple[str, float] | None = None
+        self._last_adapt: float | None = None
         self.big_change_since: float | None = None
         self.ref_lum: float | None = None
         self.ref_focus: float | None = None
@@ -53,9 +58,13 @@ class HealthMonitor:
             self.set_reference(reference)
 
     def set_reference(self, reference: np.ndarray) -> None:
-        self.ref_lum, self.ref_focus, _ = frame_stats(reference)
+        self.ref_lum, self.ref_focus, gray = frame_stats(reference)
+        if not self.cfg.allow_baseline_adaptation:
+            self.bg = gray.astype(np.float32)
 
-    def _set(self, ts: float, state: str, reason: str | None) -> HealthTransition | None:
+    def _set(
+        self, ts: float, state: str, reason: str | None
+    ) -> HealthTransition | None:
         if state == self.state and reason == self.reason:
             return None
         changed_state = state != self.state
@@ -77,7 +86,9 @@ class HealthMonitor:
             return self._set(ts, "lost", "no_frames")
         return None
 
-    def update(self, ts: float, frame: np.ndarray, any_zone_active: bool = False) -> HealthTransition | None:
+    def update(
+        self, ts: float, frame: np.ndarray, any_zone_active: bool = False
+    ) -> HealthTransition | None:
         self.last_frame_ts = ts
         lum, focus, gray = frame_stats(frame)
         self.last_lum, self.last_focus = lum, focus
@@ -85,12 +96,21 @@ class HealthMonitor:
         big = False
         if self.first_frame_ts is None:
             self.first_frame_ts = ts
-        still = self.prev is not None and float((cv2.absdiff(g, self.prev) > 15).mean()) < 0.01
+        still = (
+            self.prev is not None
+            and float((cv2.absdiff(g, self.prev) > 15).mean()) < 0.01
+        )
         self.prev = g
         if self.bg is None or ts - self.first_frame_ts < self.cfg.warmup_s:
-            self.bg = g.copy()  # camera auto-exposure settles during warm-up; don't judge yet
-        elif self.cfg.allow_rebaseline and self.big_change_since is not None and still and \
-                ts - (self.still_since or ts) >= self.cfg.rebaseline_s:
+            # Canonical warmup cannot redefine an explicitly calibrated scene.
+            if self.bg is None or self.cfg.allow_baseline_adaptation:
+                self.bg = g.copy()
+        elif (
+            self.cfg.allow_rebaseline
+            and self.big_change_since is not None
+            and still
+            and ts - (self.still_since or ts) >= self.cfg.rebaseline_s
+        ):
             # "blocked" but nothing has moved for a while: the camera or scene was rearranged.
             # Accept the new view instead of staying obstructed forever.
             self.bg = g.copy()
@@ -101,8 +121,10 @@ class HealthMonitor:
             g_n = g * (float(self.bg.mean()) / max(float(g.mean()), 1.0))
             frac = float((cv2.absdiff(g_n, self.bg) > 30).mean())
             big = frac > self.cfg.big_change_fraction
-            if not big:
-                cv2.accumulateWeighted(g, self.bg, 0.05)  # don't learn the obstruction into the background
+            if not big and self.cfg.allow_baseline_adaptation:
+                cv2.accumulateWeighted(
+                    g, self.bg, 0.05
+                )  # don't learn the obstruction into the background
         if still:
             self.still_since = self.still_since or ts
         else:
@@ -118,19 +140,81 @@ class HealthMonitor:
             return self._set(ts, "obstructed", "dark")
         # blur only counts relative to the calibrated scene: a plain, low-texture counter
         # must not read as "obstructed"
-        blur_limit = self.cfg.blur_threshold if self.ref_focus is None else min(self.cfg.blur_threshold,
-                                                                                0.25 * self.ref_focus)
+        blur_limit = (
+            self.cfg.blur_threshold
+            if self.ref_focus is None
+            else min(self.cfg.blur_threshold, 0.25 * self.ref_focus)
+        )
         if focus < blur_limit:
             return self._set(ts, "obstructed", "blur")
-        if self.big_change_since is not None and ts - self.big_change_since > self.cfg.big_change_hold_s:
+        if (
+            self.big_change_since is not None
+            and ts - self.big_change_since >= self.cfg.big_change_hold_s
+        ):
             return self._set(ts, "obstructed", "view_blocked")
         if self.state == "obstructed" and self.reason == "view_blocked" and big:
             return None  # still blocked
-        if self.ref_lum and abs(lum - self.ref_lum) / self.ref_lum > self.cfg.degraded_light_shift:
-            return self._set(ts, "degraded", "lighting_shift")
-        if self.ref_focus and focus < (1 - self.cfg.degraded_focus_drop) * self.ref_focus:
-            return self._set(ts, "degraded", "focus_drop")
-        return self._set(ts, "ok", None)
+        self._adapt_baseline(ts, lum, focus)
+        if (
+            self.ref_lum
+            and abs(lum - self.ref_lum) / self.ref_lum > self.cfg.degraded_light_shift
+        ):
+            cand = ("degraded", "lighting_shift")
+        elif (
+            self.ref_focus
+            and focus < (1 - self.cfg.degraded_focus_drop) * self.ref_focus
+        ):
+            cand = ("degraded", "focus_drop")
+        else:
+            cand = ("ok", None)
+        if self.state in ("obstructed", "lost"):
+            self._pending = None
+            return self._set(
+                ts, *cand
+            )  # recovery is immediate; the pipeline waits before reconciling
+        if cand[0] == self.state:
+            self._pending = None
+            if cand[1] != self.reason:
+                self._set(ts, *cand)  # same state, new reason: not a transition
+            return None
+        if self.cfg.degraded_hold_s == 0:
+            self._pending = None
+            return self._set(
+                ts, *cand
+            )  # canonical: the first unsafe frame closes the gate
+        # ok <-> degraded: only after the new state has held for degraded_hold_s (no flicker)
+        if self._pending is None or self._pending[0] != cand[0]:
+            self._pending = (cand[0], ts)
+            return None
+        if ts - self._pending[1] < self.cfg.degraded_hold_s:
+            return None
+        self._pending = None
+        return self._set(ts, *cand)
+
+    def _adapt_baseline(self, ts: float, lum: float, focus: float) -> None:
+        """Let the reference brightness/sharpness drift slowly toward the current scene, so a
+        rearranged counter (plates vs none, a moved object) becomes the new normal instead of
+        reading as degraded forever. Sudden changes still trip the thresholds."""
+        if not self.cfg.allow_baseline_adaptation:
+            return
+        if self._last_adapt is None:
+            self._last_adapt = ts
+            return
+        a = min(1.0, max(0.0, ts - self._last_adapt) / self.cfg.baseline_tau_s)
+        self._last_adapt = ts
+        if self.ref_lum is not None:
+            self.ref_lum += a * (lum - self.ref_lum)
+        if self.ref_focus is not None:
+            self.ref_focus += a * (focus - self.ref_focus)
+
+    @property
+    def qualified(self) -> bool:
+        """Warmup is not proof of safe frames, even when legacy status says ok."""
+        return (
+            self.first_frame_ts is not None
+            and self.last_frame_ts is not None
+            and self.last_frame_ts - self.first_frame_ts >= self.cfg.warmup_s
+        )
 
     @property
     def frozen(self) -> bool:

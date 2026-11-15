@@ -55,6 +55,25 @@ coloured counter and ignores the counter's texture and the camera's auto white b
 Debug streams: `/debug/<camera>.mjpg` (overlay) and `/debug/<camera>.mjpg?raw=1` (raw frames,
 for recording and replay).
 
+## Cameras and reconnection
+
+Pick webcams by name, not index: `cameras.<id>.name: Brio` (an unambiguous part of the device name).
+`python -m cvsvc.main --list-cameras` prints what is connected. Indices change when cameras
+are re-plugged; the name is resolved every time capture (re)starts, and a camera that isn't
+connected yet is waited for, never swapped for another one. Names require a numeric
+webcam source and `capture_process: true`; missing, blank or ambiguous matches fail
+closed. A different unique device identity after reconnect requires an explicit restart
+and calibration review, even if its model name is the same.
+
+Webcams are read in a child process (`capture_process: true`). If frames stop (USB dropout),
+the child is restarted with a grace period and backoff (5 s, then 1/2/4/8/10 s). This is
+needed on macOS, where a running process never sees a re-plugged camera. Health changes
+between ok and degraded only after holding 3 s, and the lighting/focus baseline adapts to the
+current scene over ~2 minutes, so moving plates around doesn't make the status flicker.
+These debounce/adaptation settings describe the legacy runner. Canonical v2 disables
+adaptation and delayed health transitions, withholds evidence through warmup and requires
+fresh capture-time proof after reconnect; see [the v2 integration guide](V2_INTEGRATION.md).
+
 ## Calibrate (under 2 minutes per camera)
 
 1. Mount the camera fixed, overhead or at a high angle; turn on the venue lighting.

@@ -1,12 +1,12 @@
 """Pydantic models for config/cv.yaml."""
+
 from __future__ import annotations
 
 from pathlib import Path
-
-import yaml
 from typing import Literal
 
-from pydantic import BaseModel, Field
+import yaml
+from pydantic import BaseModel, Field, model_validator
 
 Point = tuple[int, int]
 
@@ -17,6 +17,25 @@ class CameraConfig(BaseModel):
     fps_target: int = 15
     resolution: tuple[int, int] = (1280, 720)
     loop: bool = False  # loop video files (useful for replay/demo)
+    # webcams only: capture in a child process that is restarted after a USB dropout
+    # (needed on macOS, where a running process never sees a re-plugged camera)
+    capture_process: bool = True
+    # webcams only: match the camera by (part of) its name, e.g. "Brio" or "MacBook". Device
+    # indices change when cameras are re-plugged; the name is resolved on every (re)connect.
+    name: str | None = None
+
+    @model_validator(mode="after")
+    def validate_named_camera(self):
+        # Named selection must never silently enter the numeric/direct path.
+        if self.name is not None and (
+            not self.name.strip()
+            or not self.capture_process
+            or not str(self.source).isdigit()
+        ):
+            raise ValueError(
+                "Camera name requires a nonempty name, numeric source and capture_process=true"
+            )
+        return self
 
 
 class SlotGrid(BaseModel):
@@ -42,16 +61,22 @@ class IngredientConfig(BaseModel):
     # trips: detect a hand reaching into a zone; the backend owns counts (default)
     # slots: count portions with the slot grid (CV_SPEC 6.2)
     mode: Literal["trips", "slots"] = "trips"
-    min_trip_s: float = 0.25        # shorter motion bursts are noise
-    trip_settle_s: float = 0.6      # no motion this long ends a trip
+    min_trip_s: float = 0.25  # shorter motion bursts are noise
+    trip_settle_s: float = 0.6  # no motion this long ends a trip
     body_motion_fraction: float = 0.25  # share of the frame occupied by something new => a person in front, not a reach
-    body_hold_s: float = 1.0        # keep treating motion as "body" this long after the person leaves
+    body_hold_s: float = (
+        1.0  # keep treating motion as "body" this long after the person leaves
+    )
     # trip_detector: hands  = a detected hand dwelling in the zone (MediaPipe); robust to bodies/passers-by
     #                motion = motion in the zone polygon (no extra dependency; fixed overhead cameras)
     trip_detector: Literal["hands", "motion"] = "motion"
     hand_model_path: str = "models/hand_landmarker.task"
-    hand_dwell_s: float = 0.35      # hand must stay in the zone this long to count as a trip
-    hand_max_size_px: float = 200   # ignore hands this large (right in front of the lens, not at the shelf)
+    hand_dwell_s: float = (
+        0.35  # hand must stay in the zone this long to count as a trip
+    )
+    hand_max_size_px: float = (
+        200  # ignore hands this large (right in front of the lens, not at the shelf)
+    )
     settle_s: float = 1.0
     occlusion_timeout_s: float = 6.0
     snapshot_interval_s: float = 10
@@ -72,11 +97,17 @@ class BayConfig(BaseModel):
     # white: foreground = bright, low-saturation pixels (white plates on a coloured counter);
     #        independent of the reference, so exposure drift and wood grain don't matter
     detector: Literal["diff", "white"] = "diff"
-    white_s_max: int = 80      # absolute bounds ...
+    white_s_max: int = 80  # absolute bounds ...
     white_v_min: int = 130
-    white_s_rel: float = 0.7   # ... and relative to the bay's median (the counter), which
-    white_v_rel: float = 1.1   # survives the camera's auto white balance / exposure shifts
-    min_solidity: float = 0.9  # area / convex hull: plates are solid, wood-grain noise is not
+    white_s_rel: float = (
+        0.7  # ... and relative to the bay's median (the counter), which
+    )
+    white_v_rel: float = (
+        1.1  # survives the camera's auto white balance / exposure shifts
+    )
+    min_solidity: float = (
+        0.9  # area / convex hull: plates are solid, wood-grain noise is not
+    )
 
 
 class PlatingConfig(BaseModel):
@@ -105,7 +136,14 @@ class HealthConfig(BaseModel):
     degraded_light_shift: float = 0.25
     degraded_focus_drop: float = 0.40
     recovery_wait_s: float = 2.0
-    allow_rebaseline: bool = True  # legacy only; canonical v2 disables automatic scene acceptance
+    allow_rebaseline: bool = (
+        True  # legacy only; canonical v2 disables automatic scene acceptance
+    )
+    allow_baseline_adaptation: bool = True  # legacy only; calibration stays fixed in v2
+    degraded_hold_s: float = Field(
+        default=3.0, ge=0
+    )  # legacy anti-flicker; v2 uses zero
+    baseline_tau_s: float = Field(default=120.0, gt=0)
     rebaseline_s: float = 5.0  # view "blocked" but perfectly still this long => the scene was rearranged; accept it
     warmup_s: float = 2.0  # ignore the first seconds of frames (auto-exposure settling)
     heartbeat_s: float = 5.0

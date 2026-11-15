@@ -25,7 +25,7 @@ from cvsvc.ingredient.zones import ZoneCounter
 from cvsvc.plating.bays import BayCounter, PlateCount
 from cvsvc.plating.circles import PlateFinder, assign_to_bays
 from cvsvc.plating.tracker import BayTracker
-from cvsvc.sources import FrameSource
+from cvsvc.sources import FrameSource, ProcessFrameSource, ReconnectingSource
 from cvsvc.vision import MotionDetector, PresenceDetector, mean_luminance
 
 log = logging.getLogger(__name__)
@@ -154,14 +154,44 @@ class CameraWorker:
 
     # ---- main loop ----
     def run(self) -> None:
-        src = FrameSource(self.ccfg.source, tuple(self.ccfg.resolution), self.ccfg.fps_target, self.ccfg.loop)
+        res = tuple(self.ccfg.resolution)
+        is_webcam = isinstance(self.ccfg.source, int) or str(self.ccfg.source).isdigit()
+        if is_webcam and self.ccfg.capture_process:
+            cam = int(self.ccfg.source)
+            name = self.ccfg.name
+            src = ReconnectingSource(lambda: ProcessFrameSource(cam, res, self.ccfg.fps_target, name))  # type: ignore[arg-type]
+        else:
+            def open_source() -> FrameSource:
+                return FrameSource(self.ccfg.source, res, self.ccfg.fps_target, self.ccfg.loop)  # type: ignore[arg-type]
+
+            first = open_source()
+            if first.finite:
+                src = first  # files and image folders: no reconnection
+            else:
+                handed = [first]  # reuse the already-open stream for the first "open"
+                src = ReconnectingSource(lambda: handed.pop() if handed else open_source())
         period = 1.0 / max(self.ccfg.fps_target, 1)
         last_hb = last_snap = 0.0
         fps_t, fps_n = time.time(), 0
         self.emit_status(time.time())
+        last_reopens = 0
+        last_capture_mono = None
         while not self.stop.is_set():
             t0 = time.time()
+            read_mono = time.monotonic()
             frame = src.read()
+            canonical = getattr(self.o, "v2_sampler", None) is not None
+            capture_mono = getattr(src, "captured_monotonic", None) or read_mono
+            capture_ts = getattr(src, "captured_at", None) or t0
+            reopens = getattr(src, "reopens", 0)
+            if canonical:
+                gap = last_capture_mono is not None and read_mono - last_capture_mono > 0.35
+                if reopens != last_reopens or gap or getattr(src, "identity_changed", False):
+                    self._v2_capture_gap(t0)
+                if frame is not None and not -0.01 <= time.monotonic() - capture_mono <= 0.35:
+                    self._v2_capture_gap(t0)
+                    frame = None
+            last_reopens = reopens
             if frame is None:
                 tr = self.health.tick(t0)
                 if tr:
@@ -173,11 +203,7 @@ class CameraWorker:
                     log.info("%s: source ended", self.id)
                     self.stop.wait(1.0)
                 else:
-                    self.stop.wait(0.5)
-                    if self.health.state == "lost":
-                        src.release()
-                        src = FrameSource(self.ccfg.source, tuple(self.ccfg.resolution), self.ccfg.fps_target,
-                                          self.ccfg.loop)
+                    self.stop.wait(0.1)  # ReconnectingSource handles reopen/backoff
             else:
                 if self.reference is None:
                     self._build(self._load_reference(frame))
@@ -185,7 +211,9 @@ class CameraWorker:
                     self.captured_path = self.set_reference(frame)
                     self.capture_request = None
                     self.capture_done.set()
-                self.process(t0, frame)
+                self.capture_monotonic = capture_mono
+                last_capture_mono = capture_mono
+                self.process(capture_ts, frame)
                 fps_n += 1
             if t0 - last_hb >= self.cfg.health.heartbeat_s:
                 last_hb = t0
@@ -200,6 +228,18 @@ class CameraWorker:
             if dt > 0:
                 self.stop.wait(dt)
         src.release()
+
+    def _v2_capture_gap(self, ts: float) -> None:
+        """A reconnect/gap cannot join two stable-looking scenes into one proof."""
+        quarantine = getattr(self.o, "v2_quarantine", None)
+        if quarantine is not None:
+            quarantine()
+        tr = self.health._set(ts, "lost", "capture_discontinuity")
+        if tr:
+            self._on_transition(tr, ts)
+        # Keep calibrated reference; only health warmup/dwell restarts. A new
+        # physical camera is rejected by ReconnectingSource until staff restart.
+        self.health.first_frame_ts = None
 
     def _snapshot_interval(self) -> float:
         vals = []
@@ -367,7 +407,10 @@ class CameraWorker:
         sampler = getattr(self.o, "v2_sampler", None)
         if sampler is not None:
             hand = getattr(self, "v2_hand_present", None)
-            sampler(bid, ts, pc.count, motion or hand is not False, self.health.state, pc.confidence)
+            state = self.health.state if self.health.qualified else "warming"
+            capture_mono = getattr(self, "capture_monotonic", None)
+            timing = {} if capture_mono is None else {"captured_monotonic": capture_mono}
+            sampler(bid, ts, pc.count, motion or hand is not False, state, pc.confidence, **timing)
         if not b.initialized:
             b.initialized = True
             b.tracker.stable_count = pc.count

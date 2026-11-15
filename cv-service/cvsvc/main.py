@@ -66,7 +66,13 @@ def main() -> None:
     ap.add_argument("--stdout", action="store_true", help="also print events to stdout")
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8001)
+    ap.add_argument("--list-cameras", action="store_true", help="print connected cameras (OpenCV index order) and exit")
     args = ap.parse_args()
+    if args.list_cameras:
+        from cvsvc.sources import list_cameras
+        for i, n in enumerate(list_cameras()):
+            print(i, n)
+        return
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     cfg = load_config(args.config) if os.path.exists(args.config) else CVConfig()
