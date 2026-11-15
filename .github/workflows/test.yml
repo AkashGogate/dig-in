@@ -18,8 +18,8 @@ jobs:
         with:
           version: "0.13.8"
       - run: uv sync --locked --python 3.11
-      - run: uv run ruff check app/coordination app/mvp app/analytics app/demo_auth.py app/server.py scripts tests/test_coordination.py tests/test_mvp*.py tests/test_deployment_auth.py tests/test_application_integration.py eval/dig_in tests/test_dig_in_eval.py
-      - run: uv run ruff format --check app/coordination app/mvp app/analytics app/demo_auth.py app/server.py scripts tests/test_coordination.py tests/test_mvp*.py tests/test_deployment_auth.py tests/test_application_integration.py eval/dig_in tests/test_dig_in_eval.py
+      - run: uv run ruff check app/coordination app/mvp app/analytics app/demo_auth.py app/server.py scripts tests/test_coordination.py tests/test_mvp*.py tests/test_deployment_auth.py tests/test_application_integration.py eval/dig_in tests/test_dig_in_eval.py tests/test_smoke_deployment.py tests/test_monitor_deployment.py
+      - run: uv run ruff format --check app/coordination app/mvp app/analytics app/demo_auth.py app/server.py scripts tests/test_coordination.py tests/test_mvp*.py tests/test_deployment_auth.py tests/test_application_integration.py eval/dig_in tests/test_dig_in_eval.py tests/test_smoke_deployment.py tests/test_monitor_deployment.py
       - run: uv run python -m scripts.check_repository_hygiene
       - run: uv run pytest -q
       - uses: actions/setup-node@v4
