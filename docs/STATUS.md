@@ -10,6 +10,11 @@ on Server screens, canonical pinned-menu sections/descriptions/quantity badges,
 Kitchen forced-dark preserved and all nine upstream changed sources archived.
 Frontend **62 passed**. Fixed the release probe's older-snapshot/malformed-mode
 crash; **13 probe/auth tests passed**. Astra independently cleared both changes.
+Actual local browser verified grouped canonical menu sections, descriptions and
+unknown prices, a two-unit badge across distinct draft lines, Save revision2
+before enabling Confirm, dark theme persistence across Server pages and restore
+to light. No console errors on the checked page. The test draft remains unsubmitted;
+the original active menu/seeded ticket and other untracked local files are preserved.
 See [follow-up handoff](handoffs/2026-11-14-final-ui-and-release-probe.md).
 
 Post-merge hosted probe now reports frontend503 (`Demo access is not configured.`),

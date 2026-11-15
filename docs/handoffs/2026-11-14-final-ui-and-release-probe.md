@@ -36,7 +36,13 @@ required-live refusal and malformed/nested voice mode. CI syntax-checks theme.js
 - The final real Deepgram validation remains the four synthetic clips in
   [the preceding handoff](2026-11-14-final-deepgram-validation.md), including
   successful Server draft, Kitchen start/ack and one safe clarification.
-- Root browser and remote CI evidence are recorded in STATUS after execution.
+- Root browser passed canonical sections/descriptions/unknown prices, a quantity2
+  badge from two distinct draft lines, Save revision2 before enabling Confirm,
+  dark theme persistence to My tables and return to light. No console errors
+  appeared on the checked page. The new table-three test draft was saved but not
+  submitted; seeded food milestones and the active menu were preserved.
+- Hygiene passed300indexed paths; Gitleaks scanned46locally reachable commits
+  with zero findings at the source checkpoint. Remote CI is checked before merge.
 
 ## Actual hosted release gap
 
