@@ -294,7 +294,7 @@ function renderTicket(order) {
   if (!dishes.length) return '';
 
   const tc = timerClass(order.elapsed_s || 0);
-  const deliveryLabel = order.delivery_mode === 'all_together' ? '🍽 All together' : '⚡ As each is ready';
+  const deliveryLabel = order.delivery_mode === 'all_together' ? 'All together' : 'As each is ready';
   const camOffline = api.getCameraStatus() === 'offline';
   const seats = groupBySeats(dishes);
 
@@ -440,7 +440,7 @@ async function refresh() {
     tv.innerHTML = clarifyHtml + heardHtml + ticketHtml;
 
     tv.querySelectorAll('[data-confirm]').forEach(btn => {
-      btn.addEventListener('click', async () => { btn.disabled = true; btn.textContent = '✓ Confirmed'; await api.confirmHeardOrder(btn.dataset.confirm); refresh(); });
+      btn.addEventListener('click', async () => { btn.disabled = true; btn.textContent = 'Confirmed'; await api.confirmHeardOrder(btn.dataset.confirm); refresh(); });
     });
     tv.querySelectorAll('[data-ready]').forEach(btn => {
       btn.addEventListener('click', () => api.markDishReady(btn.dataset.ready));

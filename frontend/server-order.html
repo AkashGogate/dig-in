@@ -308,9 +308,6 @@ body { background: var(--sys-grouped); }
 lucide.createIcons();
 
 // ── State ──────────────────────────────────────────────────────────────────
-const ITEM_COLORS = ['#ff9500','#34c759','#007aff','#5856d6','#30b0c7','#ff3b30','#af52de','#ffcc00'];
-function colorFor(name) { let h=0; for(const c of name) h=(h<<5)-h+c.charCodeAt(0); return ITEM_COLORS[Math.abs(h)%ITEM_COLORS.length]; }
-
 const state = {
   table: 12,
   delivery_mode: 'all_together',
@@ -337,7 +334,6 @@ const state = {
 
 // ── Menu rendering ─────────────────────────────────────────────────────────
 const CATEGORIES = ['All', 'Burgers', 'Bowls', 'Mains', 'Sides', 'Drinks'];
-const CAT_ICONS  = { All:'🍽️', Burgers:'🍔', Bowls:'🥣', Mains:'🥩', Sides:'🍟', Drinks:'🥤' };
 const CAT_MAP    = { Burger:'Burgers', 'Chicken bowl':'Bowls', Salmon:'Mains', Risotto:'Mains', Salad:'Sides', Fries:'Sides' };
 
 function countInOrder(itemName) {
@@ -346,10 +342,7 @@ function countInOrder(itemName) {
 
 function renderCategories(rowEl, gridEl) {
   rowEl.innerHTML = CATEGORIES.map(cat => `
-    <button class="category-tile ${cat === state.activeCategory ? 'active' : ''}" data-cat="${cat}" role="tab">
-      <span class="cat-icon">${CAT_ICONS[cat] || '🍽️'}</span>
-      <span>${cat}</span>
-    </button>`).join('');
+    <button class="category-tile ${cat === state.activeCategory ? 'active' : ''}" data-cat="${cat}" role="tab">${cat}</button>`).join('');
 
   rowEl.querySelectorAll('[data-cat]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -371,10 +364,8 @@ function renderMenuGrid(gridEl) {
 
   gridEl.innerHTML = filtered.map(m => {
     const count = countInOrder(m.name);
-    const color = colorFor(m.name);
     return `
       <button class="item-card ${count > 0 ? 'in-order' : ''}" data-item="${m.id}" data-name="${m.name}" data-price="${m.price}">
-        <div class="item-initial" style="background:${color}">${m.name[0]}</div>
         <div class="item-name">${m.name}</div>
         <div class="item-price">$${m.price.toFixed(2)}</div>
         ${count > 0 ? `<div class="item-badge">${count}</div>` : ''}
@@ -679,7 +670,7 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
   ];
   await api.submitOrder({ table: state.table, server_id: api.getServer().id, delivery_mode: state.delivery_mode, dishes: allDishes });
   state.dishes = []; state.heard = []; state.seats = [1]; state.activeSeat = 1;
-  btn.textContent = 'Sent ✓';
+  btn.textContent = 'Sent to kitchen';
   setTimeout(() => { btn.disabled = false; btn.textContent = 'Confirm and send to kitchen'; renderAll(); }, 2000);
 });
 
