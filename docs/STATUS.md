@@ -19,8 +19,8 @@ application code commit0c56900. PR: https://github.com/AkashGogate/dig-in/pull/1
   run without opening cameras. Darwin-only PyObjC dependencies/lock validated.
 - Latest Kitchen glance layout preserves the teammate stylesheet, chronological
   sent-ticket order, physical-unit actions/counts, review-aware ready accent and
-  stable disclosure focus. Full frontend53cases pass; prior protected3page browser
-  flow is recorded below. No fake UI authority or camera feed was reintroduced.
+  stable disclosure focus. Full frontend53cases pass. Final Kitchen layout was inspected in the real local
+  browser with actual ticket/physical-unit data; protected3page browser flow is recorded below. No fake UI authority or camera feed was reintroduced.
 - Hygiene passed282indexed paths; all38commits scanned with Gitleaks8.30.1,
   no findings. Actual backend/.env remains ignored/undisplayed; calibration tip
   contains only.gitkeep. Main and teammate branches were preserved.

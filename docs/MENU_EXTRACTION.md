@@ -26,8 +26,9 @@ local OCR plus heuristic line grouping, not a guarantee of menu understanding.
   checked-in `backend/app/mvp/adapters/menu_ocr.swift` runs locally. First execution
   may compile framework caches and take longer. No paid service/key/model download.
 - Linux: `poppler-utils` and `tesseract-ocr` on PATH. The Dockerfile installs them.
-  This adapter rasterizes PDF pages and runs Tesseract. Container build and Linux
-  OCR have not been executed in this task; tests verify the source seam and rules.
+  This adapter rasterizes PDF pages and runs Tesseract. See [STATUS](STATUS.md)
+  for current container-build and CI evidence. Actual Linux document OCR remains
+  unverified; extraction tests cover the source seam and rules.
 - `GET /api/v2/menu/extraction-status` reports readiness, provider and limits.
   Missing tools produce an actionable 503; JSON/CSV/TXT remain usable.
 
@@ -63,10 +64,12 @@ and keep both outside Restaurant's lock. A future model extractor must return
 reviewable evidence through this seam, never call activation or invent kitchen
 facts. Menu/Core reviews changes to extraction/import/activation contracts.
 
-## Evidence
+## Original extraction checkpoint — 2026-11-14
 
-119 backend tests pass, including invalid signature/size, grouping, missing tools,
-empty output and lead-only extract-without-state-mutation. Actual Apple Vision
+At this historical checkpoint, 119 backend tests passed, including invalid
+signature/size, grouping, missing tools, empty output and lead-only
+extract-without-state-mutation. Actual Apple Vision
 read the synthetic PNG and a generated one-page scanned PDF. Browser photo upload,
 false-positive removal, name correction, preparation, review and activation
-passed. Existing nine UI state checks still pass. No live semantic calls occurred.
+passed, along with the existing nine UI state checks. No live semantic calls
+occurred. See [STATUS](STATUS.md) for current integrated test and CI results.
