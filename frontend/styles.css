@@ -120,16 +120,26 @@ label input,label select,label textarea {
   justify-content:space-between;
   padding:1.5rem 2rem 1rem;
   gap:1rem;
+  position:relative;
+  --green:#6fcf97;
+  --danger:#ff6b5e;
+  background:
+    linear-gradient(170deg,rgba(255,197,110,.16),transparent 55%),
+    repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 2px,transparent 2px 7px),
+    linear-gradient(160deg,#20262c,#161a1e 70%);
+  color:#ece6da;
+  border-bottom:2px solid #caa24a;
+  box-shadow:inset 0 -14px 22px -16px rgba(255,170,60,.35);
 }
 .wordmark {
   font-size:2.15rem;
   font-weight:850;
   text-decoration:none;
   letter-spacing:-.08em;
-  color:var(--ink);
+  color:#f4efe3;
 }
 .dot {
-  color:var(--green);
+  color:#e8a33d;
 }
 .eyebrow {
   font-size:.68rem;
@@ -138,14 +148,18 @@ label input,label select,label textarea {
   margin:0 0 .3rem;
   color:var(--muted);
 }
-.connection {
+.masthead .eyebrow {
+  color:#b9ac98;
+}
+.masthead .connection {
   text-align:right;
   font-size:.9rem;
   font-weight:650;
+  color:#ece6da;
 }
-.connection small {
+.masthead .connection small {
   display:block;
-  color:var(--muted);
+  color:#9b9082;
   font-weight:400;
 }
 .session-bar {
@@ -181,8 +195,10 @@ label input,label select,label textarea {
   background:var(--ink);
   color:white;
 }
-.view-nav a {
+.view-nav a:only-of-type {
   margin-inline-start:auto;
+}
+.view-nav a {
   font-size:.8rem;
 }
 #feedback {
