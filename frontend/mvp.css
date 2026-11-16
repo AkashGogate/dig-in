@@ -71,7 +71,7 @@ footer { align-items: flex-start; }
   button:active { transform: none; }
 }
 /* Lead setup: inputs stay beside the review, with one explicit commit action. */
-.menu-setup-nav { margin-inline-start: auto; }
+
 .menu-current { display: flex; flex-wrap: wrap; gap: 1rem 2rem; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border: 1px solid var(--line); border-inline-start: 4px solid var(--green); background: var(--surface); border-radius: var(--radius); }
 .menu-current h2, .menu-current p { margin-block: 0; }
 .menu-current > .note { max-width: 32ch; }
@@ -109,7 +109,6 @@ footer { align-items: flex-start; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 @media (max-width: 920px) { .menu-setup-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 480px) {
-  .menu-setup-nav { margin-inline-start: 0; }
   .menu-current > .note { max-width: none; }
   .menu-activation-area .actions > button, #menu-prepare, #menu-activate { width: 100%; }
 }
