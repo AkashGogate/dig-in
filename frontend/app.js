@@ -27,8 +27,8 @@ async function request(path, {timeoutMs = 10000, ...options} = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(`${API}${path}`, {...options, headers:{...(voice.auth?{Authorization:`Basic ${voice.auth}`} : {}),...options.headers}, signal: controller.signal});
-    if(response.status===401){voice.auth=null;$("voice-login").hidden=false;connected(false);}
+    const response = await fetch(`${API}${path}`, {...options, headers:{...options.headers}, signal: controller.signal});
+    if(response.status===401){connected(false);}
     const data = await response.json().catch(()=>({detail:response.status===401?"Demo sign-in required":"Unexpected backend response"}));
     if (!response.ok) {
       const error = new Error(`${response.status}: ${typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || data)}`);
@@ -91,7 +91,7 @@ async function refresh() {
     state = await request("/api/v2/state");
     render();
   } catch (error) {
-    feedback(error.status===401?"Sign in above to connect to the protected demo backend.":"Shared backend unavailable · UNSYNCED. Draft text stays visible, but offline orders are not completed. Reconnect before sending.", true);
+    feedback(error.status===401?"Demo sign-in expired. Reload the page and sign in again.":"Shared backend unavailable · UNSYNCED. Draft text stays visible, but offline orders are not completed. Reconnect before sending.", true);
   }
 }
 function fillSelect(id, options, placeholder) {
@@ -264,7 +264,7 @@ async function captureText(captureMode = "mock_voice") {
   const data = await dispatch({action: "capture_voice", order_id: order.id, revision: order.revision, text, capture_mode: captureMode}, "voice");
   if (data) $("transcript").value = "";
 }
-let voice = {live: false, authRequired: false, auth: null}, capture = null, captureEpoch = 0;
+let voice = {live: false, authRequired: false}, capture = null, captureEpoch = 0;
 async function loadVoiceStatus() {
   try {
     const status = await request("/api/v2/voice/status");
@@ -317,7 +317,7 @@ async function startLive(target) {
   const cap=capture={target,ui,pin:window.DigInVoiceAudio.pin(target,voiceContext()),text:"",stopped:false,cancelled:false};
   const abandoned=()=>!currentCapture(cap) || cap.stopped;
   try {
-    const ticket=await request("/api/v2/voice/ticket",{method:"POST",headers:{"Content-Type":"application/json","X-Demo-Session":cap.pin.session,...(voice.auth?{Authorization:`Basic ${voice.auth}`}:{})},body:JSON.stringify({order_id:cap.pin.orderId,menu_revision:cap.pin.menuRevision})});
+    const ticket=await request("/api/v2/voice/ticket",{method:"POST",headers:{"Content-Type":"application/json","X-Demo-Session":cap.pin.session},body:JSON.stringify({order_id:cap.pin.orderId,menu_revision:cap.pin.menuRevision})});
     if(abandoned()){stopMedia(cap);if(capture===cap)capture=null;return false;}
     cap.media=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true}});
     if(abandoned()){stopMedia(cap);if(capture===cap)capture=null;return false;}
@@ -356,7 +356,6 @@ async function startLive(target) {
     ui.status.textContent=`Listening (max ${Math.round(ticket.max_stream_seconds)}s). Release to stop.`;
     return true;
   } catch(error) {
-    if(error.status===401 && capture===cap && !cap.cancelled){voice.auth=null;$("voice-login").hidden=false;}
     stopMedia(cap);if(capture===cap)capture=null;
     if(!cap.cancelled && !capture)ui.status.textContent=`Live mic unavailable: ${error.message}. Type the order or use manual entry.`;
     return false;
@@ -456,14 +455,6 @@ for (const [id, target] of [["hold-talk", "order"], ["kitchen-hold", "kitchen"]]
   button.addEventListener("keyup", event => { if ([" ", "Enter"].includes(event.key)) endHold(event, false, target); });
   button.addEventListener("blur", event => endHold(event, true, target));
 }
-$("voice-login").addEventListener("submit", async event => {
-  event.preventDefault();
-  voice.auth = btoa(`${$("voice-user").value}:${$("voice-pass").value}`);
-  $("voice-pass").value = "";
-  await refresh();
-  if(backendOnline){$("voice-login").hidden=true;await loadVoiceStatus();feedback("Signed in for this tab. Choose a staff session to continue.");}
-  else feedback("Sign-in failed. Check the demo credentials and try again.",true);
-});
 $("kitchen-voice-form").addEventListener("submit", async event => { event.preventDefault(); const data = await dispatch({action: "kitchen_voice", text: $("kitchen-transcript").value.trim()}, "voice"); if (data) $("kitchen-transcript").value = ""; });
 document.addEventListener("click", event => {
   const button = event.target.closest("[data-action]");
