@@ -13,10 +13,6 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 
-# Module loggers (e.g. app.mvp.api) are silent under Python's default root
-# config; this makes their curl-verifiable action logs actually reach stdout.
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
-
 from fastapi import (
     Depends,
     FastAPI,
@@ -38,6 +34,10 @@ from app.mvp.api import router as mvp_router
 from app.mvp.cv_api import create_cv_router
 from app.session import KitchenSession, SessionLimitExceeded
 from app.ticket_queue import TicketQueue
+
+# Module loggers (e.g. app.mvp.api) are silent under Python's default root
+# config; this makes their curl-verifiable action logs actually reach stdout.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
 engine, SessionFactory = make_session_factory()
 
