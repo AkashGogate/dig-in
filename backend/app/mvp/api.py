@@ -86,14 +86,21 @@ def state():
 @router.post("/sessions")
 def sessions(body: c.SessionRequest):
     result = checked(lambda: restaurant.session(body.actor_id))
-    logger.info("session_start actor_id=%s session_id=%s", body.actor_id, result["session_id"])
+    logger.info(
+        "session_start actor_id=%s session_id=%s", body.actor_id, result["session_id"]
+    )
     return result
 
 
 @router.post("/commands", response_model=c.CommandResponse)
 def commands(body: c.Command, x_demo_session: str = Header(default="")):
     result = checked(lambda: restaurant.execute(body, x_demo_session))
-    logger.info("command session=%s action=%s result=%s", x_demo_session, body.payload.action, result["result"])
+    logger.info(
+        "command session=%s action=%s result=%s",
+        x_demo_session,
+        body.payload.action,
+        result["result"],
+    )
     return result
 
 
@@ -302,7 +309,13 @@ def ingest_event(body: CanonicalEvent, x_demo_session: str = Header(default=""))
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     result = checked(lambda: restaurant.execute(command, x_demo_session))
-    logger.info("event_ingest session=%s type=%s action=%s result=%s", x_demo_session, body.type, payload["action"], result["result"])
+    logger.info(
+        "event_ingest session=%s type=%s action=%s result=%s",
+        x_demo_session,
+        body.type,
+        payload["action"],
+        result["result"],
+    )
     return result
 
 
