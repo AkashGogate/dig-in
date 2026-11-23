@@ -8,9 +8,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
+
+# Module loggers (e.g. app.mvp.api) are silent under Python's default root
+# config; this makes their curl-verifiable action logs actually reach stdout.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
 from fastapi import (
     Depends,

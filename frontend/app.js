@@ -256,11 +256,36 @@ function showView(name) {
   if (name === "menu-setup") $("menu-setup-title").focus();
   serviceCoordination?.sync();
 }
+function speak(text) {
+  try { if (!window.speechSynthesis) return; window.speechSynthesis.cancel(); window.speechSynthesis.speak(new SpeechSynthesisUtterance(text)); } catch {}
+}
+const NEXT_TASK_PHRASES = [/what('?s| is) (my )?next/i, /next (task|dish|ticket|order)/i, /what should i do next/i];
+const isNextTaskQuery = text => NEXT_TASK_PHRASES.some(re => re.test(text));
+// ponytail: role-wide answer, not per-cook assignment — state has no per-dish cook owner to personalize on.
+function nextTaskAnswer(role, actorId) {
+  if (!state) return "No session state yet.";
+  if (role === "cook" || role === "lead") {
+    const started = Object.values(state.dishes).find(d => d.stage === "started");
+    if (started) return `Finish ${started.item_name} for table ${state.orders[started.order_id]?.table_id ?? "unknown"}.`;
+    const queued = Object.values(state.dishes).find(d => d.stage === "queued");
+    if (queued) return `Start ${queued.item_name} for table ${state.orders[queued.order_id]?.table_id ?? "unknown"}.`;
+  }
+  if (role === "server" || role === "lead") {
+    const ready = Object.values(state.orders).find(o => o.owner === actorId && o.status === "ready");
+    if (ready) return `Deliver the order for table ${ready.table_id}.`;
+    const flagged = Object.values(state.orders).find(o => o.owner === actorId && o.flags?.length);
+    if (flagged) return `Resolve a flag on the order for table ${flagged.table_id}.`;
+    const draft = Object.values(state.orders).find(o => o.owner === actorId && o.status === "draft" && o.lines.length);
+    if (draft) return `Send the draft order for table ${draft.table_id}.`;
+  }
+  return "No pending tasks right now.";
+}
 async function captureText(captureMode = "mock_voice") {
   const order = state?.orders[draftId];
   if (!order) { feedback("Start an order before capturing a read-back.", true); return; }
   const text = $("transcript").value.trim();
   if (!text) { feedback("Enter a mock transcript first. No microphone is connected.", true); return; }
+  if (isNextTaskQuery(text)) { speak(nextTaskAnswer(actor?.role, actor?.id)); $("transcript").value = ""; $("capture-status").textContent = nextTaskAnswer(actor?.role, actor?.id); return; }
   const data = await dispatch({action: "capture_voice", order_id: order.id, revision: order.revision, text, capture_mode: captureMode}, "voice");
   if (data) $("transcript").value = "";
 }
@@ -372,6 +397,7 @@ async function finishLive(cap) {
   stopMedia(cap);capture=null;
   const text=cap.text.trim();
   if(cap.error || !text){cap.ui.field.value="";cap.ui.status.textContent=cap.error || "Nothing was heard. Try again or use manual entry.";return;}
+  if(isNextTaskQuery(text)){const answer=nextTaskAnswer(actor?.role,actor?.id);speak(answer);cap.ui.field.value="";cap.ui.status.textContent=answer;return;}
   const payload=cap.target==="kitchen"?{action:"kitchen_voice",text,capture_mode:"live_voice",stt_confidence:cap.confidence ?? null}:{action:"capture_voice",order_id:cap.pin.orderId,revision:cap.pin.revision,text,capture_mode:"live_voice",stt_confidence:cap.confidence ?? null};
   const data=await dispatch(payload,"voice");
   if(data)cap.ui.field.value="";
@@ -455,7 +481,13 @@ for (const [id, target] of [["hold-talk", "order"], ["kitchen-hold", "kitchen"]]
   button.addEventListener("keyup", event => { if ([" ", "Enter"].includes(event.key)) endHold(event, false, target); });
   button.addEventListener("blur", event => endHold(event, true, target));
 }
-$("kitchen-voice-form").addEventListener("submit", async event => { event.preventDefault(); const data = await dispatch({action: "kitchen_voice", text: $("kitchen-transcript").value.trim()}, "voice"); if (data) $("kitchen-transcript").value = ""; });
+$("kitchen-voice-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const text = $("kitchen-transcript").value.trim();
+  if (isNextTaskQuery(text)) { speak(nextTaskAnswer(actor?.role, actor?.id)); $("kitchen-transcript").value = ""; $("kitchen-capture-status").textContent = nextTaskAnswer(actor?.role, actor?.id); return; }
+  const data = await dispatch({action: "kitchen_voice", text}, "voice");
+  if (data) $("kitchen-transcript").value = "";
+});
 document.addEventListener("click", event => {
   const button = event.target.closest("[data-action]");
   if (!button || button.disabled || busy) return;

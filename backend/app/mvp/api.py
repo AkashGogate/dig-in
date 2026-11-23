@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 
 from fastapi import APIRouter, Header, HTTPException, Request
@@ -27,6 +28,7 @@ from app.mvp.voice import adapter_status
 from app.mvp.voice_live import make_router as make_voice_router
 
 router = APIRouter(prefix="/api/v2", tags=["MVP v2"])
+logger = logging.getLogger(__name__)
 restaurant = Restaurant()
 
 
@@ -83,12 +85,16 @@ def state():
 
 @router.post("/sessions")
 def sessions(body: c.SessionRequest):
-    return checked(lambda: restaurant.session(body.actor_id))
+    result = checked(lambda: restaurant.session(body.actor_id))
+    logger.info("session_start actor_id=%s session_id=%s", body.actor_id, result["session_id"])
+    return result
 
 
 @router.post("/commands", response_model=c.CommandResponse)
 def commands(body: c.Command, x_demo_session: str = Header(default="")):
-    return checked(lambda: restaurant.execute(body, x_demo_session))
+    result = checked(lambda: restaurant.execute(body, x_demo_session))
+    logger.info("command session=%s action=%s result=%s", x_demo_session, body.payload.action, result["result"])
+    return result
 
 
 @router.get("/service/summary", response_model=ServiceSummary)
@@ -295,7 +301,9 @@ def ingest_event(body: CanonicalEvent, x_demo_session: str = Header(default=""))
         )
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return checked(lambda: restaurant.execute(command, x_demo_session))
+    result = checked(lambda: restaurant.execute(command, x_demo_session))
+    logger.info("event_ingest session=%s type=%s action=%s result=%s", x_demo_session, body.type, payload["action"], result["result"])
+    return result
 
 
 @router.get("/analytics/health")
